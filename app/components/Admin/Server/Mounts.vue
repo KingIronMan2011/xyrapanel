@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Mount } from '#shared/types/ui'
+import type { MountUI as Mount } from '#shared/types/ui'
 
 const props = defineProps<{
   serverId: string

@@ -1,4 +1,4 @@
-
+import type { ServerState } from './server-console'
 
 export interface ServerEventDetails {
   event: string
@@ -18,18 +18,6 @@ export interface WingsStatsPayload {
   uptime?: number
   state?: string
 }
-
-export interface ServerStats {
-  memoryUsed: number
-  memoryLimit: number
-  cpuUsed: number
-  diskUsed: number
-  networkRx: number
-  networkTx: number
-  uptime: number
-}
-
-export type ServerState = 'offline' | 'starting' | 'running' | 'stopping' | 'stopped'
 
 export interface WebSocketMessage {
   event: string

@@ -11,7 +11,7 @@ export interface ServerStats {
   diskBytes: number
 }
 
-export type ServerState = 'offline' | 'starting' | 'running' | 'stopping'
+export type ServerState = 'offline' | 'starting' | 'running' | 'stopping' | 'stopped'
 
 export interface ServerStatsHistoryEntry {
   timestamp: number
@@ -23,11 +23,6 @@ export type ServerStatsHistory = ServerStatsHistoryEntry[]
 export interface ConsoleLog {
   timestamp: string
   message: string
-}
-
-export interface WebSocketMessage {
-  event: string
-  args?: string[]
 }
 
 export interface PowerActionRequest {

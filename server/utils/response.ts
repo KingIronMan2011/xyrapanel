@@ -40,14 +40,3 @@ export function noContentResponse(event: H3Event) {
 
 export type SuccessResponse<T> = { data: T }
 export type SuccessResponseWithMeta<T, M> = { data: T; meta: M }
-export type PaginatedResponse<T> = {
-  data: T[]
-  meta: {
-    pagination: {
-      page: number
-      limit: number
-      total: number
-      totalPages: number
-    }
-  }
-}

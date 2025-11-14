@@ -113,7 +113,7 @@ import type {
   ClientDashboardActivity,
   ClientDashboardResponse,
 } from '#shared/types/dashboard'
-import type { Server } from '#shared/types/ui'
+import type { ServerUI as Server } from '#shared/types/ui'
 
 const { data: session } = useAuth()
 

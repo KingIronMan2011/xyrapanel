@@ -7,13 +7,13 @@ export interface QuickLink {
   onClick?: () => void
 }
 
-export interface Mount {
+export interface MountUI {
   id: string
   name: string
   [key: string]: unknown
 }
 
-export interface Server {
+export interface ServerUI {
   uuid: string
   name: string
   description?: string

@@ -13,10 +13,6 @@ export interface CommandRequest {
   command: string
 }
 
-export interface PowerActionRequest {
-  action: 'start' | 'stop' | 'restart' | 'kill'
-}
-
 export interface UpdateVariablePayload {
   value: string
 }
