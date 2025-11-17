@@ -92,7 +92,5 @@ const hasMore = computed(() => Boolean(pagination.value?.hasMore))
         </UCard>
       </section>
     </UPageBody>
-
-    <template #right />
   </UPage>
 </template>

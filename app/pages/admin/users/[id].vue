@@ -315,7 +315,5 @@ const isLoading = computed(() => pending.value && !profile.value)
         </div>
       </section>
     </UPageBody>
-
-    <template #right />
   </UPage>
 </template>

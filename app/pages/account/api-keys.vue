@@ -111,7 +111,7 @@ function formatDate(date: Date | string | number | null | undefined) {
 <template>
   <UPage>
     <UPageHeader title="API Keys" description="Manage your API keys for programmatic access">
-      <template #actions>
+      <template #links>
         <UButton variant="subtle" icon="i-lucide-plus" @click="showCreateModal = true">
           Create API Key
         </UButton>
@@ -223,19 +223,9 @@ function formatDate(date: Date | string | number | null | undefined) {
     <UPageBody>
       <UCard :ui="{ body: 'space-y-3' }">
         <template #header>
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 class="text-lg font-semibold">Active API Keys</h2>
-              <p class="text-sm text-muted-foreground">Manage existing keys or create new ones for API access.</p>
-            </div>
-            <UButton
-              icon="i-lucide-plus"
-              color="primary"
-              variant="soft"
-              @click="showCreateModal = true"
-            >
-              Create API Key
-            </UButton>
+          <div class="space-y-1">
+            <h2 class="text-lg font-semibold">Active API Keys</h2>
+            <p class="text-sm text-muted-foreground">Manage existing keys or create new ones for API access.</p>
           </div>
         </template>
         <UEmpty

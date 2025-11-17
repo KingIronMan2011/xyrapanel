@@ -82,7 +82,5 @@ function statusColor(enabled: boolean) {
         </UCard>
       </section>
     </UPageBody>
-
-    <template #right />
   </UPage>
 </template>

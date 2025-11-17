@@ -252,7 +252,5 @@ function copyToClipboard(text: string) {
         </div>
       </template>
     </UModal>
-
-    <template #right />
   </UPage>
 </template>

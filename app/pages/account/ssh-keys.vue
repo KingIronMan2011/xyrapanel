@@ -94,7 +94,7 @@ function formatDate(date: Date | string | number | null | undefined) {
 <template>
   <UPage>
     <UPageHeader title="SSH Keys" description="Manage SSH keys for SFTP access to your servers">
-      <template #actions>
+      <template #links>
         <UButton icon="i-lucide-plus" @click="showCreateModal = true">
           Add SSH Key
         </UButton>
@@ -161,19 +161,9 @@ function formatDate(date: Date | string | number | null | undefined) {
     <UPageBody>
       <UCard :ui="{ body: 'space-y-3' }">
         <template #header>
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 class="text-lg font-semibold">Configured SSH Keys</h2>
-              <p class="text-sm text-muted-foreground">Add SSH keys to access your servers over SFTP.</p>
-            </div>
-            <UButton
-              icon="i-lucide-plus"
-              color="primary"
-              variant="subtle"
-              @click="showCreateModal = true"
-            >
-              Add SSH Key
-            </UButton>
+          <div class="space-y-1">
+            <h2 class="text-lg font-semibold">Configured SSH Keys</h2>
+            <p class="text-sm text-muted-foreground">Add SSH keys to access your servers over SFTP.</p>
           </div>
         </template>
         <UEmpty

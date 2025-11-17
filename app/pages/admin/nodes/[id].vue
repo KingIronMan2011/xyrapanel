@@ -555,7 +555,5 @@ function handleDeleteAllocation(row: AdminWingsNodeAllocationSummary) {
         </template>
       </section>
     </UPageBody>
-
-    <template #right />
   </UPage>
 </template>

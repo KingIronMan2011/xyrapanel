@@ -54,11 +54,6 @@ function formatTarget(target: string | null) {
           <span v-else>recently</span>
         </span>
       </template>
-      <template #actions>
-        <UButton variant="soft" color="neutral" :loading="loading" @click="fetchActivity">
-          Refresh
-        </UButton>
-      </template>
     </UPageHeader>
 
     <UPageBody>

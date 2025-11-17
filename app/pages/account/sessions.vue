@@ -172,7 +172,7 @@ async function handleSignOutAll(includeCurrent = false) {
       title="Sessions"
       description="Manage devices currently authenticated with your XyraPanel account."
     >
-      <template #actions>
+      <template #links>
         <UButton variant="ghost" color="neutral" :loading="updatingSessions"
           :disabled="!hasSessions || updatingSessions" @click="handleSignOutAll(false)">
           Sign out others

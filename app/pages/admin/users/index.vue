@@ -273,7 +273,5 @@ async function handleDelete(user: AdminUserResponse) {
         </div>
       </template>
     </UModal>
-
-    <template #right />
   </UPage>
 </template>

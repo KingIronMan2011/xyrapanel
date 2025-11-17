@@ -328,8 +328,6 @@ watch(
           </UCard>
         </section>
       </UPageBody>
-
-      <template #right />
     </UPage>
 
     <UModal v-model:open="showCreate" title="Register Wings node"

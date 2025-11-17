@@ -267,7 +267,5 @@ function formatTimestamp(value: string | null): string {
         </UCard>
       </section>
     </UPageBody>
-
-    <template #right />
   </UPage>
 </template>

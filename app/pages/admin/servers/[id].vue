@@ -128,7 +128,5 @@ function formatDate(date: string | Date | null) {
         </template>
       </section>
     </UPageBody>
-
-    <template #right />
   </UPage>
 </template>

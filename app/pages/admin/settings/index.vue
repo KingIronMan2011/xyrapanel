@@ -115,7 +115,5 @@ const currentTabComponent = computed(() => {
         </div>
       </section>
     </UPageBody>
-
-    <template #right />
   </UPage>
 </template>

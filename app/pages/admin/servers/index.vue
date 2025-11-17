@@ -85,7 +85,5 @@ const servers = computed(() => serversResponse.value?.data ?? [])
         </UCard>
       </section>
     </UPageBody>
-
-    <template #right />
   </UPage>
 </template>
