@@ -1,6 +1,6 @@
 import { eq, desc } from 'drizzle-orm'
 import type { ServerBackup } from '#shared/types/server-backups'
-import { useDrizzle } from './drizzle'
+import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
 
 export async function listServerBackups(serverId: string): Promise<ServerBackup[]> {

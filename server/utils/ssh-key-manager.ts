@@ -1,5 +1,5 @@
-import { useDrizzle, tables, eq } from './drizzle'
-import { recordAuditEvent } from './audit'
+import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { recordAuditEvent } from '~~/server/utils/audit'
 import { randomUUID, createHash } from 'crypto'
 import type {
   SSHKeyManagerOptions,

@@ -1,4 +1,4 @@
-import { useDrizzle, tables, eq } from './drizzle'
+import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 
 export const SETTINGS_KEYS = {
 

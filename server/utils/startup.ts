@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import type { ServerStartupVariable } from '#shared/types/server-startup'
-import { useDrizzle } from './drizzle'
+import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
 
 export async function listServerStartupVariables(serverId: string): Promise<ServerStartupVariable[]> {

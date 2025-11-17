@@ -1,6 +1,6 @@
 import type { Session } from 'next-auth'
-import { useDrizzle, tables, eq } from './drizzle'
-import { buildCacheKey, withCache } from './cache'
+import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { buildCacheKey, withCache } from '~~/server/utils/cache'
 
 const NODE_CACHE_TTL = 30
 

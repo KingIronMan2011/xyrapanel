@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import type { ServerSchedule } from '#shared/types/server-schedules'
-import { useDrizzle } from './drizzle'
+import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
 
 export async function listServerSchedules(serverId: string): Promise<ServerSchedule[]> {

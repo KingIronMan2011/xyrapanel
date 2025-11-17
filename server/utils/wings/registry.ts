@@ -1,5 +1,5 @@
-import { toWingsHttpError } from './http'
-import { findWingsNode, listWingsNodes } from './nodesStore'
+import { toWingsHttpError } from '~~/server/utils/wings/http'
+import { findWingsNode, listWingsNodes } from '~~/server/utils/wings/nodesStore'
 
 import type {
   StoredWingsNode,

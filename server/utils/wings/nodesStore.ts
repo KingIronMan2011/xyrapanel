@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { StoredWingsNode, WingsNodeConfiguration } from '#shared/types/wings'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { decryptToken, encryptToken, generateToken, generateTokenId } from './encryption'
+import { decryptToken, encryptToken, generateToken, generateTokenId } from '~~/server/utils/wings/encryption'
 
 function toBoolean(value: unknown): boolean {
   if (typeof value === 'boolean') {

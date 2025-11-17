@@ -1,6 +1,6 @@
-import { useDrizzle, tables, eq, inArray } from './drizzle'
-import { getWingsClient } from './wings-client'
-import type { WingsClient, WingsNode } from './wings-client'
+import { useDrizzle, tables, eq, inArray } from '~~/server/utils/drizzle'
+import { getWingsClient } from '~~/server/utils/wings-client'
+import type { WingsClient, WingsNode } from '~~/server/utils/wings-client'
 import type { WingsServerConfiguration } from '#shared/types/wings-config'
 import type { ServerProvisioningConfig } from '#shared/types/server-provisioning'
 

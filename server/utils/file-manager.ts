@@ -1,5 +1,5 @@
-import { getWingsClientForServer } from './wings-client'
-import { recordAuditEvent } from './audit'
+import { getWingsClientForServer } from '~~/server/utils/wings-client'
+import { recordAuditEvent } from '~~/server/utils/audit'
 
 export interface FileManagerOptions {
   userId?: string

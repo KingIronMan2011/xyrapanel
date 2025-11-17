@@ -1,5 +1,5 @@
 import type { WingsJWTClaims as _WingsJWTClaims } from '#shared/types/wings'
-import { useDrizzle, tables, eq, and } from './drizzle'
+import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 
 const ADMIN_PERMISSIONS = [
   'control.console',

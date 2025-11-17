@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import type { ServerDatabase } from '#shared/types/server-databases'
-import { useDrizzle } from './drizzle'
+import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
 
 export async function listServerDatabases(serverId: string): Promise<ServerDatabase[]> {

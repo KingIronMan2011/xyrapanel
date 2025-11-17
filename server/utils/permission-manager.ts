@@ -1,4 +1,4 @@
-import { useDrizzle, tables, eq, and } from './drizzle'
+import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 
 export type Permission =
   | 'server.view'

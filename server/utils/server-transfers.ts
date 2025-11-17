@@ -1,6 +1,6 @@
-import { useDrizzle, tables, eq } from './drizzle'
-import { getWingsClient } from './wings-client'
-import type { WingsNode } from './wings-client'
+import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { getWingsClient } from '~~/server/utils/wings-client'
+import type { WingsNode } from '~~/server/utils/wings-client'
 import { randomUUID } from 'crypto'
 import type { ServerTransferConfig, TransferStatus } from '#shared/types/server-transfers'
 

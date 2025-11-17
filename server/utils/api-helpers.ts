@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import { createError } from 'h3'
-import { useDrizzle, tables, eq } from './drizzle'
+import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 
 export async function requireAdmin(event: H3Event): Promise<void> {
   const { getServerSession } = await import('#auth')

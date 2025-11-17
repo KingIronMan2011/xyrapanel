@@ -1,8 +1,8 @@
 import type { H3Event } from 'h3'
 import { createError } from 'h3'
 import { getServerSession } from '#auth'
-import { permissionManager, type Permission } from './permission-manager'
-import { resolveSessionUser } from './auth/sessionUser'
+import { permissionManager, type Permission } from '~~/server/utils/permission-manager'
+import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 
 export interface PermissionMiddlewareOptions {
   requiredPermissions: Permission[]
