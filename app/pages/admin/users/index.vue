@@ -163,7 +163,7 @@ async function handleDelete(user: AdminUserResponse) {
             <p class="text-xs text-muted-foreground">Manage access to Wings-managed infrastructure.</p>
           </div>
           <div class="flex gap-2">
-            <UButton icon="i-lucide-user-plus" color="primary" @click="openCreateModal">
+            <UButton icon="i-lucide-user-plus" color="primary" variant="subtle" @click="openCreateModal">
               Create User
             </UButton>
           </div>
@@ -208,7 +208,7 @@ async function handleDelete(user: AdminUserResponse) {
                 </div>
                 <span class="col-span-3 text-xs text-muted-foreground">{{ user.email }}</span>
                 <div class="col-span-2">
-                  <UBadge :color="user.role === 'admin' ? 'primary' : 'neutral'" size="xs">
+                  <UBadge :color="user.role === 'admin' ? 'primary' : 'neutral'" size="sm" variant="subtle">
                     {{ user.role }}
                   </UBadge>
                 </div>
@@ -264,10 +264,10 @@ async function handleDelete(user: AdminUserResponse) {
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" :disabled="isSubmitting" @click="showUserModal = false">
+          <UButton variant="ghost" color="error" :disabled="isSubmitting" @click="showUserModal = false">
             Cancel
           </UButton>
-          <UButton color="primary" :loading="isSubmitting" @click="handleSubmit">
+          <UButton color="primary" variant="subtle" :loading="isSubmitting" @click="handleSubmit">
             {{ editingUser ? 'Update' : 'Create' }}
           </UButton>
         </div>

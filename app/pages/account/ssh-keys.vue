@@ -138,6 +138,7 @@ function formatDate(date: Date | string | number | null | undefined) {
         <div class="flex justify-end gap-2">
           <UButton
             variant="ghost"
+            color="error"
             :disabled="isCreating"
             @click="close"
           >
@@ -146,6 +147,7 @@ function formatDate(date: Date | string | number | null | undefined) {
           <UButton
             icon="i-lucide-plus"
             color="primary"
+            variant="subtle"
             :loading="isCreating"
             :disabled="isCreating"
             @click="createSshKey"
@@ -167,7 +169,7 @@ function formatDate(date: Date | string | number | null | undefined) {
             <UButton
               icon="i-lucide-plus"
               color="primary"
-              variant="soft"
+              variant="subtle"
               @click="showCreateModal = true"
             >
               Add SSH Key

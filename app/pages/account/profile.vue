@@ -135,7 +135,7 @@ async function handleSubmit() {
           </UFormField>
 
           <div class="md:col-span-2">
-            <UButton type="submit" color="primary" :loading="isSaving" :disabled="!hasChanges">
+            <UButton type="submit" variant="subtle" color="primary" :loading="isSaving" :disabled="!hasChanges">
               Save changes
             </UButton>
           </div>

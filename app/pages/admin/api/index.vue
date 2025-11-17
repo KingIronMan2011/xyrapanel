@@ -114,7 +114,7 @@ function copyToClipboard(text: string) {
             <h1 class="text-xl font-semibold">API Keys</h1>
             <p class="text-xs text-muted-foreground">Manage application API keys for external integrations</p>
           </div>
-          <UButton icon="i-lucide-plus" color="primary" @click="showCreateModal = true">
+          <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="showCreateModal = true">
             Create API Key
           </UButton>
         </header>
@@ -212,10 +212,10 @@ function copyToClipboard(text: string) {
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" :disabled="isSubmitting" @click="showCreateModal = false">
+          <UButton color="error" variant="ghost" :disabled="isSubmitting" @click="showCreateModal = false">
             Cancel
           </UButton>
-          <UButton color="primary" :loading="isSubmitting" @click="handleCreate">
+          <UButton color="primary" variant="subtle" :loading="isSubmitting" @click="handleCreate">
             Create Key
           </UButton>
         </div>

@@ -138,7 +138,7 @@ function formatTimestamp(value: string | null): string {
             <template #header>
               <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Node health</h2>
-                <UBadge :color="loading ? 'neutral' : 'primary'">
+                <UBadge :color="loading ? 'neutral' : 'primary'" :variant="'subtle'">
                   {{ loading ? 'Loading…' : `${nodes.length} tracked` }}
                 </UBadge>
               </div>

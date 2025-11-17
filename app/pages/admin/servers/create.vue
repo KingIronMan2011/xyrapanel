@@ -470,17 +470,17 @@ const stepTitles = [
               <div v-else />
 
               <div class="flex gap-2">
-                <UButton variant="ghost" @click="router.push('/admin/servers')">
+                <UButton variant="ghost" color="error" @click="router.push('/admin/servers')">
                   Cancel
                 </UButton>
 
-                <UButton v-if="currentStep < totalSteps" color="primary" :disabled="!canProceed(currentStep)"
+                <UButton v-if="currentStep < totalSteps" color="primary" variant="subtle" :disabled="!canProceed(currentStep)"
                   @click="nextStep">
                   Next
                   <UIcon name="i-lucide-chevron-right" class="ml-1 size-4" />
                 </UButton>
 
-                <UButton v-else color="primary" :loading="isSubmitting" @click="createServer">
+                <UButton v-else color="primary" variant="subtle" :loading="isSubmitting" @click="createServer">
                   <UIcon name="i-lucide-rocket" class="mr-1 size-4" />
                   Create Server
                 </UButton>

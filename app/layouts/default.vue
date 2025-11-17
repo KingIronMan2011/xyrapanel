@@ -72,12 +72,9 @@ const isAdminUser = computed(() => authUser.value?.role === 'admin')
     <UDashboardSidebar collapsible resizable :ui="{ footer: 'border-t border-default' }">
       <template #header="{ collapsed }">
         <NuxtLink v-if="!collapsed" to="/" class="group inline-flex items-center gap-2">
-          <span class="rounded bg-primary/10 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
-            Xyra
-          </span>
-          <span class="text-xs font-medium text-muted-foreground group-hover:text-foreground transition">
-            Panel
-          </span>
+          <h1 class="text-lg font-semibold text-muted-foreground group-hover:text-foreground transition">
+            XyraPanel
+          </h1>
         </NuxtLink>
         <UIcon v-else name="i-simple-icons-nuxtdotjs" class="mx-auto size-5 text-primary" />
       </template>
@@ -112,7 +109,7 @@ const isAdminUser = computed(() => authUser.value?.role === 'admin')
             <UButton v-if="isAdminUser" icon="i-lucide-shield" variant="ghost" color="neutral" to="/admin">
               Admin
             </UButton>
-            <UButton icon="i-lucide-log-out" color="primary" variant="soft" :loading="signOutLoading"
+            <UButton icon="i-lucide-log-out" color="primary" variant="subtle" :loading="signOutLoading"
               @click="handleSignOut">
               Sign out
             </UButton>

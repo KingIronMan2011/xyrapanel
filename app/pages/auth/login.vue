@@ -65,6 +65,7 @@ const submitProps = computed(() => ({
   label: 'Sign In',
   icon: 'i-lucide-log-in',
   block: true,
+  variant: 'subtle' as const,
   color: 'primary' as const,
   loading: loading.value,
 }))

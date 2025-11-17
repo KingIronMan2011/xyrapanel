@@ -53,7 +53,7 @@
               <h2 class="text-lg font-semibold">Recent account activity</h2>
               <p class="text-sm text-muted-foreground">Latest actions taken on your account.</p>
             </div>
-            <UButton variant="soft" to="/account/activity" size="sm">See history</UButton>
+            <UButton variant="subtle" to="/account/activity" size="sm">See history</UButton>
           </div>
         </template>
 

@@ -36,7 +36,7 @@ function statusColor(enabled: boolean) {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold">Schedules</h2>
-              <UBadge :color="schedulesPending ? 'neutral' : 'primary'">
+              <UBadge :color="schedulesPending ? 'neutral' : 'primary'" variant="ghost">
                 {{ schedulesPending ? 'Loading…' : `${schedules.length} found` }}
               </UBadge>
             </div>

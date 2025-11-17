@@ -28,7 +28,7 @@ const servers = computed(() => serversResponse.value?.data ?? [])
             <p class="text-xs text-muted-foreground">Manage lifecycle and sync state across nodes.</p>
           </div>
           <div class="flex gap-2">
-            <UButton icon="i-lucide-plus" color="primary" to="/admin/servers/create">
+            <UButton icon="i-lucide-plus" color="primary" variant="subtle" to="/admin/servers/create">
               Create Server
             </UButton>
           </div>
@@ -38,7 +38,6 @@ const servers = computed(() => serversResponse.value?.data ?? [])
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold">Server inventory</h2>
-              <UBadge color="neutral">Live data</UBadge>
             </div>
           </template>
 

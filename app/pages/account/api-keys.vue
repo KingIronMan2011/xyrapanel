@@ -112,7 +112,7 @@ function formatDate(date: Date | string | number | null | undefined) {
   <UPage>
     <UPageHeader title="API Keys" description="Manage your API keys for programmatic access">
       <template #actions>
-        <UButton icon="i-lucide-plus" @click="showCreateModal = true">
+        <UButton variant="subtle" icon="i-lucide-plus" @click="showCreateModal = true">
           Create API Key
         </UButton>
       </template>
@@ -187,6 +187,7 @@ function formatDate(date: Date | string | number | null | undefined) {
         <div v-if="!newKeyToken" class="flex justify-end gap-2">
           <UButton
             variant="ghost"
+            color="error"
             :disabled="isCreating"
             @click="() => {
               showCreateModal = false
@@ -199,6 +200,7 @@ function formatDate(date: Date | string | number | null | undefined) {
           <UButton
             icon="i-lucide-plus"
             color="primary"
+            variant="subtle"
             :loading="isCreating"
             :disabled="isCreating"
             @click="createApiKey"
@@ -241,11 +243,6 @@ function formatDate(date: Date | string | number | null | undefined) {
           icon="i-lucide-key"
           title="No API keys yet"
           description="Create an API key to access the panel programmatically"
-          :actions="[{
-            label: 'Create Your First API Key',
-            icon: 'i-lucide-plus',
-            onClick: () => { showCreateModal = true }
-          }]"
         />
 
         <div v-else class="divide-y">

@@ -125,7 +125,7 @@ async function handleDelete(mount: MountWithRelations) {
             <p class="text-xs text-muted-foreground">Manage shared directories for servers</p>
           </div>
           <div class="flex gap-2">
-            <UButton icon="i-lucide-plus" color="primary" @click="openCreateModal">
+            <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="openCreateModal">
               Create Mount
             </UButton>
           </div>
@@ -135,7 +135,7 @@ async function handleDelete(mount: MountWithRelations) {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold">All Mounts</h2>
-              <UBadge color="neutral">{{ mounts.length }} total</UBadge>
+              <UBadge color="neutral" variant="ghost">{{ mounts.length }} total</UBadge>
             </div>
           </template>
 
@@ -154,7 +154,6 @@ async function handleDelete(mount: MountWithRelations) {
             <p class="mt-1 text-xs text-muted-foreground">
               Mounts allow sharing directories between servers
             </p>
-            <UButton class="mt-4" size="sm" @click="openCreateModal">Create your first mount</UButton>
           </div>
 
           <div v-else class="divide-y divide-default">
@@ -260,10 +259,10 @@ async function handleDelete(mount: MountWithRelations) {
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" :disabled="isSubmitting" @click="showCreateModal = false">
+          <UButton variant="ghost" color="error" :disabled="isSubmitting" @click="showCreateModal = false">
             Cancel
           </UButton>
-          <UButton color="primary" :loading="isSubmitting" @click="handleSubmit">
+          <UButton color="primary" variant="subtle" :loading="isSubmitting" @click="handleSubmit">
             Create Mount
           </UButton>
         </div>

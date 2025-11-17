@@ -239,7 +239,7 @@ const handleSignOut = async () => {
                 </span>
                 <span v-if="sessionUser?.email" class="text-muted-foreground">{{ sessionUser.email }}</span>
               </div>
-              <UBadge v-if="sessionUser?.role" size="xs" variant="soft"
+              <UBadge v-if="sessionUser?.role" size="xs" variant="subtle"
                 color="error" class="uppercase tracking-wide text-[10px]">
                 {{ sessionUser.role }}
               </UBadge>

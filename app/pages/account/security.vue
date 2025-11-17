@@ -294,6 +294,7 @@ async function disableTotp() {
               <UButton
                 type="submit"
                 color="primary"
+                variant="subtle"
                 icon="i-lucide-save"
                 :loading="isSaving"
                 :disabled="!canSubmit"
@@ -313,7 +314,7 @@ async function disableTotp() {
                   Protect your account with TOTP-compatible authenticator apps (Google Authenticator, 1Password, etc.).
                 </p>
               </div>
-              <UBadge :color="totpEnabled ? 'success' : 'neutral'" variant="soft">
+              <UBadge :color="totpEnabled ? 'success' : 'warning'" variant="subtle">
                 {{ totpEnabled ? 'Enabled' : 'Disabled' }}
               </UBadge>
             </div>
@@ -333,7 +334,7 @@ async function disableTotp() {
               <p class="text-sm text-muted-foreground">
                 Click the button below to generate a TOTP secret and recovery codes. You’ll scan a QR code and confirm with a 6-digit token.
               </p>
-              <UButton color="primary" icon="i-lucide-shield" @click="beginTotpSetup">
+              <UButton color="primary" variant="subtle" icon="i-lucide-shield" @click="beginTotpSetup">
                 Start setup
               </UButton>
             </div>
@@ -375,6 +376,7 @@ async function disableTotp() {
                 </UFormField>
                 <UButton
                   color="primary"
+                  variant="subtle"
                   icon="i-lucide-check-circle"
                   :loading="verifyingToken"
                   :disabled="verifyingToken || verificationCode.length < 6"
@@ -416,7 +418,7 @@ async function disableTotp() {
                 </UFormField>
                 <UButton
                   color="error"
-                  variant="soft"
+                  variant="subtle"
                   icon="i-lucide-shield-off"
                   :loading="disableSubmitting"
                   :disabled="!disableForm.password"

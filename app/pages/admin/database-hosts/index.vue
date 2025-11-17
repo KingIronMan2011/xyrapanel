@@ -104,7 +104,7 @@ async function handleDelete(host: DatabaseHostWithStats) {
             <p class="text-xs text-muted-foreground">Manage MySQL/MariaDB servers for game databases</p>
           </div>
           <div class="flex gap-2">
-            <UButton icon="i-lucide-plus" color="primary" @click="openCreateModal">
+            <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="openCreateModal">
               Add Database Host
             </UButton>
           </div>
@@ -114,7 +114,7 @@ async function handleDelete(host: DatabaseHostWithStats) {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold">All Database Hosts</h2>
-              <UBadge color="neutral">{{ hosts.length }} total</UBadge>
+              <UBadge color="neutral" variant="ghost">{{ hosts.length }} total</UBadge>
             </div>
           </template>
 
@@ -130,7 +130,6 @@ async function handleDelete(host: DatabaseHostWithStats) {
           <div v-else-if="hosts.length === 0" class="py-12 text-center">
             <UIcon name="i-lucide-database" class="mx-auto size-12 text-muted-foreground opacity-50" />
             <p class="mt-4 text-sm text-muted-foreground">No database hosts yet</p>
-            <UButton class="mt-4" size="sm" @click="openCreateModal">Add your first database host</UButton>
           </div>
 
           <div v-else class="divide-y divide-default">
@@ -216,10 +215,10 @@ async function handleDelete(host: DatabaseHostWithStats) {
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" :disabled="isSubmitting" @click="showCreateModal = false">
+          <UButton variant="ghost" color="error" :disabled="isSubmitting" @click="showCreateModal = false">
             Cancel
           </UButton>
-          <UButton color="primary" :loading="isSubmitting" @click="handleSubmit">
+          <UButton color="primary" variant="subtle" :loading="isSubmitting" @click="handleSubmit">
             Add Host
           </UButton>
         </div>

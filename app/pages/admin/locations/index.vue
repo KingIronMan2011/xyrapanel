@@ -116,7 +116,7 @@ async function handleDelete(location: LocationWithNodeCount) {
             <p class="text-xs text-muted-foreground">Organize nodes by geographic location</p>
           </div>
           <div class="flex gap-2">
-            <UButton icon="i-lucide-plus" color="primary" @click="openCreateModal">
+            <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="openCreateModal">
               Create Location
             </UButton>
           </div>
@@ -126,7 +126,7 @@ async function handleDelete(location: LocationWithNodeCount) {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold">All Locations</h2>
-              <UBadge color="neutral">{{ locations.length }} total</UBadge>
+              <UBadge color="neutral" variant="ghost">{{ locations.length }} total</UBadge>
             </div>
           </template>
 
@@ -142,7 +142,6 @@ async function handleDelete(location: LocationWithNodeCount) {
           <div v-else-if="locations.length === 0" class="py-12 text-center">
             <UIcon name="i-lucide-map-pin" class="mx-auto size-12 text-muted-foreground opacity-50" />
             <p class="mt-4 text-sm text-muted-foreground">No locations yet</p>
-            <UButton class="mt-4" size="sm" @click="openCreateModal">Create your first location</UButton>
           </div>
 
           <div v-else class="divide-y divide-default">
@@ -194,10 +193,10 @@ async function handleDelete(location: LocationWithNodeCount) {
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" :disabled="isSubmitting" @click="showCreateModal = false">
+          <UButton variant="ghost" color="warning" :disabled="isSubmitting" @click="showCreateModal = false">
             Cancel
           </UButton>
-          <UButton color="primary" :loading="isSubmitting" @click="handleSubmit">
+          <UButton color="primary" variant="subtle" :loading="isSubmitting" @click="handleSubmit">
             {{ editingLocation ? 'Update' : 'Create' }}
           </UButton>
         </div>

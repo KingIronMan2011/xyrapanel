@@ -35,7 +35,7 @@ const hasMore = computed(() => Boolean(pagination.value?.hasMore))
             <p class="text-xs text-muted-foreground">Consolidate actions executed through panel and Wings.</p>
           </div>
           <div class="flex items-center gap-2">
-            <UButton icon="i-lucide-download" color="primary" variant="soft">Export CSV</UButton>
+            <UButton icon="i-lucide-download" color="primary" variant="subtle">Export CSV</UButton>
           </div>
         </header>
 
@@ -50,7 +50,6 @@ const hasMore = computed(() => Boolean(pagination.value?.hasMore))
                 </p>
               </div>
               <UBadge v-if="pending" color="primary" variant="soft">Loading</UBadge>
-              <UBadge v-else color="neutral">Live data</UBadge>
             </div>
           </template>
 

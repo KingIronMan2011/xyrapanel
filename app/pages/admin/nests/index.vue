@@ -101,7 +101,7 @@ function viewNest(nest: NestWithEggCount) {
             <p class="text-xs text-muted-foreground">Manage game server types and configurations</p>
           </div>
           <div class="flex gap-2">
-            <UButton icon="i-lucide-plus" color="primary" @click="openCreateModal">
+            <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="openCreateModal">
               Create Nest
             </UButton>
           </div>
@@ -111,7 +111,7 @@ function viewNest(nest: NestWithEggCount) {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold">All Nests</h2>
-              <UBadge color="neutral">{{ nests.length }} total</UBadge>
+              <UBadge color="neutral" variant="ghost">{{ nests.length }} total</UBadge>
             </div>
           </template>
 
@@ -130,7 +130,6 @@ function viewNest(nest: NestWithEggCount) {
             <p class="mt-1 text-xs text-muted-foreground">
               Nests are categories of game servers (e.g., Minecraft, Source Engine)
             </p>
-            <UButton class="mt-4" size="sm" @click="openCreateModal">Create your first nest</UButton>
           </div>
 
           <div v-else class="divide-y divide-default">
@@ -192,10 +191,10 @@ function viewNest(nest: NestWithEggCount) {
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" :disabled="isSubmitting" @click="showCreateModal = false">
+          <UButton variant="ghost" color="error" :disabled="isSubmitting" @click="showCreateModal = false">
             Cancel
           </UButton>
-          <UButton color="primary" :loading="isSubmitting" @click="handleSubmit">
+          <UButton color="primary" variant="subtle" :loading="isSubmitting" @click="handleSubmit">
             Create Nest
           </UButton>
         </div>
