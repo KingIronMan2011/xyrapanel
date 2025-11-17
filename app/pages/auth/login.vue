@@ -5,6 +5,8 @@ import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 import { until } from '@vueuse/core'
 
 const { signIn, getSession, status } = useAuth()
+const runtimeConfig = useRuntimeConfig()
+const appName = computed(() => runtimeConfig.public.appName || 'XyraPanel')
 const route = useRoute()
 const toast = useToast()
 
@@ -162,6 +164,9 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
   <div class="space-y-6">
     <UAuthForm class="space-y-6" :schema="schema" :fields="fields" :submit="submitProps" @submit="onSubmit">
       <template #description>
+        <h1 class="text-3xl font-semibold text-white">
+          {{ appName }}
+        </h1>
         <p class="text-sm text-muted">
           Enter your panel credentials to continue.
         </p>
