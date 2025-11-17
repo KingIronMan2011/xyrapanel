@@ -1,3 +1,28 @@
+export interface BackupManagerOptions {
+  userId?: string
+  skipAudit?: boolean
+}
+
+export interface CreateBackupOptions extends BackupManagerOptions {
+  name?: string
+  ignoredFiles?: string
+}
+
+export interface BackupInfo {
+  id: string
+  uuid: string
+  name: string
+  serverId: string
+  serverUuid: string
+  size: number
+  isSuccessful: boolean
+  isLocked: boolean
+  checksum?: string
+  ignoredFiles?: string
+  completedAt?: string | Date | null
+  createdAt: string | Date
+}
+
 export interface ServerBackup {
   id: string
   serverId: string

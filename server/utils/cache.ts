@@ -1,3 +1,5 @@
+import type { CacheOptions, CacheSetOptions } from '#shared/types/cache'
+
 const CACHE_NAMESPACE = 'xyra'
 const DEFAULT_CACHE_TTL = 60
 
@@ -16,14 +18,6 @@ export function buildCacheKey(...parts: Array<string | number | null | undefined
     .join(':')
 
   return suffix.length > 0 ? `${CACHE_NAMESPACE}:${suffix}` : CACHE_NAMESPACE
-}
-
-export interface CacheSetOptions {
-  ttl?: number
-}
-
-export interface CacheOptions extends CacheSetOptions {
-  skipCache?: boolean
 }
 
 export async function getCacheItem<T>(key: string): Promise<T | null> {

@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import { createError, getQuery } from 'h3'
 import { getServerSession } from '#auth'
-import type { SessionUser } from '#shared/types/auth'
+import type { ServerAccessOptions as SharedServerAccessOptions, ServerRequestContext as SharedServerRequestContext } from '#shared/types/server-access'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
@@ -10,27 +10,8 @@ import { getUserPermissions } from '~~/server/utils/permissions'
 import { resolveNodeConnection } from '~~/server/utils/wings/nodesStore'
 import type { StoredWingsNode } from '#shared/types/wings'
 
-export interface ServerRequestContext {
-  user: SessionUser
-  server: typeof tables.servers.$inferSelect
-  permissions: string[]
-  isAdmin: boolean
-  isOwner: boolean
-  subuserPermissions: string[] | null
-  node: StoredWingsNode | null
-  nodeConnection: {
-    tokenId: string
-    tokenSecret: string
-    combinedToken: string
-  } | null
-}
-
-export interface ServerAccessOptions {
-  identifier?: string
-  requireNode?: boolean
-  requiredPermissions?: string[]
-  fallbackPermissions?: string[]
-}
+type ServerRequestContext = SharedServerRequestContext<typeof tables.servers.$inferSelect>
+type ServerAccessOptions = SharedServerAccessOptions
 
 export async function resolveServerRequest(
   event: H3Event,

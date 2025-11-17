@@ -11,11 +11,9 @@ export default defineTask({
     try {
       console.log(`[${new Date().toISOString()}] Starting resource collection...`)
 
-      // Collect server resources
       const serverResources = await resourceMonitor.getAllServerResources()
       console.log(`Collected resources for ${serverResources.length} servers`)
 
-      // Collect node resources
       const nodeResources = await resourceMonitor.getAllNodeResources()
       const onlineNodes = nodeResources.filter(node => node.status === 'online' || node.status === 'maintenance')
       const offlineNodes = nodeResources.filter(node => node.status === 'offline')

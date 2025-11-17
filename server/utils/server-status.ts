@@ -111,7 +111,6 @@ export async function refreshAllServerStatuses(): Promise<void> {
 
   const serverUuids = servers.map(s => s.uuid)
   
-  // Process in batches to avoid overwhelming Wings
   const batchSize = 5
   for (let i = 0; i < serverUuids.length; i += batchSize) {
     const batch = serverUuids.slice(i, i + batchSize)
@@ -119,7 +118,6 @@ export async function refreshAllServerStatuses(): Promise<void> {
       batch.map(uuid => updateServerStatus(uuid))
     )
     
-    // Small delay between batches
     if (i + batchSize < serverUuids.length) {
       await new Promise(resolve => setTimeout(resolve, 1000))
     }

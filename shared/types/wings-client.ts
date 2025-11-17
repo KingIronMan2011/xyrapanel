@@ -1,7 +1,12 @@
-export interface WingsError {
-  code: string
-  message: string
-  details?: Record<string, unknown>
+export interface WingsNode {
+  id: string
+  fqdn: string
+  scheme: 'http' | 'https'
+  daemonListen: number
+  daemonSftp: number
+  daemonBase: string
+  tokenId: string
+  token: string
 }
 
 export interface WingsServerDetails {
@@ -18,4 +23,32 @@ export interface WingsServerDetails {
     uptime: number
     disk_bytes: number
   }
+}
+
+export interface WingsFileObject {
+  name: string
+  mode: string
+  mode_bits: string
+  size: number
+  is_file: boolean
+  is_symlink: boolean
+  mimetype: string
+  created_at: string
+  modified_at: string
+}
+
+export interface WingsBackup {
+  uuid: string
+  name: string
+  ignored_files: string[]
+  sha256_hash: string
+  bytes: number
+  created_at: string
+  completed_at: string | null
+}
+
+export interface WingsError {
+  code: string
+  message: string
+  details?: Record<string, unknown>
 }

@@ -4,30 +4,13 @@ import { getNodeResourceUsage, canNodeFitResources } from '~~/server/utils/nodes
 import { resolveNodeConnection } from '~~/server/utils/wings/nodesStore'
 import { generateWingsJWT } from '~~/server/utils/wings/jwt'
 import { createWingsTransferClient } from '~~/server/utils/wings/transfer'
+import type { TransferOptions, TransferResult } from '#shared/types/server-transfers'
 
 export class TransferError extends Error {
   constructor(message: string, public statusCode = 400) {
     super(message)
     this.name = 'TransferError'
   }
-}
-
-interface TransferOptions {
-  startOnCompletion?: boolean
-  allocationId?: string
-  additionalAllocationIds?: string[]
-}
-
-interface TransferResult {
-  transferId: string
-  server: {
-    id: string
-    uuid: string
-    name: string | null
-  }
-  sourceNodeId: string
-  targetNodeId: string
-  newAllocationId: string
 }
 
 export async function initiateServerTransfer(serverId: string, targetNodeId: string, options: TransferOptions = {}): Promise<TransferResult> {

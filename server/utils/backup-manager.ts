@@ -2,31 +2,7 @@ import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { recordAuditEvent } from '~~/server/utils/audit'
 import { randomUUID } from 'crypto'
-
-export interface BackupManagerOptions {
-  userId?: string
-  skipAudit?: boolean
-}
-
-export interface CreateBackupOptions extends BackupManagerOptions {
-  name?: string
-  ignoredFiles?: string
-}
-
-export interface BackupInfo {
-  id: string
-  uuid: string
-  name: string
-  serverId: string
-  serverUuid: string
-  size: number
-  isSuccessful: boolean
-  isLocked: boolean
-  checksum?: string
-  ignoredFiles?: string
-  completedAt?: Date
-  createdAt: Date
-}
+import type { BackupManagerOptions, CreateBackupOptions, BackupInfo } from '#shared/types/server-backups'
 
 export class BackupManager {
   private db = useDrizzle()
@@ -34,7 +10,6 @@ export class BackupManager {
   async createBackup(serverUuid: string, options: CreateBackupOptions = {}): Promise<BackupInfo> {
     const { client, server } = await getWingsClientForServer(serverUuid)
     
-    // Create backup record in database first
     const backupId = randomUUID()
     const backupUuid = randomUUID()
     const now = new Date()
@@ -60,10 +35,8 @@ export class BackupManager {
     await this.db.insert(tables.serverBackups).values(backupRecord)
 
     try {
-      // Trigger backup creation on Wings
       const wingsBackup = await client.createBackup(serverUuid, backupName, options.ignoredFiles)
       
-      // Update backup record with Wings data
       await this.db
         .update(tables.serverBackups)
         .set({
@@ -106,7 +79,6 @@ export class BackupManager {
         createdAt: now,
       }
     } catch (error) {
-      // Mark backup as failed
       await this.db
         .update(tables.serverBackups)
         .set({
@@ -140,10 +112,8 @@ export class BackupManager {
       throw new Error('Cannot delete locked backup')
     }
 
-    // Delete from Wings first
     await client.deleteBackup(serverUuid, backupUuid)
 
-    // Remove from database
     await this.db
       .delete(tables.serverBackups)
       .where(eq(tables.serverBackups.id, backup.id))
@@ -190,7 +160,6 @@ export class BackupManager {
       throw new Error('Cannot restore failed backup')
     }
 
-    // Trigger restore on Wings
     await client.restoreBackup(serverUuid, backupUuid, truncate)
 
     if (!options.skipAudit && options.userId) {
@@ -348,7 +317,6 @@ export class BackupManager {
   }
 
   getDownloadUrl(serverUuid: string, backupUuid: string): string {
-    // This would typically generate a signed URL or token
     return `/api/servers/${serverUuid}/backups/${backupUuid}/download`
   }
 
@@ -362,12 +330,10 @@ export class BackupManager {
       const errors: string[] = []
       let synced = 0
 
-      // Update existing backups with Wings data
       for (const wingsBackup of wingsBackups) {
         const dbBackup = dbBackups.find(b => b.uuid === wingsBackup.uuid)
         
         if (dbBackup) {
-          // Update existing backup
           await this.db
             .update(tables.serverBackups)
             .set({
@@ -382,7 +348,6 @@ export class BackupManager {
           
           synced++
         } else {
-          // Create missing backup record
           try {
             await this.db.insert(tables.serverBackups).values({
               id: randomUUID(),
@@ -413,5 +378,4 @@ export class BackupManager {
   }
 }
 
-// Export singleton instance
 export const backupManager = new BackupManager()

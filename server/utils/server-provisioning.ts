@@ -2,18 +2,18 @@ import { useDrizzle, tables, eq, inArray } from '~~/server/utils/drizzle'
 import { getWingsClient } from '~~/server/utils/wings-client'
 import type { WingsClient, WingsNode } from '~~/server/utils/wings-client'
 import type { WingsServerConfiguration } from '#shared/types/wings-config'
-import type { ServerProvisioningConfig } from '#shared/types/server-provisioning'
+import type { ServerProvisioningConfig, ServerProvisioningContext as SharedServerProvisioningContext } from '#shared/types/server-provisioning'
 
-interface ServerProvisioningContext {
-  wingsNode: WingsNode
-  server: typeof tables.servers.$inferSelect
-  limits: typeof tables.serverLimits.$inferSelect
-  egg: typeof tables.eggs.$inferSelect
-  allocation: typeof tables.serverAllocations.$inferSelect
-  additionalAllocations: typeof tables.serverAllocations.$inferSelect[]
-  eggVariables: typeof tables.eggVariables.$inferSelect[]
-  mounts: typeof tables.mounts.$inferSelect[]
-}
+type ServerProvisioningContext = SharedServerProvisioningContext<
+  typeof tables.servers.$inferSelect,
+  typeof tables.serverLimits.$inferSelect,
+  typeof tables.eggs.$inferSelect,
+  typeof tables.serverAllocations.$inferSelect,
+  typeof tables.serverAllocations.$inferSelect,
+  typeof tables.eggVariables.$inferSelect,
+  typeof tables.mounts.$inferSelect,
+  WingsNode
+>
 
 function buildEnvironmentVariables(
   context: ServerProvisioningContext,

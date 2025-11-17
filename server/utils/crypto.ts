@@ -1,21 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import type { CookieSerializeOptions } from 'cookie-es'
 import { useRuntimeConfig } from '#imports'
-
-type CookieSameSite = 'lax' | 'strict' | 'none'
-
-interface RuntimeAuthConfig {
-  tokenSecret?: string
-  cookie?: {
-    secure?: boolean
-    sameSite?: CookieSameSite
-    domain?: string
-  }
-}
-
-interface ExtendedRuntimeConfig {
-  auth?: RuntimeAuthConfig
-}
+import type { AuthCookieOptions, CookieSameSite, ExtendedRuntimeConfig } from '#shared/types/auth-config'
 
 const HASHED_TOKEN_REGEX = /^[a-f0-9]{64}$/i
 let cachedKey: Buffer | null = null
@@ -82,12 +68,6 @@ export function isHashedToken(token: string): boolean {
 
 export function toStoredToken(token: string): string {
   return isHashedToken(token) ? token.toLowerCase() : hashToken(token)
-}
-
-interface AuthCookieOptions {
-  secure: boolean
-  sameSite: CookieSameSite
-  domain?: string
 }
 
 export function resolveAuthCookieOptions(): AuthCookieOptions {

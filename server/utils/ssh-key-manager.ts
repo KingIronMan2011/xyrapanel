@@ -11,7 +11,6 @@ export class SSHKeyManager {
   private db = useDrizzle()
 
   private generateFingerprint(publicKey: string): string {
-    // Extract the key part (remove ssh-rsa, ssh-ed25519, etc. and comment)
     const keyParts = publicKey.trim().split(' ')
     if (keyParts.length < 2) {
       throw new Error('Invalid SSH public key format')
@@ -23,11 +22,9 @@ export class SSHKeyManager {
     }
     
     try {
-      // Decode base64 and create MD5 hash
       const keyBuffer = Buffer.from(keyData, 'base64')
       const hash = createHash('md5').update(keyBuffer).digest('hex')
       
-      // Format as SSH fingerprint (xx:xx:xx:...)
       return hash.match(/.{2}/g)?.join(':') || hash
     } catch {
       throw new Error('Invalid SSH public key format')
@@ -50,12 +47,10 @@ export class SSHKeyManager {
       return { keyType: 'unknown', isValid: false }
     }
     
-    // Check if key type is supported
     if (!supportedTypes.includes(keyType)) {
       return { keyType, isValid: false }
     }
     
-    // Check if key data is valid base64
     try {
       Buffer.from(keyData, 'base64')
       return { keyType, isValid: true }
@@ -71,16 +66,13 @@ export class SSHKeyManager {
 
     const { name, publicKey } = options
     
-    // Validate SSH key
     const validation = this.validateSSHKey(publicKey)
     if (!validation.isValid) {
       throw new Error('Invalid SSH public key format')
     }
 
-    // Generate fingerprint
     const fingerprint = this.generateFingerprint(publicKey)
     
-    // Check if fingerprint already exists
     const existingKey = await this.db
       .select()
       .from(tables.sshKeys)
@@ -143,7 +135,6 @@ export class SSHKeyManager {
       throw new Error('SSH key not found')
     }
 
-    // Check ownership if userId is provided
     if (options.userId && sshKey.userId !== options.userId) {
       throw new Error('Permission denied')
     }
@@ -198,7 +189,6 @@ export class SSHKeyManager {
       return null
     }
 
-    // Check ownership if userId is provided
     if (userId && key.userId !== userId) {
       return null
     }
@@ -247,7 +237,6 @@ export class SSHKeyManager {
       throw new Error('SSH key not found')
     }
 
-    // Check ownership if userId is provided
     if (options.userId && sshKey.userId !== options.userId) {
       throw new Error('Permission denied')
     }
@@ -289,7 +278,6 @@ export class SSHKeyManager {
     }
   }
 
-  // Utility method to validate SSH key format without creating
   validatePublicKey(publicKey: string): { isValid: boolean; keyType?: string; fingerprint?: string; error?: string } {
     try {
       const validation = this.validateSSHKey(publicKey)
@@ -317,5 +305,4 @@ export class SSHKeyManager {
   }
 }
 
-// Export singleton instance
 export const sshKeyManager = new SSHKeyManager()

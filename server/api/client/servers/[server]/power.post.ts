@@ -9,7 +9,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Server identifier required' })
   }
 
-  // Check permissions - user must have power control access
   const { userId } = await requireServerPermission(event, {
     serverId: serverIdentifier,
     requiredPermissions: ['server.power'],

@@ -1,14 +1,6 @@
 import { formatAuthToken } from '~~/server/utils/wings/encryption'
 import type { WingsNodeConnection } from '#shared/types/wings'
-
-export interface TransferNotificationPayload {
-  serverUuid: string
-  destination: {
-    baseUrl: string
-    token: string
-  }
-  startOnCompletion?: boolean
-}
+import type { TransferNotificationPayload } from '#shared/types/server-transfers'
 
 export function createWingsTransferClient(node: WingsNodeConnection) {
   const baseUrl = `${node.scheme}://${node.fqdn}:${node.daemonListen}`

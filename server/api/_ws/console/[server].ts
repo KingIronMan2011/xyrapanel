@@ -5,7 +5,6 @@ import { getServerSession } from '#auth'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { permissionManager } from '~~/server/utils/permission-manager'
 
-// Store authenticated connections with user context
 const connections = new Map<string, { 
   serverId: string; 
   serverUuid: string; 
@@ -31,7 +30,6 @@ export default defineWebSocketHandler({
         return
       }
 
-      // Get server details
       const db = useDrizzle()
       const server = await db
         .select()
@@ -51,15 +49,13 @@ export default defineWebSocketHandler({
 
       switch (type) {
         case 'auth': {
-          // Authenticate using Nuxt Auth session
           try {
-            // Create a mock event with the token for session validation
             const mockEvent = {
               node: {
                 req: {
                   headers: {
                     authorization: `Bearer ${token}`,
-                    cookie: token // Pass token as cookie for session validation
+                    cookie: token
                   }
                 }
               }
@@ -76,7 +72,6 @@ export default defineWebSocketHandler({
               return
             }
 
-            // Check if user has console permission for this server
             const permissionCheck = await permissionManager.checkPermission(user.id, 'server.console', serverId)
             if (!permissionCheck.hasPermission) {
               peer.send(JSON.stringify({
@@ -86,7 +81,6 @@ export default defineWebSocketHandler({
               return
             }
 
-            // Store authenticated connection
             connections.set(peer.id, {
               serverId,
               serverUuid: server.uuid,
@@ -113,7 +107,6 @@ export default defineWebSocketHandler({
         }
 
         case 'command': {
-          // Send command to server
           const connection = connections.get(peer.id)
           if (!connection?.authenticated) {
             peer.send(JSON.stringify({
@@ -139,7 +132,6 @@ export default defineWebSocketHandler({
         }
 
         case 'status': {
-          // Get server status
           const statusConnection = connections.get(peer.id)
           if (!statusConnection?.authenticated) {
             peer.send(JSON.stringify({

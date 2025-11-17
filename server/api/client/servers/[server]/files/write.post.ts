@@ -2,7 +2,7 @@ import { getWingsClientForServer, WingsConnectionError, WingsAuthError } from '~
 import { recordAuditEvent } from '~~/server/utils/audit'
 import { requirePermission } from '~~/server/utils/permission-middleware'
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB limit for writing
+const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 function sanitizeFilePath(path: string): string {
   return path.replace(/\.\./g, '').replace(/\/+/g, '/')
@@ -18,7 +18,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Check permissions - user must have file write access
   const { userId } = await requirePermission(event, 'server.files.write', serverId)
 
   const body = await readBody<{ file: string; content: string }>(event)
@@ -39,7 +38,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Check content size
   const contentSize = Buffer.byteLength(content, 'utf8')
   if (contentSize > MAX_FILE_SIZE) {
     throw createError({
@@ -52,13 +50,11 @@ export default defineEventHandler(async (event) => {
   try {
     const { client, server } = await getWingsClientForServer(serverId)
     
-    // Create backup of existing file if it exists
     let hadExistingFile = false
     try {
       await client.getFileContents(server.uuid as string, file)
       hadExistingFile = true
       
-      // Create backup with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
       const backupPath = `${file}.backup-${timestamp}`
       await client.copyFile(server.uuid as string, file)
@@ -66,12 +62,10 @@ export default defineEventHandler(async (event) => {
         { from: file.substring(file.lastIndexOf('/') + 1), to: backupPath.substring(backupPath.lastIndexOf('/') + 1) }
       ])
     } catch {
-      // File doesn't exist, no backup needed
     }
     
     await client.writeFileContents(server.uuid as string, file, content)
 
-    // Record audit event
     await recordAuditEvent({
       actor: userId,
       actorType: 'user',

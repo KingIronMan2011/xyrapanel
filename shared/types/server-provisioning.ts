@@ -15,3 +15,23 @@ export interface ServerProvisioningConfig {
     imagePullPolicy?: string
   }
 }
+
+export interface ServerProvisioningContext<
+  TServer = unknown,
+  TLimits = unknown,
+  TEgg = unknown,
+  TAllocation = unknown,
+  TAdditionalAllocation = TAllocation,
+  TEggVariable = unknown,
+  TMount = unknown,
+  TWingsNode = unknown,
+> {
+  wingsNode: TWingsNode
+  server: TServer
+  limits: TLimits
+  egg: TEgg
+  allocation: TAllocation
+  additionalAllocations: TAdditionalAllocation[]
+  eggVariables: TEggVariable[]
+  mounts: TMount[]
+}

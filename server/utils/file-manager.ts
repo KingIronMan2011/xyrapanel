@@ -1,29 +1,10 @@
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { recordAuditEvent } from '~~/server/utils/audit'
-
-export interface FileManagerOptions {
-  userId?: string
-  skipAudit?: boolean
-}
-
-export interface FileOperation {
-  type: 'create' | 'edit' | 'delete' | 'rename' | 'copy' | 'move' | 'chmod' | 'compress' | 'decompress'
-  path: string
-  newPath?: string
-  content?: string
-  permissions?: string
-  files?: string[]
-}
-
-export interface FileUploadResult {
-  success: boolean
-  uploadUrl?: string
-  error?: string
-}
+import type { FileManagerOptions, FileUploadResult } from '#shared/types/file-manager'
 
 export class FileManager {
-  private readonly MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-  private readonly MAX_VIEW_SIZE = 5 * 1024 * 1024 // 5MB
+  private readonly MAX_FILE_SIZE = 10 * 1024 * 1024
+  private readonly MAX_VIEW_SIZE = 5 * 1024 * 1024
   private readonly BINARY_EXTENSIONS = [
     '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', 
     '.pdf', '.zip', '.tar', '.gz', '.exe', '.bin', '.so', '.dll'
@@ -44,7 +25,6 @@ export class FileManager {
     
     const files = await client.listFiles(serverUuid, sanitizedDir)
     
-    // Sort: directories first, then files, both alphabetically
     const sortedFiles = files.sort((a, b) => {
       if (a.is_file !== b.is_file) {
         return a.is_file ? 1 : -1
@@ -67,7 +47,6 @@ export class FileManager {
       throw new Error('Cannot view binary file')
     }
 
-    // Check file size
     const directory = sanitizedPath.substring(0, sanitizedPath.lastIndexOf('/')) || '/'
     const filename = sanitizedPath.substring(sanitizedPath.lastIndexOf('/') + 1)
     const files = await client.listFiles(serverUuid, directory)
@@ -97,13 +76,11 @@ export class FileManager {
       throw new Error(`File content too large (${contentSize} bytes, max ${this.MAX_FILE_SIZE})`)
     }
 
-    // Check if file exists for backup
     let hadExistingFile = false
     try {
       await client.getFileContents(serverUuid, sanitizedPath)
       hadExistingFile = true
       
-      // Create backup
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
       const backupPath = `${sanitizedPath}.backup-${timestamp}`
       await client.copyFile(serverUuid, sanitizedPath)
@@ -116,7 +93,6 @@ export class FileManager {
         { from: filename, to: backupFilename }
       ])
     } catch {
-      // File doesn't exist, no backup needed
     }
 
     await client.writeFileContents(serverUuid, sanitizedPath, content)
@@ -302,14 +278,9 @@ export class FileManager {
   }
 
   getDownloadUrl(serverUuid: string, filePath: string): string {
-    // This will be handled by Wings directly
     const sanitizedPath = this.sanitizePath(filePath)
-    // Note: In a real implementation, you'd need to get the Wings client
-    // and call client.getFileDownloadUrl(serverUuid, sanitizedPath)
-    // For now, return a placeholder
     return `/api/servers/${serverUuid}/files/download?file=${encodeURIComponent(sanitizedPath)}`
   }
 }
 
-// Export singleton instance
 export const fileManager = new FileManager()

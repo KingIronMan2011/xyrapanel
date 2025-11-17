@@ -2,7 +2,7 @@ import { getServerSession } from '#auth'
 import { getSessionUser } from '~~/server/utils/session'
 import { getWingsClientForServer, WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB limit for viewing
+const MAX_FILE_SIZE = 5 * 1024 * 1024
 const BINARY_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', '.pdf', '.zip', '.tar', '.gz', '.exe', '.bin']
 
 function isBinaryFile(filename: string): boolean {
@@ -11,7 +11,6 @@ function isBinaryFile(filename: string): boolean {
 }
 
 function sanitizeFilePath(path: string): string {
-  // Remove path traversal attempts and normalize
   return path.replace(/\.\./g, '').replace(/\/+/g, '/')
 }
 
@@ -44,7 +43,6 @@ export default defineEventHandler(async (event) => {
   try {
     const { client, server } = await getWingsClientForServer(serverId)
     
-    // Check if file is binary
     if (isBinaryFile(file)) {
       throw createError({
         statusCode: 400,
@@ -53,7 +51,6 @@ export default defineEventHandler(async (event) => {
       })
     }
     
-    // Get file info first to check size
     const directory = file.substring(0, file.lastIndexOf('/')) || '/'
     const filename = file.substring(file.lastIndexOf('/') + 1)
     const files = await client.listFiles(server.uuid as string, directory)
@@ -94,7 +91,6 @@ export default defineEventHandler(async (event) => {
       })
     }
     
-    // Re-throw our custom errors
     if (error && typeof error === 'object' && 'statusCode' in error) {
       throw error
     }

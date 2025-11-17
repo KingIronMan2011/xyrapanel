@@ -47,3 +47,30 @@ export interface TransferValidation {
   errors: string[]
   warnings: string[]
 }
+
+export interface TransferOptions {
+  startOnCompletion?: boolean
+  allocationId?: string
+  additionalAllocationIds?: string[]
+}
+
+export interface TransferResult {
+  transferId: string
+  server: {
+    id: string
+    uuid: string
+    name: string | null
+  }
+  sourceNodeId: string
+  targetNodeId: string
+  newAllocationId: string
+}
+
+export interface TransferNotificationPayload {
+  serverUuid: string
+  destination: {
+    baseUrl: string
+    token: string
+  }
+  startOnCompletion?: boolean
+}

@@ -18,7 +18,6 @@ export class TransferManager {
     const warnings: string[] = []
 
     try {
-      // Get server details
       const server = await this.db
         .select()
         .from(tables.servers)
@@ -30,7 +29,6 @@ export class TransferManager {
         return { isValid: false, errors, warnings }
       }
 
-      // Check if server is already being transferred
       const existingTransfer = await this.db
         .select()
         .from(tables.serverTransfers)
@@ -44,12 +42,10 @@ export class TransferManager {
         errors.push('Server is already being transferred')
       }
 
-      // Check if server is suspended
       if (server.suspended) {
         warnings.push('Server is suspended - transfer may fail')
       }
 
-      // Validate new node exists and is available
       const newNode = await this.db
         .select()
         .from(tables.wingsNodes)
@@ -65,12 +61,10 @@ export class TransferManager {
         errors.push('Target node is in maintenance mode')
       }
 
-      // Check if transferring to same node
       if (server.nodeId === options.newNodeId) {
         errors.push('Cannot transfer server to the same node')
       }
 
-      // Validate new allocation
       const newAllocation = await this.db
         .select()
         .from(tables.serverAllocations)
@@ -88,7 +82,6 @@ export class TransferManager {
         }
       }
 
-      // Validate additional allocations if provided
       if (options.newAdditionalAllocations?.length) {
         for (const allocId of options.newAdditionalAllocations) {
           const allocation = await this.db
@@ -107,14 +100,13 @@ export class TransferManager {
         }
       }
 
-      // Check node resources (basic check)
       const nodeServers = await this.db
         .select()
         .from(tables.servers)
         .where(eq(tables.servers.nodeId, options.newNodeId))
         .all()
 
-      if (nodeServers.length >= 50) { // Arbitrary limit
+      if (nodeServers.length >= 50) {
         warnings.push('Target node has many servers - performance may be affected')
       }
 
@@ -130,7 +122,6 @@ export class TransferManager {
   }
 
   async createTransfer(options: CreateTransferOptions): Promise<TransferInfo> {
-    // Validate transfer first
     const validation = await this.validateTransfer(options)
     if (!validation.isValid) {
       throw new Error(`Transfer validation failed: ${validation.errors.join(', ')}`)
@@ -149,7 +140,6 @@ export class TransferManager {
     const transferId = randomUUID()
     const now = new Date()
 
-    // Get current allocations
     const currentAllocations = await this.db
       .select()
       .from(tables.serverAllocations)
@@ -180,7 +170,6 @@ export class TransferManager {
 
     await this.db.insert(tables.serverTransfers).values(transferRecord)
 
-    // Update server status
     await this.db
       .update(tables.servers)
       .set({
@@ -251,7 +240,6 @@ export class TransferManager {
     }
 
     try {
-      // Update transfer status to processing
       await this.db
         .update(tables.serverTransfers)
         .set({
@@ -260,7 +248,6 @@ export class TransferManager {
         .where(eq(tables.serverTransfers.id, transferId))
         .run()
 
-      // Get source node Wings client
       const sourceNode = await this.db
         .select()
         .from(tables.wingsNodes)
@@ -271,7 +258,6 @@ export class TransferManager {
         throw new Error('Source node not found')
       }
 
-      // Get target node Wings client  
       const targetNode = await this.db
         .select()
         .from(tables.wingsNodes)
@@ -306,22 +292,14 @@ export class TransferManager {
 
       const targetClient = getWingsClient(targetWingsNode)
 
-      // Initiate transfer on Wings
-      // Note: This is a simplified version - real implementation would need
-      // to handle the complex transfer protocol between Wings daemons
       
-      // 1. Create server on target node
       const serverConfig = {
         uuid: server.uuid,
-        // ... other server configuration
       }
       
       await targetClient.createServer(server.uuid, serverConfig)
       
-      // 2. Transfer would happen via Wings-to-Wings communication
-      // This is handled by Wings internally using their transfer protocol
       
-      // For now, we'll simulate the transfer completion
       await this.completeTransfer(transferId, true, options)
 
     } catch (error) {
@@ -349,20 +327,17 @@ export class TransferManager {
     const now = new Date()
 
     if (successful) {
-      // Update server to point to new node and allocation
       await this.db
         .update(tables.servers)
         .set({
           nodeId: transfer.newNode,
           allocationId: transfer.newAllocation,
-          status: 'installing', // Server will need to be reinstalled on new node
+          status: 'installing',
           updatedAt: now,
         })
         .where(eq(tables.servers.id, transfer.serverId))
         .run()
 
-      // Update allocations
-      // Free old allocations
       await this.db
         .update(tables.serverAllocations)
         .set({
@@ -373,7 +348,6 @@ export class TransferManager {
         .where(eq(tables.serverAllocations.serverId, transfer.serverId))
         .run()
 
-      // Assign new primary allocation
       await this.db
         .update(tables.serverAllocations)
         .set({
@@ -384,7 +358,6 @@ export class TransferManager {
         .where(eq(tables.serverAllocations.id, transfer.newAllocation))
         .run()
 
-      // Assign additional allocations if any
       if (transfer.newAdditionalAllocations) {
         const additionalIds = JSON.parse(transfer.newAdditionalAllocations) as string[]
         for (const allocId of additionalIds) {
@@ -400,7 +373,6 @@ export class TransferManager {
         }
       }
     } else {
-      // Transfer failed - restore server status
       await this.db
         .update(tables.servers)
         .set({
@@ -411,7 +383,6 @@ export class TransferManager {
         .run()
     }
 
-    // Update transfer record
     await this.db
       .update(tables.serverTransfers)
       .set({
@@ -452,17 +423,15 @@ export class TransferManager {
       throw new Error('Transfer is already completed')
     }
 
-    // Update server status
     await this.db
       .update(tables.servers)
       .set({
-        status: null, // Reset to normal
+        status: null,
         updatedAt: new Date(),
       })
       .where(eq(tables.servers.id, transfer.serverId))
       .run()
 
-    // Archive transfer as cancelled
     await this.db
       .update(tables.serverTransfers)
       .set({
@@ -506,7 +475,6 @@ export class TransferManager {
     if (transfer.archived) {
       status = transfer.successful ? 'completed' : 'failed'
     } else {
-      // Check server status to determine transfer status
       if (server?.status === 'transferring') {
         status = 'processing'
       }
@@ -555,5 +523,4 @@ export class TransferManager {
   }
 }
 
-// Export singleton instance
 export const transferManager = new TransferManager()

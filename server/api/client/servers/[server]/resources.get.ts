@@ -7,7 +7,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Server identifier required' })
   }
 
-  // Check permissions - user must have server view access
   await requirePermission(event, 'server.view', serverIdentifier)
 
   try {

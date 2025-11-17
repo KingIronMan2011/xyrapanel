@@ -209,11 +209,9 @@ export class ResourceMonitor {
     const startTime = Date.now()
     
     try {
-      // Collect server resources
       const serverResources = await this.getAllServerResources()
       console.log(`Collected resources for ${serverResources.length} servers`)
 
-      // Collect node resources
       const nodeResources = await this.getAllNodeResources()
       const onlineNodes = nodeResources.filter(node => node.status === 'online' || node.status === 'maintenance')
       const offlineNodes = nodeResources.filter(node => node.status === 'offline')
@@ -226,7 +224,6 @@ export class ResourceMonitor {
         }
       }
 
-      // Persist node status/health information
       for (const node of nodeResources) {
         await this.db
           .update(tables.wingsNodes)
@@ -238,7 +235,6 @@ export class ResourceMonitor {
           .run()
       }
 
-      // Update server statuses in database
       for (const resource of serverResources) {
         await this.db
           .update(tables.servers)
@@ -266,5 +262,4 @@ export class ResourceMonitor {
   }
 }
 
-// Export singleton instance
 export const resourceMonitor = new ResourceMonitor()

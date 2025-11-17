@@ -2,7 +2,6 @@ import { sshKeyManager } from '~~/server/utils/ssh-key-manager'
 import { requirePermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
-  // Get authenticated user
   const { userId } = await requirePermission(event, 'server.view', 'self')
 
   const keyId = getRouterParam(event, 'keyId')
@@ -14,7 +13,6 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Verify the key exists and belongs to the user
     const sshKey = await sshKeyManager.getSSHKey(keyId, userId)
     if (!sshKey) {
       throw createError({

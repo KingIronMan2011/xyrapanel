@@ -12,7 +12,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Check permissions - user must have schedule update access
   await requirePermission(event, 'server.schedule.update', serverId)
 
   const db = useDrizzle()

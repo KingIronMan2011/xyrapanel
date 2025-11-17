@@ -18,9 +18,7 @@ export class TaskScheduler {
   private runningTasks = new Map<string, boolean>()
   private isProcessingQueue = false
 
-  // Parse cron expression to get next run time
   private parseNextRun(cronExpression: string, lastRun?: Date): Date {
-    // Simplified cron parser - in production, use a proper cron library like node-cron
     const now = lastRun ? new Date(lastRun.getTime() + 60000) : new Date()
     const tokens = cronExpression.split(' ')
     const minuteToken = tokens.at(0)
@@ -33,7 +31,6 @@ export class TaskScheduler {
     nextRun.setSeconds(0)
     nextRun.setMilliseconds(0)
     
-    // If the time has passed today, schedule for tomorrow
     if (nextRun <= now) {
       nextRun.setDate(nextRun.getDate() + 1)
     }
@@ -116,7 +113,6 @@ export class TaskScheduler {
 
       let output: string | undefined
 
-      // Execute task based on action type
       switch (task.action) {
         case 'command': {
           const { client } = await getWingsClientForServer(serverUuid)
@@ -188,7 +184,6 @@ export class TaskScheduler {
         throw new Error('Schedule is disabled')
       }
 
-      // Get tasks for this schedule
       const tasks = await this.db
         .select()
         .from(tables.serverScheduleTasks)
@@ -196,9 +191,7 @@ export class TaskScheduler {
         .orderBy(tables.serverScheduleTasks.sequenceId)
         .all()
 
-      // Execute tasks in sequence with time offsets
       for (const task of tasks) {
-        // Wait for time offset
         if (task.timeOffset > 0) {
           await new Promise(resolve => setTimeout(resolve, task.timeOffset * 1000))
         }
@@ -209,12 +202,11 @@ export class TaskScheduler {
         if (!result.success) {
           scheduleSuccess = false
           if (!task.continueOnFailure) {
-            break // Stop executing remaining tasks
+            break
           }
         }
       }
 
-      // Update schedule run times
       const nextRun = this.parseNextRun(schedule.cron, executedAt)
       await this.db
         .update(tables.serverSchedules)
@@ -239,14 +231,13 @@ export class TaskScheduler {
 
   async processScheduledTasks(): Promise<void> {
     if (this.isProcessingQueue) {
-      return // Already processing
+      return
     }
 
     this.isProcessingQueue = true
     const now = new Date()
 
     try {
-      // Get all enabled schedules
       const schedules = await this.db
         .select()
         .from(tables.serverSchedules)
@@ -254,7 +245,6 @@ export class TaskScheduler {
         .all()
 
       for (const schedule of schedules) {
-        // Check if schedule is due using cron expression
         if (this.isCronDue(schedule.cron, now)) {
           try {
             await this.executeSchedule(schedule.id)
@@ -279,13 +269,12 @@ export class TaskScheduler {
     const now = new Date()
     const nextRun = this.parseNextRun(cron)
 
-    // Create schedule
     await this.db.insert(tables.serverSchedules).values({
       id: scheduleId,
       serverId,
       name,
       cron,
-      action: 'task', // Default action
+      action: 'task',
       nextRunAt: nextRun,
       lastRunAt: null,
       enabled: true,
@@ -293,7 +282,6 @@ export class TaskScheduler {
       updatedAt: now,
     })
 
-    // Create tasks
     const taskRecords = tasks.map((task, index) => ({
       id: randomUUID(),
       scheduleId,
@@ -362,13 +350,11 @@ export class TaskScheduler {
       throw new Error('Schedule not found')
     }
 
-    // Delete tasks first
     await this.db
       .delete(tables.serverScheduleTasks)
       .where(eq(tables.serverScheduleTasks.scheduleId, scheduleId))
       .run()
 
-    // Delete schedule
     await this.db
       .delete(tables.serverSchedules)
       .where(eq(tables.serverSchedules.id, scheduleId))
@@ -485,29 +471,24 @@ export class TaskScheduler {
     }
   }
 
-  // Start the scheduler (call this on server startup)
   startScheduler(): void {
     console.log('Starting task scheduler...')
     
-    // Process schedules every minute
     setInterval(() => {
       this.processScheduledTasks().catch(error => {
         console.error('Scheduled task processing failed:', error)
       })
-    }, 60000) // 60 seconds
+    }, 60000)
   }
 
-  // Stop all running tasks (call this on server shutdown)
   stopScheduler(): void {
     console.log('Stopping task scheduler...')
     this.runningTasks.clear()
   }
 }
 
-// Export singleton instance
 export const taskScheduler = new TaskScheduler()
 
-// Legacy function exports for compatibility
 export async function executeScheduledTask(scheduleId: string, taskId: string): Promise<void> {
   await taskScheduler.executeScheduledTask(scheduleId, taskId)
 }

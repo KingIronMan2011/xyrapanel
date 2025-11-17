@@ -1,41 +1,6 @@
 import type { WingsJWTClaims as _WingsJWTClaims } from '#shared/types/wings'
+import { ADMIN_PERMISSIONS, DEFAULT_SUBUSER_PERMISSIONS, type GetUserPermissionsOptions } from '#shared/types/server-permissions'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
-
-const ADMIN_PERMISSIONS = [
-  'control.console',
-  'control.start',
-  'control.stop',
-  'control.restart',
-  'websocket.connect',
-  'admin.websocket.errors',
-  'admin.websocket.install',
-  'admin.websocket.transfer',
-  'file.read',
-  'file.write',
-  'file.delete',
-  'file.rename',
-  'file.download',
-  'file.upload',
-  'file.copy',
-  'file.create',
-  'file.chmod',
-  'file.compress',
-  'file.decompress',
-  'file.pull',
-]
-
-const DEFAULT_SUBUSER_PERMISSIONS = [
-  'control.console',
-  'control.start',
-  'control.stop',
-  'control.restart',
-  'websocket.connect',
-  'file.read',
-  'file.write',
-  'file.download',
-  'file.upload',
-  'file.copy',
-]
 
 export function normalizePermissionPayload(payload: unknown): string[] {
   if (!payload) {
@@ -59,12 +24,6 @@ export function normalizePermissionPayload(payload: unknown): string[] {
   return list
     .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     .map(item => item.trim())
-}
-
-interface GetUserPermissionsOptions {
-  isAdmin?: boolean
-  isOwner?: boolean
-  subuserPermissions?: string[] | null
 }
 
 async function _getUserPermissionsJWT(

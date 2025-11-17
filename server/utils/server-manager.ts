@@ -54,7 +54,6 @@ export class ServerManager {
         })
       }
     } catch (error) {
-      // Update server status to failed
       await this.db
         .update(tables.servers)
         .set({
@@ -94,7 +93,6 @@ export class ServerManager {
 
       await this.waitForServerDeletion(client, serverUuid)
 
-      // Remove from database
       await this.db
         .delete(tables.servers)
         .where(eq(tables.servers.uuid, serverUuid))
@@ -137,12 +135,11 @@ export class ServerManager {
     
     await client.sendPowerAction(serverUuid, action)
 
-    // Update server status after power action
     setTimeout(() => {
       updateServerStatus(serverUuid).catch(error => {
         console.error(`Failed to update status after power action for ${serverUuid}:`, error)
       })
-    }, 2000) // Wait 2 seconds for state to change
+    }, 2000)
 
     if (!options.skipAudit && options.userId) {
       await recordAuditEvent({
@@ -220,14 +217,12 @@ export class ServerManager {
       throw new Error('Server not found')
     }
 
-    // Stop the server first
     try {
       await this.powerAction(serverUuid, 'stop', { ...options, skipAudit: true })
     } catch (error) {
       console.warn(`Failed to stop server during suspension: ${error}`)
     }
 
-    // Update suspension status
     await this.db
       .update(tables.servers)
       .set({
@@ -260,7 +255,6 @@ export class ServerManager {
       throw new Error('Server not found')
     }
 
-    // Update suspension status
     await this.db
       .update(tables.servers)
       .set({
@@ -302,5 +296,4 @@ export class ServerManager {
   }
 }
 
-// Export singleton instance
 export const serverManager = new ServerManager()

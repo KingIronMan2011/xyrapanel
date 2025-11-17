@@ -47,7 +47,6 @@ export default defineEventHandler(async (event) => {
     if (isConnected) {
       const systemInfo = await client.getSystemInfo()
       
-      // Update last seen timestamp
       await db
         .update(tables.wingsNodes)
         .set({

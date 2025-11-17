@@ -2,7 +2,6 @@ import { sshKeyManager } from '~~/server/utils/ssh-key-manager'
 import { requirePermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
-  // Get authenticated user
   const { userId } = await requirePermission(event, 'server.view', 'self')
 
   const body = await readBody<{ name: string; publicKey: string }>(event)
@@ -15,7 +14,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Validate the SSH key format first
   const validation = sshKeyManager.validatePublicKey(publicKey)
   if (!validation.isValid) {
     throw createError({

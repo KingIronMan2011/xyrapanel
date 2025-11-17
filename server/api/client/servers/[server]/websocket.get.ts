@@ -13,10 +13,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Check permissions - user must have console access
   const { userId } = await requirePermission(event, 'server.console', serverId)
 
-  // Get server details
   const db = useDrizzle()
   const server = await db
     .select()

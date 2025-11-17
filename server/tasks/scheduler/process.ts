@@ -1,18 +1,15 @@
-// import { parseExpression } from 'cron-parser'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { serverManager } from '~~/server/utils/server-manager'
 import { backupManager } from '~~/server/utils/backup-manager'
 import { recordAuditEvent } from '~~/server/utils/audit'
 
-// Simple cron parser fallback until cron-parser is available
 function parseNextRun(cronExpression: string): Date {
   const now = new Date()
   const [minute, _hour, _day, _month, _weekday] = cronExpression.split(' ')
   
   const nextRun = new Date(now)
   
-  // Simple minute-based scheduling for now
   if (minute === '*') {
     nextRun.setMinutes(now.getMinutes() + 1)
   } else {
@@ -42,7 +39,6 @@ export default defineTask({
     try {
       console.log(`[${now.toISOString()}] Processing scheduled tasks...`)
 
-      // Get all enabled schedules that are due
       const schedules = await db
         .select()
         .from(tables.serverSchedules)
@@ -51,13 +47,11 @@ export default defineTask({
 
       for (const schedule of schedules) {
         try {
-          // Parse cron expression and check if it's due
           const nextRun = parseNextRun(schedule.cron)
           const lastRun = schedule.lastRunAt ? new Date(schedule.lastRunAt) : null
           
-          // Check if schedule is due (within the last minute)
           const timeSinceLastRun = lastRun ? now.getTime() - lastRun.getTime() : Infinity
-          const isOverdue = !lastRun || timeSinceLastRun > 65000 // 65 seconds buffer
+          const isOverdue = !lastRun || timeSinceLastRun > 65000
           
           if (isOverdue && nextRun <= now) {
             await processSchedule(schedule.id, db)
@@ -111,7 +105,6 @@ async function processSchedule(scheduleId: string, db: ReturnType<typeof useDriz
       return
     }
 
-    // Get tasks for this schedule
     const tasks = await db
       .select()
       .from(tables.serverScheduleTasks)
@@ -138,9 +131,7 @@ async function processSchedule(scheduleId: string, db: ReturnType<typeof useDriz
 
     let _allTasksSucceeded = true
 
-    // Execute tasks in sequence with time offsets
     for (const task of tasks) {
-      // Wait for time offset
       if (task.timeOffset > 0) {
         console.log(`Waiting ${task.timeOffset}s before executing task ${task.id}`)
         await new Promise(resolve => setTimeout(resolve, task.timeOffset * 1000))
@@ -161,7 +152,6 @@ async function processSchedule(scheduleId: string, db: ReturnType<typeof useDriz
       }
     }
 
-    // Update schedule run times
     const nextRun = parseNextRun(schedule.cron)
     
     await db
@@ -215,7 +205,6 @@ async function executeTask(
       throw new Error(`Unknown task action: ${task.action}`)
   }
 
-  // Record audit event for task execution
   await recordAuditEvent({
     actor: 'system',
     actorType: 'system',

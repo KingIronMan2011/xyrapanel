@@ -1,20 +1,9 @@
 import { createError, type H3Error } from 'h3'
-
-interface FetchError extends Error {
-  response?: Response
-  data?: unknown
-}
-
-interface WingsErrorOptions {
-  operation?: string
-  nodeId?: string
-}
-
-type QueryLike = Record<string, unknown>
+import type { WingsErrorOptions, WingsFetchError, WingsQuery } from '#shared/types/wings'
 
 const NODE_QUERY_KEYS = ['node', 'node_id', 'nodeId'] as const
 
-function isFetchError(error: unknown): error is FetchError {
+function isFetchError(error: unknown): error is WingsFetchError {
   return Boolean(error && typeof error === 'object' && 'response' in error)
 }
 
@@ -22,7 +11,7 @@ export function isH3Error(error: unknown): error is H3Error {
   return Boolean(error && typeof error === 'object' && 'statusCode' in error)
 }
 
-export function getNodeIdFromQuery(query: QueryLike): string | undefined {
+export function getNodeIdFromQuery(query: WingsQuery): string | undefined {
   for (const key of NODE_QUERY_KEYS) {
     const value = query[key]
     if (typeof value === 'string' && value.trim().length > 0) {

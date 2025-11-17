@@ -1,23 +1,9 @@
 import type { H3Event } from 'h3'
 import { createError } from 'h3'
 import { getServerSession } from '#auth'
-import { permissionManager, type Permission } from '~~/server/utils/permission-manager'
+import { permissionManager } from '~~/server/utils/permission-manager'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-
-export interface PermissionMiddlewareOptions {
-  requiredPermissions: Permission[]
-  serverId?: string
-  allowOwner?: boolean
-  allowAdmin?: boolean
-}
-
-export interface PermissionContext {
-  userId: string
-  isAdmin: boolean
-  isOwner: boolean
-  hasPermissions: boolean
-  missingPermissions: Permission[]
-}
+import type { Permission, PermissionContext, PermissionMiddlewareOptions } from '#shared/types/server-permissions'
 
 /**
  * Middleware to check user permissions for server operations
@@ -49,10 +35,8 @@ export async function requireServerPermission(
   const isAdmin = userPermissions.isAdmin
   const serverPerms = userPermissions.serverPermissions.get(options.serverId) || []
 
-  // Check if user is server owner
   const isOwner = serverPerms.length > 0 && serverPerms.includes('server.view')
 
-  // Admin bypass
   if (isAdmin && (options.allowAdmin !== false)) {
     return {
       userId: user.id,
@@ -63,7 +47,6 @@ export async function requireServerPermission(
     }
   }
 
-  // Owner bypass
   if (isOwner && (options.allowOwner !== false)) {
     return {
       userId: user.id,
@@ -74,7 +57,6 @@ export async function requireServerPermission(
     }
   }
 
-  // Check specific permissions
   const missingPermissions: Permission[] = []
   for (const permission of options.requiredPermissions) {
     if (!serverPerms.includes(permission)) {
@@ -156,10 +138,8 @@ export async function requireAnyPermission(
   const isAdmin = userPermissions.isAdmin
   const serverPerms = userPermissions.serverPermissions.get(serverId) || []
 
-  // Check if user is server owner
   const isOwner = serverPerms.length > 0 && serverPerms.includes('server.view')
 
-  // Admin or owner bypass
   if (isAdmin || isOwner) {
     return {
       userId: user.id,
@@ -170,7 +150,6 @@ export async function requireAnyPermission(
     }
   }
 
-  // Check if user has any of the required permissions
   const hasAnyPermission = permissions.some(permission => 
     serverPerms.includes(permission)
   )

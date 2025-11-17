@@ -71,7 +71,6 @@ export default defineEventHandler(async (event) => {
       .all()
   }
   catch (error) {
-    // If the session metadata table is missing (migration not applied yet), fall back to basic session info.
     if (error instanceof Error && /session_metadata/i.test(error.message ?? '')) {
       metadataAvailable = false
       rows = db.select({

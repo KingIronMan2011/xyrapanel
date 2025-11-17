@@ -11,7 +11,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Check permissions - user must have backup create access
   const { userId } = await requirePermission(event, 'server.backup.create', serverId)
 
   const body = await readBody<{ name?: string; ignored?: string }>(event)

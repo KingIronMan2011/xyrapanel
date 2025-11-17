@@ -3,9 +3,7 @@ import { getSessionUser } from '~~/server/utils/session'
 import { getWingsClientForServer, WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
 
 function sanitizePath(path: string): string {
-  // Remove any path traversal attempts
   const sanitized = path.replace(/\.\./g, '').replace(/\/+/g, '/')
-  // Ensure it starts with /
   return sanitized.startsWith('/') ? sanitized : `/${sanitized}`
 }
 
@@ -32,10 +30,9 @@ export default defineEventHandler(async (event) => {
     const { client, server } = await getWingsClientForServer(serverId)
     const files = await client.listFiles(server.uuid as string, directory)
 
-    // Sort files: directories first, then files, both alphabetically
     const sortedFiles = files.sort((a, b) => {
       if (a.is_file !== b.is_file) {
-        return a.is_file ? 1 : -1 // Directories first
+        return a.is_file ? 1 : -1
       }
       return a.name.localeCompare(b.name)
     })

@@ -1,15 +1,4 @@
-
-
-interface QueueJob {
-  id: string
-  type: string
-  data: Record<string, unknown>
-  status: 'pending' | 'processing' | 'completed' | 'failed'
-  createdAt: Date
-  startedAt?: Date
-  completedAt?: Date
-  error?: string
-}
+import type { QueueJob } from '#shared/types/queue'
 
 class SimpleQueue {
   private jobs: Map<string, QueueJob> = new Map()

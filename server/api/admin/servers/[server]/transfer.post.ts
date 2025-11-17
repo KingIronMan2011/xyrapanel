@@ -10,7 +10,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Check permissions - admin only
   await requireAdminPermission(event)
 
   const body = await readBody<{
