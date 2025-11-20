@@ -5,6 +5,7 @@ import type { CreateServerPayload } from '#shared/types/admin-servers'
 import { randomUUID } from 'crypto'
 import { and, eq, isNull } from 'drizzle-orm'
 import { provisionServerOnWings } from '~~/server/utils/server-provisioning'
+import { sendServerCreatedEmail } from '~~/server/utils/email'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -88,10 +89,16 @@ export default defineEventHandler(async (event) => {
   await db.insert(tables.serverLimits).values({
     serverId,
     memory: body.memory,
-    swap: body.swap,
+    memoryOverallocate: null,
     disk: body.disk,
+    diskOverallocate: null,
     io: body.io,
     cpu: body.cpu,
+    threads: body.threads ?? null,
+    oomDisabled: body.oomDisabled ?? true,
+    databaseLimit: null,
+    allocationLimit: null,
+    backupLimit: null,
     createdAt: now,
     updatedAt: now,
   })
@@ -145,6 +152,15 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Server provisioning failed',
       message: error instanceof Error ? error.message : 'Failed to provision server on Wings',
     })
+  }
+
+  if (owner?.email) {
+    try {
+      await sendServerCreatedEmail(owner.email, newServer.name, serverUuid)
+    }
+    catch (error) {
+      console.error('Failed to send server created email', error)
+    }
   }
 
   return {

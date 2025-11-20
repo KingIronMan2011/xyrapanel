@@ -1,4 +1,4 @@
-import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { useDrizzle, tables, eq, inArray } from '~~/server/utils/drizzle'
 
 export const SETTINGS_KEYS = {
 
@@ -12,6 +12,7 @@ export const SETTINGS_KEYS = {
   BRAND_LOGO_PATH: 'branding:logo_path',
 
   MAIL_DRIVER: 'mail:mailers:smtp:transport',
+  MAIL_SERVICE: 'mail:service',
   MAIL_HOST: 'mail:mailers:smtp:host',
   MAIL_PORT: 'mail:mailers:smtp:port',
   MAIL_USERNAME: 'mail:mailers:smtp:username',
@@ -65,13 +66,15 @@ export function getNumericSetting(key: SettingKey, fallback: number): number {
 export function getSettings(keys: SettingKey[]): Record<string, string | null> {
   const db = useDrizzle()
 
-  const results = keys.length > 0 && keys[0]
-    ? db
-        .select()
-        .from(tables.settings)
-        .where(eq(tables.settings.key, keys[0]))
-        .all()
-    : []
+  if (keys.length === 0) {
+    return {}
+  }
+
+  const results = db
+    .select()
+    .from(tables.settings)
+    .where(inArray(tables.settings.key, keys))
+    .all()
 
   const settingsMap: Record<string, string | null> = {}
 

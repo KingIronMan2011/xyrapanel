@@ -176,5 +176,10 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
         </div>
       </template>
     </UAuthForm>
+    <p class="text-center text-sm text-muted-foreground">
+      <NuxtLink to="/auth/password/request" class="text-primary underline-offset-4 hover:underline">
+        Forgot your password?
+      </NuxtLink>
+    </p>
   </div>
 </template>

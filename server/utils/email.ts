@@ -1,34 +1,114 @@
-
-
 import { createTransport } from 'nodemailer'
-import type { Transporter } from 'nodemailer'
+import type { Transporter, TransportOptions as NodemailerTransportOptions } from 'nodemailer'
+import { getSettings, getSettingWithDefault, SETTINGS_KEYS } from '~~/server/utils/settings'
 
 let transporter: Transporter | null = null
 
-export function initializeEmailService(config?: {
-  host?: string
-  port?: number
+interface EmailConfig {
+  service?: string | null
+  host?: string | null
+  port?: number | null
   secure?: boolean
-  user?: string
-  pass?: string
-}): void {
-  const emailConfig = config || {
-    host: process.env.SMTP_HOST || 'localhost',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+  user?: string | null
+  pass?: string | null
+}
+
+function sanitizeService(service?: string | null): string | null {
+  const trimmed = service?.trim()
+  return trimmed && trimmed.length > 0 ? trimmed : null
+}
+
+function resolveEmailConfig(explicit?: EmailConfig): EmailConfig | null {
+  if (explicit) {
+    return explicit
+  }
+
+  const settings = getSettings([
+    SETTINGS_KEYS.MAIL_SERVICE,
+    SETTINGS_KEYS.MAIL_HOST,
+    SETTINGS_KEYS.MAIL_PORT,
+    SETTINGS_KEYS.MAIL_USERNAME,
+    SETTINGS_KEYS.MAIL_PASSWORD,
+    SETTINGS_KEYS.MAIL_ENCRYPTION,
+  ])
+
+  const service = sanitizeService(settings[SETTINGS_KEYS.MAIL_SERVICE])
+
+  if (service) {
+    return {
+      service,
+      user: settings[SETTINGS_KEYS.MAIL_USERNAME],
+      pass: settings[SETTINGS_KEYS.MAIL_PASSWORD],
+    }
+  }
+
+  const host = settings[SETTINGS_KEYS.MAIL_HOST]
+  if (!host) {
+    return null
+  }
+
+  const portValue = settings[SETTINGS_KEYS.MAIL_PORT] || '587'
+  const encryption = (settings[SETTINGS_KEYS.MAIL_ENCRYPTION] || 'tls').toLowerCase()
+  const secure = encryption === 'ssl' || encryption === '465' || encryption === 'smtps' || encryption === 'true'
+
+  return {
+    host,
+    port: Number.parseInt(String(portValue), 10) || (secure ? 465 : 587),
+    secure,
+    user: settings[SETTINGS_KEYS.MAIL_USERNAME],
+    pass: settings[SETTINGS_KEYS.MAIL_PASSWORD],
+  }
+}
+
+export function initializeEmailService(config?: EmailConfig): void {
+  const emailConfig = resolveEmailConfig(config)
+
+  if (!emailConfig) {
+    transporter = null
+    console.warn('Email service configuration is incomplete; transport not initialized')
+    return
+  }
+
+  if (emailConfig.service) {
+    transporter = createTransport({
+      service: emailConfig.service,
+      auth: emailConfig.user && emailConfig.pass ? {
+        user: emailConfig.user,
+        pass: emailConfig.pass,
+      } : undefined,
+    } as NodemailerTransportOptions)
+    return
   }
 
   transporter = createTransport({
-    host: emailConfig.host,
-    port: emailConfig.port,
-    secure: emailConfig.secure,
+    host: emailConfig.host!,
+    port: emailConfig.port ?? 587,
+    secure: emailConfig.secure ?? false,
     auth: emailConfig.user && emailConfig.pass ? {
       user: emailConfig.user,
       pass: emailConfig.pass,
     } : undefined,
   })
+}
+
+export function refreshEmailService(): void {
+  initializeEmailService()
+}
+
+function ensureEmailServiceInitialized(): void {
+  if (!transporter) {
+    refreshEmailService()
+  }
+}
+
+export function resolvePanelBaseUrl(): string {
+  const base = process.env.AUTH_ORIGIN
+    || process.env.NUXT_AUTH_ORIGIN
+    || process.env.NUXT_PUBLIC_APP_URL
+    || process.env.APP_URL
+    || 'http://localhost:3000'
+
+  return base.replace(/\/$/, '')
 }
 
 export async function sendEmail(options: {
@@ -37,12 +117,16 @@ export async function sendEmail(options: {
   html: string
   text?: string
 }): Promise<void> {
+  ensureEmailServiceInitialized()
+
   if (!transporter) {
     console.warn('Email service not initialized, skipping email send')
     return
   }
 
-  const from = process.env.SMTP_FROM || 'noreply@xyrapanel.com'
+  const fromAddress = getSettingWithDefault(SETTINGS_KEYS.MAIL_FROM_ADDRESS, 'noreply@xyrapanel.local')
+  const fromName = getSettingWithDefault(SETTINGS_KEYS.MAIL_FROM_NAME, 'XyraPanel')
+  const from = fromName ? `${fromName} <${fromAddress}>` : fromAddress
 
   await transporter.sendMail({
     from,
@@ -147,5 +231,55 @@ export async function sendServerSuspendedEmail(
     to: email,
     subject: `Server Suspended: ${serverName}`,
     html,
+  })
+}
+
+export async function sendServerReinstalledEmail(
+  email: string,
+  serverName: string,
+  serverUuid: string
+): Promise<void> {
+  const html = `
+    <h2>Server Reinstalled</h2>
+    <p>Your server "${serverName}" has been reinstalled successfully.</p>
+    <p>Server UUID: ${serverUuid}</p>
+    <p>You can now access your server from the panel.</p>
+  `
+
+  await sendEmail({
+    to: email,
+    subject: `Server Reinstalled: ${serverName}`,
+    html,
+  })
+}
+
+export async function sendAdminUserCreatedEmail(options: {
+  to: string
+  username: string
+  temporaryPassword?: string
+}): Promise<void> {
+  const baseUrl = resolvePanelBaseUrl()
+  const loginUrl = `${baseUrl}/auth/login`
+
+  const bodyLines = [
+    '<h2>Your XyraPanel account is ready</h2>',
+    `<p>An administrator has created an account for you with username <strong>${options.username}</strong>.</p>`,
+  ]
+
+  if (options.temporaryPassword) {
+    bodyLines.push('<p>A temporary password has been generated for you:</p>')
+    bodyLines.push(`<p><strong>${options.temporaryPassword}</strong></p>`)
+    bodyLines.push('<p>Please sign in and change this password immediately from your account security settings.</p>')
+  }
+  else {
+    bodyLines.push('<p>Please sign in using the credentials provided by your administrator.</p>')
+  }
+
+  bodyLines.push(`<p>You can access the panel here: <a href="${loginUrl}">${loginUrl}</a></p>`) 
+
+  await sendEmail({
+    to: options.to,
+    subject: 'Your XyraPanel account has been created',
+    html: bodyLines.join('\n'),
   })
 }

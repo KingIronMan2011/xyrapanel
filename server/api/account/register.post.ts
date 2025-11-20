@@ -3,6 +3,7 @@ import { createError, defineEventHandler, readBody } from 'h3'
 import bcrypt from 'bcryptjs'
 
 import { useDrizzle, tables, eq, or } from '~~/server/utils/drizzle'
+import { sendWelcomeEmail } from '~~/server/utils/email'
 import type { Role } from '#shared/types/auth'
 
 export default defineEventHandler(async (event) => {
@@ -72,6 +73,10 @@ export default defineEventHandler(async (event) => {
       .where(eq(tables.users.id, id))
       .limit(1)
       .get()
+
+    if (createdUser) {
+      await sendWelcomeEmail(createdUser.email, createdUser.username)
+    }
 
     return {
       user: createdUser ?? {

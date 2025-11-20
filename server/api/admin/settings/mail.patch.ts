@@ -1,6 +1,7 @@
 import { getServerSession } from '#auth'
 import { isAdmin } from '~~/server/utils/session'
 import { SETTINGS_KEYS, setSettings } from '~~/server/utils/settings'
+import { refreshEmailService } from '~~/server/utils/email'
 import type { MailSettings } from '#shared/types/admin-settings'
 
 export default defineEventHandler(async (event) => {
@@ -18,6 +19,10 @@ export default defineEventHandler(async (event) => {
 
   if (body.driver !== undefined) {
     updates[SETTINGS_KEYS.MAIL_DRIVER] = body.driver
+  }
+
+  if (body.service !== undefined) {
+    updates[SETTINGS_KEYS.MAIL_SERVICE] = body.service
   }
 
   if (body.host !== undefined) {
@@ -56,6 +61,8 @@ export default defineEventHandler(async (event) => {
   }
 
   setSettings(updates as Record<typeof SETTINGS_KEYS[keyof typeof SETTINGS_KEYS], string>)
+
+  refreshEmailService()
 
   return { success: true }
 })

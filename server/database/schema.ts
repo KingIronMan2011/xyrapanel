@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, uniqueIndex, primaryKey, index } from 'drizzle-orm/sqlite-core'
 
 export const users = sqliteTable(
   'users',
@@ -378,6 +378,18 @@ export const recoveryTokens = sqliteTable('recovery_tokens', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
+export const passwordResets = sqliteTable('password_resets', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text('token').notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  usedAt: integer('used_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, table => ({
+  userIndex: uniqueIndex('password_resets_user_id_index').on(table.userId),
+  tokenIndex: index('password_resets_token_index').on(table.token),
+}))
+
 export const nests = sqliteTable('nests', {
   id: text('id').primaryKey(),
   uuid: text('uuid').notNull().unique(),
@@ -474,6 +486,7 @@ export type ServerBackupRow = typeof serverBackups.$inferSelect
 export type ServerTransferRow = typeof serverTransfers.$inferSelect
 export type AuditEventRow = typeof auditEvents.$inferSelect
 export type RecoveryTokenRow = typeof recoveryTokens.$inferSelect
+export type PasswordResetRow = typeof passwordResets.$inferSelect
 export type DatabaseHostRow = typeof databaseHosts.$inferSelect
 export type NestRow = typeof nests.$inferSelect
 export type EggRow = typeof eggs.$inferSelect
@@ -547,6 +560,7 @@ export const tables = {
   serverTransfers,
   auditEvents,
   recoveryTokens,
+  passwordResets,
   nests,
   eggs,
   eggVariables,

@@ -12,6 +12,7 @@ export interface GeneralSettings {
 
 export interface MailSettings {
   driver: string
+  service: string
   host: string
   port: string
   username: string

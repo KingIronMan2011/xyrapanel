@@ -4,6 +4,7 @@ import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import type { AdminCreateUserPayload } from '#shared/types/user'
+import { sendAdminUserCreatedEmail } from '~~/server/utils/email'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -44,6 +45,17 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.insert(tables.users).values(newUser).run()
+
+  try {
+    await sendAdminUserCreatedEmail({
+      to: newUser.email,
+      username: newUser.username,
+      temporaryPassword: body.password,
+    })
+  }
+  catch (error) {
+    console.error('Failed to send admin user created email', error)
+  }
 
   return {
     data: {

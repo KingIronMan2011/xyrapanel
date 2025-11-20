@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import type { FormSubmitEvent } from '@nuxt/ui'
+import type { FormSubmitEvent, SelectItem } from '@nuxt/ui'
 import type { MailSettings } from '#shared/types/admin-settings'
 
 const toast = useToast()
@@ -23,8 +23,26 @@ const encryptionOptions = [
   { label: 'None', value: encryptionEnumValues[2] },
 ] satisfies { label: string; value: EncryptionValue }[]
 
+const CUSTOM_SERVICE_VALUE = 'custom'
+const serviceEnumValues = [
+  CUSTOM_SERVICE_VALUE,
+  'gmail',
+  'outlook365',
+  'yahoo',
+  'zoho',
+  'ses',
+  'sendgrid',
+  'mailgun',
+  'postmark',
+  'sendinblue',
+  'mailjet',
+  'mailtrap',
+  'proton',
+] as const
+
 const schema = z.object({
   driver: z.enum(driverEnumValues),
+  service: z.enum(serviceEnumValues),
   host: z.string().trim().max(255),
   port: z.string().trim().max(5),
   username: z.string().trim().max(255),
@@ -33,7 +51,9 @@ const schema = z.object({
   fromAddress: z.string().trim().email('Enter a valid email address'),
   fromName: z.string().trim().min(1, 'Sender name is required').max(120, 'Sender name must be under 120 characters'),
 }).superRefine((data, ctx) => {
-  if (data.driver !== 'sendmail') {
+  const usingService = data.service !== CUSTOM_SERVICE_VALUE
+
+  if (data.driver !== 'sendmail' && !usingService) {
     if (data.host.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -51,7 +71,7 @@ const schema = z.object({
     }
   }
 
-  if (data.port.length > 0) {
+  if (data.port.length > 0 && !usingService) {
     if (!/^\d+$/.test(data.port)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -75,8 +95,13 @@ const schema = z.object({
 type FormSchema = z.infer<typeof schema>
 
 function createFormState(source?: MailSettings | null): FormSchema {
+  const normalizedService = source?.service && (serviceEnumValues as readonly string[]).includes(source.service)
+    ? (source.service as typeof serviceEnumValues[number])
+    : CUSTOM_SERVICE_VALUE
+
   return {
     driver: (source?.driver as DriverValue | undefined) ?? 'smtp',
+    service: normalizedService,
     host: source?.host ?? '',
     port: source?.port ?? '587',
     username: source?.username ?? '',
@@ -92,7 +117,23 @@ const { data: settings, refresh } = await useFetch<MailSettings>('/api/admin/set
 })
 
 const form = reactive<FormSchema>(createFormState(settings.value))
-const disableSmtpFields = computed(() => form.driver === 'sendmail')
+const serviceOptions: SelectItem[] = [
+  { label: 'Custom (enter SMTP host)', value: CUSTOM_SERVICE_VALUE },
+  { label: 'Gmail / Google Workspace', value: 'gmail' },
+  { label: 'Microsoft 365 / Outlook', value: 'outlook365' },
+  { label: 'Yahoo Mail', value: 'yahoo' },
+  { label: 'Zoho Mail', value: 'zoho' },
+  { label: 'Amazon SES', value: 'ses' },
+  { label: 'SendGrid', value: 'sendgrid' },
+  { label: 'Mailgun', value: 'mailgun' },
+  { label: 'Postmark', value: 'postmark' },
+  { label: 'Brevo (Sendinblue)', value: 'sendinblue' },
+  { label: 'Mailjet', value: 'mailjet' },
+  { label: 'Mailtrap', value: 'mailtrap' },
+  { label: 'Proton Mail', value: 'proton' },
+]
+
+const disableSmtpFields = computed(() => form.driver === 'sendmail' || form.service !== CUSTOM_SERVICE_VALUE)
 
 watch(settings, (newSettings) => {
   if (!newSettings)
@@ -101,25 +142,40 @@ watch(settings, (newSettings) => {
   Object.assign(form, createFormState(newSettings))
 })
 
+watch(() => form.driver, (driver) => {
+  if (driver !== 'smtp')
+    form.service = CUSTOM_SERVICE_VALUE
+})
+
 async function handleSubmit(event: FormSubmitEvent<FormSchema>) {
   if (isSubmitting.value)
     return
 
   isSubmitting.value = true
 
+  const isPresetService = event.data.service !== CUSTOM_SERVICE_VALUE
   const payload: FormSchema = {
     ...event.data,
-    host: event.data.driver === 'sendmail' ? '' : event.data.host,
-    port: event.data.driver === 'sendmail' ? '' : event.data.port,
+    service: isPresetService ? event.data.service : CUSTOM_SERVICE_VALUE,
+    host: event.data.driver === 'sendmail' || isPresetService ? '' : event.data.host,
+    port: event.data.driver === 'sendmail' || isPresetService ? '' : event.data.port,
   }
+
+  const persistedService = isPresetService ? event.data.service : ''
 
   try {
     await $fetch('/api/admin/settings/mail', {
       method: 'PATCH',
-      body: payload,
+      body: {
+        ...payload,
+        service: persistedService,
+      },
     })
 
-    Object.assign(form, payload)
+    Object.assign(form, {
+      ...payload,
+      service: isPresetService ? event.data.service : CUSTOM_SERVICE_VALUE,
+    })
 
     toast.add({
       title: 'Settings updated',
@@ -198,21 +254,51 @@ async function handleTestEmail() {
     >
       <div class="grid gap-4 md:grid-cols-2">
         <UFormField label="Mail Driver" name="driver" required>
-          <USelect v-model="form.driver" :items="driverOptions" value-key="value" :disabled="isSubmitting" />
+          <USelect v-model="form.driver" :items="driverOptions" value-key="value" :disabled="isSubmitting" class="w-full" />
         </UFormField>
 
         <UFormField label="Encryption" name="encryption" required>
-          <USelect v-model="form.encryption" :items="encryptionOptions" value-key="value" :disabled="isSubmitting" />
+          <USelect
+            v-model="form.encryption"
+            :items="encryptionOptions"
+            value-key="value"
+            :disabled="isSubmitting || disableSmtpFields"
+            class="w-full"
+          />
+        </UFormField>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-2">
+        <UFormField label="Service" name="service" class="md:col-span-2">
+          <USelect
+            v-model="form.service"
+            :items="serviceOptions"
+            value-key="value"
+            :disabled="isSubmitting || form.driver !== 'smtp'"
+            class="w-full"
+            :ui="{ content: 'min-w-[20rem]', itemLabel: 'whitespace-normal', item: 'items-start whitespace-normal' }"
+          />
         </UFormField>
       </div>
 
       <div class="grid gap-4 md:grid-cols-2">
         <UFormField label="SMTP Host" name="host" required>
-          <UInput v-model="form.host" placeholder="smtp.gmail.com" :disabled="isSubmitting || disableSmtpFields" class="w-full" />
+          <UInput
+            v-model="form.host"
+            placeholder="smtp.gmail.com"
+            :disabled="isSubmitting || disableSmtpFields"
+            class="w-full"
+          />
         </UFormField>
 
         <UFormField label="SMTP Port" name="port" required>
-          <UInput v-model="form.port" type="number" placeholder="587" :disabled="isSubmitting || disableSmtpFields" class="w-full" />
+          <UInput
+            v-model="form.port"
+            type="number"
+            placeholder="587"
+            :disabled="isSubmitting || disableSmtpFields"
+            class="w-full"
+          />
         </UFormField>
       </div>
 

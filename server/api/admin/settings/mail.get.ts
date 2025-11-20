@@ -14,6 +14,7 @@ export default defineEventHandler(async (event) => {
 
   return {
     driver: getSettingWithDefault(SETTINGS_KEYS.MAIL_DRIVER, 'smtp'),
+    service: getSettingWithDefault(SETTINGS_KEYS.MAIL_SERVICE, ''),
     host: getSettingWithDefault(SETTINGS_KEYS.MAIL_HOST, 'localhost'),
     port: getSettingWithDefault(SETTINGS_KEYS.MAIL_PORT, '587'),
     username: getSettingWithDefault(SETTINGS_KEYS.MAIL_USERNAME, ''),

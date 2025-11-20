@@ -1,11 +1,24 @@
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { recordAuditEvent } from '~~/server/utils/audit'
+import { sendBackupCompletedEmail } from '~~/server/utils/email'
 import { randomUUID } from 'crypto'
 import type { BackupManagerOptions, CreateBackupOptions, BackupInfo } from '#shared/types/server-backups'
 
 export class BackupManager {
   private db = useDrizzle()
+
+  private async getServerOwnerContact(ownerId: string | null | undefined) {
+    if (!ownerId) {
+      return null
+    }
+
+    return this.db
+      .select({ email: tables.users.email, username: tables.users.username })
+      .from(tables.users)
+      .where(eq(tables.users.id, ownerId))
+      .get()
+  }
 
   async createBackup(serverUuid: string, options: CreateBackupOptions = {}): Promise<BackupInfo> {
     const { client, server } = await getWingsClientForServer(serverUuid)
@@ -62,6 +75,11 @@ export class BackupManager {
             size: wingsBackup.bytes,
           },
         })
+      }
+
+      const owner = await this.getServerOwnerContact(server.ownerId as string | undefined)
+      if (owner?.email) {
+        await sendBackupCompletedEmail(owner.email, server.name as string, backupName)
       }
 
       return {

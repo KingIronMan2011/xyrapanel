@@ -3,11 +3,24 @@ import { getWingsClientForServer, WingsConnectionError, WingsAuthError } from '~
 import { getServerStatus, updateServerStatus } from '~~/server/utils/server-status'
 import { provisionServerOnWings, waitForServerInstall } from '~~/server/utils/server-provisioning'
 import { recordAuditEvent } from '~~/server/utils/audit'
+import { sendServerReinstalledEmail, sendServerSuspendedEmail } from '~~/server/utils/email'
 import type { WingsClient } from '~~/server/utils/wings-client'
 import type { ServerManagerOptions } from '#shared/types/server-manager'
 
 export class ServerManager {
   private db = useDrizzle()
+
+  private async getServerOwnerContact(ownerId: string | null | undefined) {
+    if (!ownerId) {
+      return null
+    }
+
+    return this.db
+      .select({ email: tables.users.email, username: tables.users.username })
+      .from(tables.users)
+      .where(eq(tables.users.id, ownerId))
+      .get()
+  }
 
   private async waitForServerDeletion(client: WingsClient, serverUuid: string): Promise<void> {
     const maxRetries = 20
@@ -182,6 +195,16 @@ export class ServerManager {
         .where(eq(tables.servers.uuid, serverUuid))
         .run()
 
+      const owner = await this.getServerOwnerContact(server.ownerId as string | undefined)
+      if (owner?.email) {
+        try {
+          await sendServerReinstalledEmail(owner.email, server.name as string, serverUuid)
+        }
+        catch (error) {
+          console.error('Failed to send server reinstalled email', error)
+        }
+      }
+
       if (!options.skipAudit && options.userId) {
         await recordAuditEvent({
           actor: options.userId,
@@ -231,6 +254,16 @@ export class ServerManager {
       })
       .where(eq(tables.servers.uuid, serverUuid))
       .run()
+
+    const owner = await this.getServerOwnerContact(server.ownerId as string | undefined)
+    if (owner?.email) {
+      try {
+        await sendServerSuspendedEmail(owner.email, server.name as string)
+      }
+      catch (error) {
+        console.error('Failed to send server suspended email', error)
+      }
+    }
 
     if (!options.skipAudit && options.userId) {
       await recordAuditEvent({
