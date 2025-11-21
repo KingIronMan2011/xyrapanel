@@ -142,7 +142,7 @@ export async function sendEmail(options: {
     to: options.to,
     subject: options.subject,
     html: options.html,
-    text: options.text || options.html.replace(/<[^>]*>/g, ''),
+    text: options.text,
   })
 }
 
