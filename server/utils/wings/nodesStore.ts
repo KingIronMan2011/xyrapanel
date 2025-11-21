@@ -127,10 +127,8 @@ export async function syncWingsNodeConfiguration(id: string, panelUrl: string): 
 
   const requestUrl = new URL('/api/update', stored.baseURL)
 
-  const previousTlsSetting = process.env.NODE_TLS_REJECT_UNAUTHORIZED
-
   if (stored.allowInsecure) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+    throw new Error('Insecure Wings connections are not supported. Disable "allowInsecure" on this node.')
   }
 
   try {
@@ -150,14 +148,7 @@ export async function syncWingsNodeConfiguration(id: string, panelUrl: string): 
     }
   }
   finally {
-    if (stored.allowInsecure) {
-      if (previousTlsSetting === undefined) {
-        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
-      }
-      else {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = previousTlsSetting
-      }
-    }
+    // no-op
   }
 }
 

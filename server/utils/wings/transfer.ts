@@ -23,10 +23,8 @@ export function createWingsTransferClient(node: WingsNodeConnection) {
       ...options.headers,
     }
 
-    const previousTlsSetting = process.env.NODE_TLS_REJECT_UNAUTHORIZED
-
     if (node.allowInsecure) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+      throw new Error('Insecure Wings connections are not supported. Disable "allowInsecure" on this node.')
     }
 
     const response = await fetch(url, {
@@ -34,15 +32,6 @@ export function createWingsTransferClient(node: WingsNodeConnection) {
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
     })
-
-    if (node.allowInsecure) {
-      if (previousTlsSetting === undefined) {
-        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
-      }
-      else {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = previousTlsSetting
-      }
-    }
 
     if (!response.ok) {
       const message = await response.text()

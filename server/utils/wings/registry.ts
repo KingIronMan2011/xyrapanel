@@ -283,6 +283,7 @@ export async function remoteUploadFiles(
   }
 
   const node = requireNode(nodeId)
+
   const formData = new FormData()
   formData.set('directory', normalizeRoot(root))
 
@@ -301,9 +302,8 @@ export async function remoteUploadFiles(
     formData.append('files', blob, file.name)
   })
 
-  if (node.allowInsecure) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-  }
+  if (node.allowInsecure)
+    throw new Error('Insecure Wings connections are not supported. Disable "allowInsecure" on this node.')
 
   const uploadUrl = new URL(`/api/servers/${serverUuid}/files/upload`, node.baseURL)
   const response = await fetch(uploadUrl.toString(), {
@@ -340,9 +340,8 @@ export async function remoteGetFileDownloadUrl(serverUuid: string, file: string,
 }
 
 async function wingsFetch<T = unknown>(url: string, options: WingsHttpRequestOptions): Promise<T> {
-  if (options.allowInsecure) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-  }
+  if (options.allowInsecure)
+    throw new Error('Insecure Wings connections are not supported. Disable "allowInsecure" on this node.')
 
   const fullUrl = new URL(url, options.baseURL)
 
