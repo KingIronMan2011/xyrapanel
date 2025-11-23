@@ -1,17 +1,13 @@
-import { getServerSession } from '#auth'
 import { createError } from 'h3'
-
+import { APIError } from 'better-auth/api'
+import { getAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { getSessionUser } from '~~/server/utils/session'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAdmin } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const admin = getSessionUser(session)
-
-  if (!admin || admin.role !== 'admin') {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden', message: 'Admin privileges required' })
-  }
+  const session = await requireAdmin(event)
+  const auth = getAuth()
 
   const userId = getRouterParam(event, 'id')
   if (!userId) {
@@ -24,7 +20,7 @@ export default defineEventHandler(async (event) => {
     .select({
       id: tables.users.id,
       username: tables.users.username,
-      useTotp: tables.users.useTotp,
+      twoFactorEnabled: tables.users.twoFactorEnabled,
     })
     .from(tables.users)
     .where(eq(tables.users.id, userId))
@@ -34,34 +30,46 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'User not found' })
   }
 
-  const now = new Date()
-
-  db.update(tables.users)
-    .set({
-      useTotp: false,
-      totpSecret: null,
-      totpAuthenticatedAt: null,
-      updatedAt: now,
+  try {
+    await auth.api.adminUpdateUser({
+      body: {
+        userId,
+        data: {
+          twoFactorEnabled: false,
+        },
+      },
+      headers: event.req.headers,
     })
-    .where(eq(tables.users.id, userId))
-    .run()
 
-  db.delete(tables.recoveryTokens)
-    .where(eq(tables.recoveryTokens.userId, userId))
-    .run()
+    db.delete(tables.twoFactor)
+      .where(eq(tables.twoFactor.userId, userId))
+      .run()
 
-  await recordAuditEventFromRequest(event, {
-    actor: admin.username,
-    actorType: 'user',
-    action: 'admin.user.disable_2fa',
-    targetType: 'user',
-    targetId: userId,
-  })
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.user.disable_2fa',
+      targetType: 'user',
+      targetId: userId,
+    })
 
-  return {
-    success: true,
-    message: existing.useTotp
-      ? 'Two-factor authentication has been disabled for the user.'
-      : 'Two-factor authentication was already disabled.',
+    return {
+      success: true,
+      message: existing.twoFactorEnabled
+        ? 'Two-factor authentication has been disabled for the user.'
+        : 'Two-factor authentication was already disabled.',
+    }
+  }
+  catch (error) {
+    if (error instanceof APIError) {
+      throw createError({
+        statusCode: error.statusCode,
+        statusMessage: error.message || 'Failed to disable 2FA',
+      })
+    }
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to disable 2FA',
+    })
   }
 })

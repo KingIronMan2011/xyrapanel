@@ -1,54 +1,18 @@
-import { createError, parseCookies, getRequestIP, getHeader, getRequestFingerprint } from 'h3'
-import { getServerSession } from '#auth'
-import type { AccountSessionRow, SessionMetadataUpsertInput, UserSessionSummary, AccountSessionsResponse } from '#shared/types/auth'
-import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
+import { createError, parseCookies } from 'h3'
+import { auth } from '~~/server/utils/auth'
+import type { UserSessionSummary, AccountSessionsResponse } from '#shared/types/auth'
+import { parseUserAgent } from '~~/server/utils/user-agent'
 
-function parseUserAgent(userAgent: string | null | undefined) {
-  const ua = userAgent ?? ''
-  if (!ua) {
-    return { browser: 'Unknown', os: 'Unknown', device: 'Unknown' }
-  }
+export default defineEventHandler(async (event): Promise<AccountSessionsResponse> => {
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  const normalized = ua.toLowerCase()
-
-  let browser = 'Unknown'
-  if (/firefox\/[\d.]+/i.test(ua)) browser = 'Firefox'
-  else if (/edg(e|a|ios)?\/[\d.]+/i.test(ua)) browser = 'Microsoft Edge'
-  else if (/opr\/[\d.]+/i.test(ua) || /opera/i.test(ua)) browser = 'Opera'
-  else if (/chrome\/[\d.]+/i.test(ua) && !/edg\//i.test(ua) && !/opr\//i.test(ua)) browser = 'Chrome'
-  else if (/crios\/[\d.]+/i.test(ua)) browser = 'Chrome iOS'
-  else if (/safari\/[\d.]+/i.test(ua) && /version\/[\d.]+/i.test(ua)) browser = 'Safari'
-  else if (/msie|trident/i.test(ua)) browser = 'Internet Explorer'
-  else if (/brave/i.test(ua)) browser = 'Brave'
-
-  let os = 'Unknown'
-  if (/windows nt 10\.0|windows nt 11\.0/i.test(normalized)) os = 'Windows'
-  else if (/windows nt 6\.3/i.test(normalized)) os = 'Windows 8.1'
-  else if (/windows nt 6\.2/i.test(normalized)) os = 'Windows 8'
-  else if (/windows nt 6\.1/i.test(normalized)) os = 'Windows 7'
-  else if (/mac os x 10[._]\d+/i.test(ua)) os = 'macOS'
-  else if (/cros/i.test(ua)) os = 'ChromeOS'
-  else if (/android/i.test(ua)) os = 'Android'
-  else if (/iphone|ipad|ipod/i.test(ua)) os = 'iOS'
-  else if (/linux/i.test(ua)) os = 'Linux'
-
-  let device = 'Desktop'
-  if (/ipad|tablet/i.test(ua)) device = 'Tablet'
-  else if (/mobile|iphone|ipod|android/i.test(ua)) device = 'Mobile'
-  else if (/bot|crawler|spider/i.test(ua)) device = 'Bot'
-
-  return { browser, os, device }
-}
-
-export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const resolvedUser = resolveSessionUser(session)
-  const db = useDrizzle()
-
-  if (!resolvedUser?.id) {
+  if (!session?.user?.id) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }
+
+  const db = useDrizzle()
 
   let metadataAvailable = true
   let rows: AccountSessionRow[]
@@ -67,7 +31,7 @@ export default defineEventHandler(async (event) => {
     })
       .from(tables.sessions)
       .leftJoin(tables.sessionMetadata, eq(tables.sessionMetadata.sessionToken, tables.sessions.sessionToken))
-      .where(eq(tables.sessions.userId, resolvedUser.id))
+      .where(eq(tables.sessions.userId, session.user.id))
       .all()
   }
   catch (error) {
@@ -78,7 +42,7 @@ export default defineEventHandler(async (event) => {
         expires: tables.sessions.expires,
       })
         .from(tables.sessions)
-        .where(eq(tables.sessions.userId, resolvedUser.id))
+        .where(eq(tables.sessions.userId, session.user.id))
         .all()
     }
     else {
@@ -87,9 +51,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const cookies = parseCookies(event)
-  const currentToken = cookies['authjs.session-token']
-    ?? cookies['next-auth.session-token']
-    ?? cookies['__Secure-next-auth.session-token']
+  const currentToken = cookies['better-auth.session_token']
 
   const currentIp = getRequestIP(event) || null
   const currentUserAgent = getHeader(event, 'user-agent') || ''

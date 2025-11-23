@@ -1,8 +1,7 @@
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { getWingsClient, WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
-import type { WingsNode } from '~~/server/utils/wings-client'
+import type { WingsNode } from '#shared/types/wings-client'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)

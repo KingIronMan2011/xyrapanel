@@ -1,5 +1,4 @@
-import { getServerSession } from '#auth'
-import { isAdmin, getSessionUser } from '~~/server/utils/session'
+import { getServerSession, isAdmin, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 
 export default defineEventHandler(async (event) => {

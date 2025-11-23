@@ -1,7 +1,8 @@
 import { createError } from 'h3'
+import { APIError } from 'better-auth/api'
+import { getAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables, eq, or } from '~~/server/utils/drizzle'
-import { createPasswordResetToken } from '~~/server/utils/password-reset'
-import { sendPasswordResetEmail, resolvePanelBaseUrl } from '~~/server/utils/email'
+import { resolvePanelBaseUrl } from '~~/server/utils/email'
 
 interface RequestBody {
   identity?: string
@@ -20,20 +21,39 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = useDrizzle()
-
   const user = db
     .select({ id: tables.users.id, email: tables.users.email })
     .from(tables.users)
     .where(or(eq(tables.users.email, identity), eq(tables.users.username, identity)))
     .get()
 
-  if (user?.email) {
-    try {
-      const { token } = await createPasswordResetToken(user.id)
-      const resetBaseUrl = `${resolvePanelBaseUrl()}/auth/password/reset`
-      await sendPasswordResetEmail(user.email, token, resetBaseUrl)
+  if (!user?.email) {
+    return {
+      success: true,
+      message: 'If an account matches, a password reset email has been sent.',
     }
-    catch (error) {
+  }
+
+  const auth = getAuth()
+  const resetBaseUrl = `${resolvePanelBaseUrl()}/auth/password/reset`
+  
+  try {
+    await auth.api.requestPasswordReset({
+      body: {
+        email: user.email,
+        redirectTo: resetBaseUrl,
+      },
+      headers: event.req.headers,
+    })
+  }
+  catch (error) {
+    if (error instanceof APIError) {
+      console.error('Failed to send password reset email', {
+        status: error.statusCode,
+        message: error.message,
+      })
+    }
+    else {
       console.error('Failed to send password reset email', error)
     }
   }

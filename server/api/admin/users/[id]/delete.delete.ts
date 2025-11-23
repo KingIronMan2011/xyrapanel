@@ -1,7 +1,6 @@
-import { getServerSession } from '#auth'
+import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { count } from 'drizzle-orm'
-import { getSessionUser } from '~~/server/utils/session'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)

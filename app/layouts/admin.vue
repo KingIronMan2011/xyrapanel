@@ -2,8 +2,14 @@
 import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { SessionUser } from '#shared/types/auth'
-import type { SecuritySettings } from '#shared/types/admin-settings'
-import type { AdminNavItem } from '#shared/types/admin-navigation'
+import type { SecuritySettings, AdminNavItem } from '#shared/types/admin'
+import { useAuthStore } from '~/stores/auth'
+import { authClient } from '~/utils/auth-client'
+
+await authClient.useSession(useFetch)
+
+const authStore = useAuthStore()
+await authStore.syncSession({ force: true })
 
 const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
@@ -93,12 +99,10 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
 
 const route = useRoute()
 const router = useRouter()
-const authStore = useAuthStore()
 const {
   user: storeUser,
   permissions: userPermissions,
   isSuperUser: storeIsSuperUser,
-  isAuthenticating,
   status: authStatus,
 } = storeToRefs(authStore)
 
@@ -193,15 +197,45 @@ const navigateToSecuritySettings = () => {
 }
 
 const handleSignOut = async () => {
-  await authStore.logout({ callbackUrl: '/auth/login' })
+  await authStore.logout()
+  await router.push('/auth/login')
 }
 
-const userLabel = computed(() => sessionUser.value?.username || sessionUser.value?.email || 'Administrator')
+const { displayName, avatar } = storeToRefs(authStore)
+
+const userLabel = computed(() => {
+  if (!authStatus.value || authStatus.value !== 'authenticated' || !sessionUser.value) {
+    return null
+  }
+  
+  if (displayName.value && displayName.value.length > 0) {
+    return displayName.value
+  }
+  
+  if (sessionUser.value) {
+    return sessionUser.value.username || sessionUser.value.email || sessionUser.value.name || null
+  }
+  
+  return null
+})
+
 const userAvatar = computed(() => {
-  const fallback = sessionUser.value?.username || sessionUser.value?.email || 'Administrator'
+  if (!authStatus.value || authStatus.value !== 'authenticated' || !sessionUser.value) {
+    return null
+  }
+  
+  if (avatar.value) {
+    return avatar.value
+  }
+  
+  const name = sessionUser.value.username || sessionUser.value.email || sessionUser.value.name
+  if (!name) {
+    return null
+  }
+  
   return {
-    alt: fallback,
-    text: fallback.slice(0, 2).toUpperCase(),
+    alt: name,
+    text: name.slice(0, 2).toUpperCase(),
   }
 })
 
@@ -249,19 +283,35 @@ const accountMenuItems = computed(() => [
 
       <template #footer="{ collapsed }">
         <div class="flex w-full flex-col gap-2">
-          <UDropdownMenu :items="accountMenuItems">
+          <template v-if="authStatus === 'authenticated' && sessionUser && userLabel">
+            <UDropdownMenu :items="accountMenuItems">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                class="w-full"
+                :block="collapsed"
+              >
+                <template #leading>
+                  <UAvatar v-bind="userAvatar" size="sm" />
+                </template>
+                <span v-if="!collapsed">{{ userLabel }}</span>
+              </UButton>
+            </UDropdownMenu>
+          </template>
+          <template v-else>
             <UButton
-              color="neutral"
+              color="error"
               variant="ghost"
               class="w-full"
               :block="collapsed"
+              to="/auth/login"
             >
               <template #leading>
-                <UAvatar v-bind="userAvatar" size="sm" />
+                <UIcon name="i-lucide-log-in" class="size-4" />
               </template>
-              <span v-if="!collapsed">{{ userLabel }}</span>
+              <span v-if="!collapsed">Sign in</span>
             </UButton>
-          </UDropdownMenu>
+          </template>
 
           <div v-if="!collapsed" class="text-[10px] uppercase tracking-wide text-muted-foreground/70">
             <p>© {{ new Date().getFullYear() }} <ULink href="https://xyrapanel.com" target="_blank">XyraPanel</ULink></p>
@@ -279,28 +329,29 @@ const accountMenuItems = computed(() => [
               <p class="text-xs text-muted-foreground">{{ adminSubtitle }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-3">
-              <div class="flex items-center gap-3 rounded-md border border-default bg-muted/30 px-3 py-2">
-                <div class="flex flex-col text-xs">
-                  <span class="font-medium text-foreground">
-                    <template v-if="sessionUser">{{ sessionUser.name || sessionUser.username || 'Administrator'
-                      }}</template>
-                    <span v-else>Signing in…</span>
-                  </span>
-                  <span v-if="sessionUser?.email" class="text-muted-foreground">{{ sessionUser.email }}</span>
+              <template v-if="authStatus === 'authenticated' && sessionUser && userLabel">
+                <div class="flex items-center gap-3 rounded-md border border-default bg-muted/30 px-3 py-2">
+                  <div class="flex flex-col text-xs">
+                    <span class="font-medium text-foreground">{{ userLabel }}</span>
+                    <span v-if="sessionUser.email" class="text-muted-foreground">{{ sessionUser.email }}</span>
+                  </div>
+                  <UBadge v-if="sessionUser.role" size="xs" variant="subtle"
+                    color="error" class="uppercase tracking-wide text-[10px]">
+                    {{ sessionUser.role }}
+                  </UBadge>
+                  <UButton size="xs" variant="ghost" color="error"
+                    icon="i-lucide-log-out" @click="handleSignOut" />
                 </div>
-                <UBadge v-if="sessionUser?.role" size="xs" variant="subtle"
-                  color="error" class="uppercase tracking-wide text-[10px]">
-                  {{ sessionUser.role }}
-                </UBadge>
-                <UButton v-if="authStatus === 'authenticated'" size="xs" variant="ghost" color="error"
-                  icon="i-lucide-log-out" @click="handleSignOut" />
-              </div>
+              </template>
+              <template v-else>
+                <UButton size="xs" variant="ghost" color="error" to="/auth/login"
+                  icon="i-lucide-log-in">
+                  Sign in
+                </UButton>
+              </template>
             </div>
           </div>
           <USeparator />
-          <div v-if="isAuthenticating" class="bg-warning/10 px-6 py-2 text-xs text-warning">
-            Authenticating session…
-          </div>
         </header>
 
         <div v-if="announcement" class="border-b border-primary/20 bg-primary/5">

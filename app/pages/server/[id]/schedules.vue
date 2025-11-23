@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ServerSchedule } from '#shared/types/server-schedules'
+import type { ServerSchedule } from '#shared/types/server'
 
 const route = useRoute()
 

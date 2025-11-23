@@ -1,7 +1,7 @@
 import { createError, readBody, type H3Event } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { getNodeIdFromAuth } from '~~/server/utils/wings/auth'
-import type { RestoreStatusRequest } from '#shared/types/backups'
+import type { RestoreStatusRequest } from '#shared/types/server'
 
 export default defineEventHandler(async (event: H3Event) => {
   const db = useDrizzle()

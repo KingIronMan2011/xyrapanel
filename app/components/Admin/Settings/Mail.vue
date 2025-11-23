@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { FormSubmitEvent, SelectItem } from '@nuxt/ui'
-import type { MailSettings } from '#shared/types/admin-settings'
+import type { MailSettings } from '#shared/types/admin'
 
 const toast = useToast()
 const isSubmitting = ref(false)

@@ -1,5 +1,5 @@
 import { eq, desc } from 'drizzle-orm'
-import type { ServerBackup } from '#shared/types/server-backups'
+import type { ServerBackup } from '#shared/types/server'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
 

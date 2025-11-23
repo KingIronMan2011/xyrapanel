@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ServerStartupVariable } from '#shared/types/server-startup'
+import type { ServerStartupVariable } from '#shared/types/server'
 
 const route = useRoute()
 

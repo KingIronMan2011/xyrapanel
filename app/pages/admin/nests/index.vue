@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { NestWithEggCount, CreateNestPayload } from '#shared/types/admin-nests'
+import type { NestWithEggCount, CreateNestPayload } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,

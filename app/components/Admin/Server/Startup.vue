@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import type { Server } from '#shared/types/server'
-import type { StartupResponse } from '#shared/types/api-responses'
+import type { StartupResponse } from '#shared/types/api'
 import type {
+  Server,
   StartupForm,
   EnvironmentEntry,
   EnvironmentInputValue,
-} from '#shared/types/server-startup'
+} from '#shared/types/server'
 
 const props = defineProps<{
   server: Server
@@ -38,6 +38,13 @@ const {
 )
 
 const startup = computed(() => startupData.value?.data ?? null)
+
+const errorMessage = computed(() => {
+  if (!startupError.value) return ''
+  if (startupError.value instanceof Error) return startupError.value.message
+  if (typeof startupError.value === 'string') return startupError.value
+  return 'An error occurred'
+})
 
 const schema = z.object({
   startup: z.string().trim().min(1, 'Startup command is required').max(2048, 'Startup command is too long'),
@@ -163,7 +170,7 @@ async function handleSubmit(event: FormSubmitEvent<FormSchema>) {
 
     <UAlert v-else-if="startupError" color="error" icon="i-lucide-alert-triangle">
       <template #title>Unable to load startup configuration</template>
-      <template #description>{{ (startupError as Error).message }}</template>
+      <template #description>{{ errorMessage }}</template>
     </UAlert>
 
     <template v-else>

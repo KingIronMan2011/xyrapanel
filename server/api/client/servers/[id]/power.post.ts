@@ -1,9 +1,9 @@
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
-import type { PowerAction, PowerActionRequest } from '#shared/types/server-console'
+import type { PowerAction, PowerActionRequest } from '#shared/types/server'
 
 const VALID_POWER_ACTIONS: PowerAction[] = ['start', 'stop', 'restart', 'kill']
 

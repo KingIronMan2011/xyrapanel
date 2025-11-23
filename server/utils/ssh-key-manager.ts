@@ -5,7 +5,7 @@ import type {
   SSHKeyManagerOptions,
   SSHKeyInfo,
   CreateSSHKeyOptions,
-} from '#shared/types/ssh-keys'
+} from '#shared/types/account'
 
 export class SSHKeyManager {
   private db = useDrizzle()

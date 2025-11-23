@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MountWithRelations, CreateMountPayload } from '#shared/types/admin-mounts'
+import type { MountWithRelations, CreateMountPayload } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,
@@ -14,15 +14,13 @@ const { data: mountsData, pending, error, refresh } = await useFetch('/api/admin
 
 const mounts = computed(() => mountsData.value?.data ?? [])
 
-const requestFetch = useRequestFetch()
+const { data: nodesData } = await useFetch<{ data: { id: string; name: string }[] }>('/api/admin/wings/nodes', {
+  key: 'admin-mount-nodes',
+})
 
-const { data: nodesData } = await useAsyncData('admin-mount-nodes', () =>
-  requestFetch<{ data: { id: string; name: string }[] }>('/api/admin/wings/nodes'),
-)
-
-const { data: eggsData } = await useAsyncData('admin-mount-eggs', () =>
-  requestFetch<{ data: { id: string; name: string; nestName?: string }[] }>('/api/admin/eggs'),
-)
+const { data: eggsData } = await useFetch<{ data: { id: string; name: string; nestName?: string }[] }>('/api/admin/eggs', {
+  key: 'admin-mount-eggs',
+})
 
 const nodeOptions = computed(() => (nodesData.value?.data ?? []).map(node => ({
   value: node.id,

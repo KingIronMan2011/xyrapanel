@@ -1,10 +1,10 @@
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
-import type { CreateServerSchedulePayload, ServerScheduleResponse } from '#shared/types/server-schedules'
+import type { CreateServerSchedulePayload, ServerScheduleResponse } from '#shared/types/server'
 
 export default defineEventHandler(async (event): Promise<ServerScheduleResponse> => {
   const identifier = event.context.params?.id

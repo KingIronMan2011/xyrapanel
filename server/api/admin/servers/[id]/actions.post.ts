@@ -1,9 +1,8 @@
-import { getServerSession } from '#auth'
-import { isAdmin, getSessionUser } from '~~/server/utils/session'
+import { getServerSession, isAdmin, getSessionUser  } from '~~/server/utils/session'
 import { serverManager } from '~~/server/utils/server-manager'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
-import type { ServerActionPayload, ServerActionResponse } from '#shared/types/admin-servers'
+import type { ServerActionPayload, ServerActionResponse } from '#shared/types/admin'
 
 export default defineEventHandler(async (event): Promise<ServerActionResponse> => {
   const session = await getServerSession(event)

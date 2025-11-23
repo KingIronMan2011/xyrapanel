@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import type { NodeResourceUsage } from '#shared/types/server-resources'
+import type { NodeResourceUsage } from '#shared/types/server'
 
 export async function getNodeResourceUsage(nodeId: string): Promise<NodeResourceUsage> {
   const db = useDrizzle()

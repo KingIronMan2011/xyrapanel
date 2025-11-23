@@ -1,7 +1,6 @@
 import { defineEventHandler, createError } from 'h3'
 import { eq, and } from 'drizzle-orm'
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 
 export default defineEventHandler(async (event) => {

@@ -1,4 +1,4 @@
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess, getNodeForServer } from '~~/server/utils/server-helpers'
 import { createWingsClient } from '~~/server/utils/wings/client'
 

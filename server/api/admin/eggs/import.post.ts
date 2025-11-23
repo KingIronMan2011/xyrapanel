@@ -1,7 +1,7 @@
 import { createError } from 'h3'
 import { randomUUID } from 'node:crypto'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import type { EggImportData, EggImportResponse } from '#shared/types/admin-eggs'
+import type { EggImportData, EggImportResponse } from '#shared/types/admin'
 
 export default defineEventHandler(async (event): Promise<EggImportResponse> => {
   const body = await readBody(event)

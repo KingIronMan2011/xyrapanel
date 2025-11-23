@@ -1,6 +1,6 @@
 import { createError } from 'h3'
 import { eq, and } from 'drizzle-orm'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'

@@ -3,8 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { join, extname } from 'pathe'
 import { readMultipartFormData, createError } from 'h3'
 
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { SETTINGS_KEYS, getSetting, setSetting } from '~~/server/utils/settings'
 import { getUploadsPath } from '~~/server/utils/storage'
 

@@ -8,7 +8,7 @@ import type {
   TransferState,
   CreateTransferOptions,
   TransferValidation,
-} from '#shared/types/server-transfers'
+} from '#shared/types/server'
 
 export class TransferManager {
   private db = useDrizzle()

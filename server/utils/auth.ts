@@ -1,0 +1,409 @@
+import { betterAuth } from 'better-auth/minimal'
+import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { username, twoFactor, customSession, apiKey, bearer, haveIBeenPwned, admin, jwt } from 'better-auth/plugins'
+import { createAuthMiddleware } from 'better-auth/api'
+import type { AuthContext } from '@better-auth/core'
+import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import type { Role } from '#shared/types/auth'
+import bcrypt from 'bcryptjs'
+import { parseUserAgent } from '~~/server/utils/user-agent'
+
+let authInstance: ReturnType<typeof betterAuth> | null = null
+
+const ADMIN_PANEL_PERMISSIONS = [
+  'admin.users.read',
+  'admin.servers.read',
+  'admin.nodes.read',
+  'admin.locations.read',
+  'admin.eggs.read',
+  'admin.mounts.read',
+  'admin.database-hosts.read',
+  'admin.activity.read',
+  'admin.settings.read',
+]
+
+async function getUserPermissionsAndRole(userId: string) {
+  const db = useDrizzle()
+  const dbUser = db
+    .select({
+      id: tables.users.id,
+      role: tables.users.role,
+      rootAdmin: tables.users.rootAdmin,
+      passwordResetRequired: tables.users.passwordResetRequired,
+      nameFirst: tables.users.nameFirst,
+      nameLast: tables.users.nameLast,
+    })
+    .from(tables.users)
+    .where(eq(tables.users.id, userId))
+    .get()
+
+  if (!dbUser) {
+    return null
+  }
+
+  const derivedRole: Role = dbUser.rootAdmin || dbUser.role === 'admin' ? 'admin' : 'user'
+  const permissions = derivedRole === 'admin' ? ADMIN_PANEL_PERMISSIONS : []
+
+  return {
+    role: derivedRole,
+    permissions,
+    passwordResetRequired: Boolean(dbUser.passwordResetRequired),
+  }
+}
+
+function createAuth() {
+  const runtimeConfig = useRuntimeConfig()
+  const db = useDrizzle()
+  
+  const isProduction = process.env.NODE_ENV === 'production'
+  
+  const baseURL = runtimeConfig.authOrigin || undefined
+  const secret = runtimeConfig.authSecret || undefined
+  
+  if (isProduction) {
+    if (!secret) {
+      throw new Error('BETTER_AUTH_SECRET is required in production. Set it in your environment variables.')
+    }
+    if (!baseURL) {
+      throw new Error('BETTER_AUTH_URL (authOrigin) is required in production. Set it in your environment variables.')
+    }
+  }
+  
+  const trustedOrigins: string[] = baseURL ? [baseURL] : []
+  
+  if (process.env.BETTER_AUTH_TRUSTED_ORIGINS) {
+    const additionalOrigins = process.env.BETTER_AUTH_TRUSTED_ORIGINS
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(Boolean)
+    trustedOrigins.push(...additionalOrigins)
+  }
+  
+  const ipAddressHeaders = process.env.BETTER_AUTH_IP_HEADER
+    ? [process.env.BETTER_AUTH_IP_HEADER]
+    : ['cf-connecting-ip', 'x-forwarded-for', 'x-real-ip']
+  
+  return betterAuth({
+    database: drizzleAdapter(db, {
+      provider: 'sqlite',
+      schema: {
+        user: tables.users,
+        session: tables.sessions,
+        account: tables.accounts,
+        verificationToken: tables.verificationTokens,
+        rateLimit: tables.rateLimit,
+        apikey: tables.apiKeys,
+        twoFactor: tables.twoFactor,
+        jwks: tables.jwks,
+      },
+    }),
+    account: {
+      fields: {
+        providerId: 'provider',
+        accountId: 'providerAccountId',
+      },
+      accountLinking: {
+        enabled: true,
+        allowDifferentEmails: false,
+        updateUserInfoOnLink: true,
+      },
+    },
+    user: {
+      changeEmail: {
+        enabled: true,
+        updateEmailWithoutVerification: false,
+        sendChangeEmailConfirmation: async ({ user, newEmail, url }, _request) => {
+          const { sendEmail } = await import('~~/server/utils/email')
+          await sendEmail({
+            to: user.email,
+            subject: 'Confirm Email Change',
+            html: `
+              <h2>Confirm Email Change</h2>
+              <p>You requested to change your email address to <strong>${newEmail}</strong>.</p>
+              <p>Click the link below to confirm this change:</p>
+              <p><a href="${url}">Confirm Email Change</a></p>
+              <p>If you didn't request this change, please ignore this email.</p>
+            `,
+          })
+        },
+      },
+      deleteUser: {
+        enabled: true,
+        sendDeleteAccountVerification: async ({ user, url }, _request) => {
+          const { sendEmail } = await import('~~/server/utils/email')
+          await sendEmail({
+            to: user.email,
+            subject: 'Confirm Account Deletion',
+            html: `
+              <h2>Confirm Account Deletion</h2>
+              <p>You requested to delete your XyraPanel account.</p>
+              <p><strong>Warning:</strong> This action cannot be undone. All your data, servers, and settings will be permanently deleted.</p>
+              <p>Click the link below to confirm account deletion:</p>
+              <p><a href="${url}" style="color: #ef4444; font-weight: bold;">Delete My Account</a></p>
+              <p>If you didn't request this, please ignore this email and secure your account.</p>
+            `,
+          })
+        },
+        beforeDelete: async (user, _request) => {
+          const db = useDrizzle()
+          const dbUser = db
+            .select({
+              rootAdmin: tables.users.rootAdmin,
+              role: tables.users.role,
+            })
+            .from(tables.users)
+            .where(eq(tables.users.id, user.id))
+            .get()
+          
+          if (dbUser?.rootAdmin || dbUser?.role === 'admin') {
+            throw new (await import('better-auth/api')).APIError('BAD_REQUEST', {
+              message: 'Admin accounts cannot be deleted',
+            })
+          }
+        },
+      },
+    },
+    ...(secret && { secret }),
+    ...(baseURL && { baseURL }),
+    basePath: '/api/auth',
+    appName: runtimeConfig.public.appName || 'XyraPanel',
+    emailAndPassword: {
+      enabled: true,
+      password: {
+        hash: async (password: string) => {
+          return await bcrypt.hash(password, 10)
+        },
+        verify: async ({ hash, password }: { hash: string; password: string }) => {
+          return await bcrypt.compare(password, hash)
+        },
+      },
+      sendResetPassword: async ({ user, token }, _request) => {
+        const { sendPasswordResetEmail, resolvePanelBaseUrl } = await import('~~/server/utils/email')
+        const resetBaseUrl = `${resolvePanelBaseUrl()}/auth/password/reset`
+        await sendPasswordResetEmail(user.email, token, resetBaseUrl)
+      },
+      resetPasswordTokenExpiresIn: 3600,
+      onPasswordReset: async ({ user }, _request) => {
+        const db = useDrizzle()
+        await db.delete(tables.sessions)
+          .where(eq(tables.sessions.userId, user.id))
+          .run()
+        
+        await db.update(tables.users)
+          .set({ passwordResetRequired: false })
+          .where(eq(tables.users.id, user.id))
+          .run()
+      },
+    },
+    session: {
+      expiresIn: 14 * 24 * 60 * 60,
+      updateAge: 24 * 60 * 60,
+      freshAge: 60 * 60 * 24,
+      cookieCache: {
+        enabled: true,
+        maxAge: 5 * 60,
+        strategy: 'compact',
+        refreshCache: false,
+      },
+      fields: {
+        token: 'sessionToken',
+        expiresAt: 'expires',
+        userId: 'userId',
+      },
+    },
+    verification: {
+      fields: {
+        value: 'token',
+        expiresAt: 'expires',
+      },
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendOnSignIn: false,
+      autoSignInAfterVerification: true,
+      expiresIn: 60 * 60 * 24,
+      sendVerificationEmail: async ({ user, token }, _request) => {
+        const { sendEmailVerificationEmail } = await import('~~/server/utils/email')
+        await sendEmailVerificationEmail({
+          to: user.email,
+          token,
+          expiresAt: new Date(Date.now() + 60 * 60 * 24 * 1000),
+          username: (user as { username?: string }).username || user.name || null,
+        })
+      },
+    },
+    trustedOrigins,
+    rateLimit: {
+      enabled: true,
+      window: 60,
+      max: 100,
+      storage: 'database',
+      customRules: {
+        '/sign-in/email': {
+          window: 10,
+          max: 3,
+        },
+        '/sign-in/username': {
+          window: 10,
+          max: 3,
+        },
+        '/two-factor/verify': {
+          window: 10,
+          max: 3,
+        },
+        '/change-password': {
+          window: 60,
+          max: 5,
+        },
+        '/api-key/create': {
+          window: 60,
+          max: 10,
+        },
+      },
+    },
+    advanced: {
+      disableCSRFCheck: false,
+      disableOriginCheck: false,
+      useSecureCookies: isProduction,
+      ipAddress: {
+        ipAddressHeaders,
+      },
+      defaultCookieAttributes: {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: 'lax',
+      },
+    },
+    onAPIError: {
+      throw: false,
+      onError: (error: unknown, ctx: AuthContext) => {
+        const request = (ctx as { request?: { url?: string; method?: string } }).request
+        console.error('[Better Auth Error]', {
+          path: request?.url || 'unknown',
+          method: request?.method || 'unknown',
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString(),
+        })
+      },
+    },
+    logger: {
+      disabled: false,
+      level: isProduction ? 'error' : 'warn',
+    },
+    hooks: {
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path.startsWith('/sign-in') || ctx.path.startsWith('/sign-up')) {
+          const newSession = ctx.context.newSession
+          if (newSession?.session?.token) {
+            const userAgent = ctx.headers?.get('user-agent') || ''
+            const ipAddress = ctx.headers?.get('x-forwarded-for')?.split(',')[0]?.trim()
+              || ctx.headers?.get('x-real-ip')
+              || 'Unknown'
+
+            const deviceInfo = parseUserAgent(userAgent)
+            const now = new Date()
+            const sessionToken = newSession.session.token
+
+            try {
+              const db = useDrizzle()
+              await db.insert(tables.sessionMetadata).values({
+                sessionToken,
+                firstSeenAt: now,
+                lastSeenAt: now,
+                ipAddress,
+                userAgent,
+                deviceName: deviceInfo.device,
+                browserName: deviceInfo.browser,
+                osName: deviceInfo.os,
+              }).onConflictDoUpdate({
+                target: tables.sessionMetadata.sessionToken,
+                set: {
+                  lastSeenAt: now,
+                  ipAddress,
+                  userAgent,
+                  deviceName: deviceInfo.device,
+                  browserName: deviceInfo.browser,
+                  osName: deviceInfo.os,
+                },
+              })
+            }
+            catch (err) {
+              console.error('Failed to track session metadata:', err)
+            }
+          }
+        }
+      }),
+    },
+    plugins: [
+      username({
+        minUsernameLength: 3,
+        maxUsernameLength: 30,
+      }),
+      twoFactor({
+        issuer: runtimeConfig.public.appName || 'XyraPanel',
+      }),
+      haveIBeenPwned({
+        customPasswordCompromisedMessage: 'This password has been found in a data breach. Please choose a more secure password.',
+      }),
+      admin({
+        adminRoles: ['admin'],
+        defaultRole: 'user',
+        impersonationSessionDuration: 60 * 60,
+        defaultBanReason: 'No reason provided',
+        bannedUserMessage: 'You have been banned from this application. Please contact support if you believe this is an error.',
+      }),
+      jwt({
+      }),
+      apiKey({
+        enableSessionForAPIKeys: false,
+        apiKeyHeaders: ['x-api-key', 'authorization'],
+      }),
+      bearer(),
+      customSession(async ({ user, session }) => {
+        if (!user?.id) {
+          return { user, session }
+        }
+
+        const userData = await getUserPermissionsAndRole(user.id)
+        if (!userData) {
+          return { user, session }
+        }
+
+        const db = useDrizzle()
+        const dbUser = db
+          .select({
+            nameFirst: tables.users.nameFirst,
+            nameLast: tables.users.nameLast,
+            username: tables.users.username,
+          })
+          .from(tables.users)
+          .where(eq(tables.users.id, user.id))
+          .get()
+
+        const name = dbUser
+          ? [dbUser.nameFirst, dbUser.nameLast].filter(Boolean).join(' ') || dbUser.username
+          : user.name || (user as { username?: string }).username || null
+
+        return {
+          user: {
+            ...user,
+            role: userData.role,
+            permissions: userData.permissions,
+            passwordResetRequired: userData.passwordResetRequired,
+            name,
+          },
+          session,
+        }
+      }),
+    ],
+  })
+}
+
+export function getAuth() {
+  if (!authInstance) {
+    authInstance = createAuth()
+  }
+  return authInstance
+}
+
+export const auth = getAuth()

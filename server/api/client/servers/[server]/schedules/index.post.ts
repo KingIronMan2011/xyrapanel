@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 

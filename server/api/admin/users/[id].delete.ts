@@ -1,13 +1,22 @@
-import { eq } from 'drizzle-orm'
-import { getServerSession } from '#auth'
-import { getSessionUser, isAdmin } from '~~/server/utils/session'
-import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { createError } from 'h3'
+import { APIError } from 'better-auth/api'
+import { getAuth } from '~~/server/utils/auth'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const auth = getAuth()
+  
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
+  if (!session?.user?.id) {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  }
+
+  const userRole = (session.user as { role?: string }).role
+  if (userRole !== 'admin') {
+    throw createError({ statusCode: 403, statusMessage: 'Forbidden', message: 'Admin access required' })
   }
 
   const userId = getRouterParam(event, 'id')
@@ -15,20 +24,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'User ID is required' })
   }
 
-  const db = useDrizzle()
-  const actingUser = getSessionUser(session)
-
-  const existing = await db
-    .select()
-    .from(tables.users)
-    .where(eq(tables.users.id, userId))
-    .get()
-
-  if (!existing) {
-    throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'User not found' })
-  }
-
-  if (actingUser && userId === actingUser.id) {
+  if (userId === session.user.id) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Bad Request',
@@ -36,7 +32,34 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await db.delete(tables.users).where(eq(tables.users.id, userId)).run()
+  try {
+    await auth.api.removeUser({
+      body: {
+        userId,
+      },
+      headers: event.req.headers,
+    })
 
-  return { success: true }
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.user.deleted',
+      targetType: 'user',
+      targetId: userId,
+    })
+
+    return { success: true }
+  }
+  catch (error) {
+    if (error instanceof APIError) {
+      throw createError({
+        statusCode: error.statusCode,
+        statusMessage: error.message || 'Failed to remove user',
+      })
+    }
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to remove user',
+    })
+  }
 })

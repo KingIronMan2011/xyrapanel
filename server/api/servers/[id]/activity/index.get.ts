@@ -1,6 +1,6 @@
 import { createError, getQuery } from 'h3'
 import { desc, eq } from 'drizzle-orm'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { useDrizzle } from '~~/server/utils/drizzle'

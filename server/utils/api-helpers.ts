@@ -3,7 +3,7 @@ import { createError } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 
 export async function requireAdmin(event: H3Event): Promise<void> {
-  const { getServerSession } = await import('#auth')
+  const { getServerSession } = await import('~~/server/utils/session')
   const session = await getServerSession(event)
 
   if (!session?.user) {

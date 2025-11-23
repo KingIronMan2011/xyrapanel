@@ -1,15 +1,32 @@
 import { createError, readBody, type H3Event } from 'h3'
+import { getAuth } from '~~/server/utils/auth'
 import { createWingsNode, toWingsNodeSummary } from '~~/server/utils/wings/nodesStore'
 import { recordAuditEvent } from '~~/server/utils/audit'
-import { getServerSession } from '#auth'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 
 import type { ActorType, TargetType } from '#shared/types/audit'
 import type { CreateWingsNodeInput } from '#shared/types/wings'
 
 export default defineEventHandler(async (event: H3Event) => {
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const auth = getAuth()
+  
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
+
+  if (!session?.user?.id) {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  }
+
+  const userRole = (session.user as { role?: string }).role
+  if (userRole !== 'admin') {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Forbidden',
+      message: 'Admin access required',
+    })
+  }
+
+  const user = session.user
 
   const body = await readBody<CreateWingsNodeInput>(event)
   if (!body?.name || !body?.baseURL) {
@@ -20,8 +37,8 @@ export default defineEventHandler(async (event: H3Event) => {
     const node = createWingsNode(body)
 
     await recordAuditEvent({
-      actor: user?.username ?? user?.email ?? 'system',
-      actorType: (user?.role ?? 'system') as ActorType,
+      actor: (user as { username?: string; email?: string }).username ?? (user as { email?: string }).email ?? 'system',
+      actorType: (userRole ?? 'system') as ActorType,
       action: 'admin:node.create',
       targetType: 'node' satisfies TargetType,
       targetId: node.id,

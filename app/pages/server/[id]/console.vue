@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { PowerAction } from '#shared/types/server-console'
+import type { PowerAction } from '#shared/types/server'
 
 const route = useRoute()
 

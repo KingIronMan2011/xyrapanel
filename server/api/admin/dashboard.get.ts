@@ -12,7 +12,7 @@ import type {
   DashboardIncident,
   DashboardOperation,
   NodeStatus,
-} from '#shared/types/admin-dashboard'
+} from '#shared/types/admin'
 
 function parseMetadata(raw: string | null): Record<string, unknown> | null {
   if (!raw) {

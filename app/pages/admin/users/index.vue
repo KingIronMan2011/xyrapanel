@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import type { AdminUserResponse } from '#shared/types/admin'
+import type { AdminUserResponse, UsersResponse } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,
@@ -11,24 +11,15 @@ definePageMeta({
 
 const toast = useToast()
 
-const requestFetch = useRequestFetch()
-
-type UsersResponse = {
-  data: AdminUserResponse[]
-}
-
 const {
   data: usersData,
   pending: loading,
   error,
   refresh: refreshUsers,
-} = await useAsyncData<UsersResponse>(
-  'admin-users',
-  () => requestFetch<UsersResponse>('/api/admin/users'),
-  {
-    default: () => ({ data: [] }),
-  },
-)
+} = await useFetch<UsersResponse>('/api/admin/users', {
+  key: 'admin-users',
+  default: () => ({ data: [] }),
+})
 
 const users = computed(() => usersData.value?.data ?? [])
 
@@ -113,14 +104,14 @@ async function handleSubmit() {
 
   try {
     if (editingUser.value) {
-      await requestFetch(`/api/admin/users/${editingUser.value.id}`, {
+      await $fetch(`/api/admin/users/${editingUser.value.id}`, {
         method: 'PATCH',
         body: userForm.value,
       })
       toast.add({ title: 'User updated', color: 'success' })
     }
     else {
-      await requestFetch('/api/admin/users', {
+      await $fetch('/api/admin/users', {
         method: 'POST',
         body: userForm.value,
       })
@@ -147,7 +138,7 @@ async function handleDelete(user: AdminUserResponse) {
   }
 
   try {
-    await requestFetch(`/api/admin/users/${user.id}`, {
+    await $fetch(`/api/admin/users/${user.id}`, {
       method: 'DELETE',
     })
     toast.add({ title: 'User deleted', color: 'success' })

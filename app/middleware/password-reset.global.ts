@@ -1,11 +1,16 @@
 import { storeToRefs } from 'pinia'
 
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (import.meta.server)
+  if (import.meta.server) {
     return
+  }
+
+  if (to.path.startsWith('/auth/') && !to.path.startsWith('/auth/password/force')) {
+    return
+  }
 
   const authStore = useAuthStore()
-  const { status, requiresPasswordReset } = storeToRefs(authStore)
+  const { status, requiresPasswordReset, isAuthenticated } = storeToRefs(authStore)
 
   if (status.value === 'loading') {
     try {
@@ -16,17 +21,17 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
   }
 
-  if (status.value !== 'authenticated')
+  if (!isAuthenticated.value) {
     return
+  }
 
-  if (!requiresPasswordReset.value)
+  if (!requiresPasswordReset.value) {
     return
+  }
 
-  if (to.path.startsWith('/auth/password/force'))
+  if (to.path.startsWith('/auth/password/force')) {
     return
-
-  if (to.path === '/auth/logout')
-    return
+  }
 
   return navigateTo({
     path: '/auth/password/force',

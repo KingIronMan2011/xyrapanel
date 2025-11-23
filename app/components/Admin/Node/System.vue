@@ -7,29 +7,19 @@ const props = defineProps<{
 
 const isRefreshing = ref(false)
 
-const requestFetch = useRequestFetch() as <T>(input: string, options?: Parameters<typeof $fetch>[1]) => Promise<T>
-
 const {
   data: systemData,
   pending: systemPending,
   refresh,
   error,
-} = await useAsyncData<WingsSystemInformation | null>(
-  `node-system-${props.nodeId}`,
-  async () => {
-    try {
-      const response = await requestFetch<{ data: WingsSystemInformation }>(`/api/admin/wings/nodes/${props.nodeId}/system`)
-      return response.data
-    }
-    catch (err) {
-      console.error('Failed to load system info', err)
-      return null
-    }
+} = await useFetch<{ data: WingsSystemInformation }>(`/api/admin/wings/nodes/${props.nodeId}/system`, {
+  key: `node-system-${props.nodeId}`,
+  transform: (response) => response.data,
+  default: () => null,
+  onResponseError({ response }) {
+    console.error('Failed to load system info', response._data)
   },
-  {
-    default: () => null,
-  },
-)
+})
 
 const systemInfo = computed(() => systemData.value)
 

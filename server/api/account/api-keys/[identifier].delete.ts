@@ -1,39 +1,32 @@
-import { getServerSession } from '#auth'
-import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
-import { getSessionUser } from '~~/server/utils/session'
+import { assertMethod, createError, getValidatedRouterParams } from 'h3'
+import { auth } from '~~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const identifier = getRouterParam(event, 'identifier')
-  const user = getSessionUser(session)
+  assertMethod(event, 'DELETE')
 
-  if (!user) {
-    throw createError({ statusCode: 401, message: 'Unauthorized' })
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
+
+  if (!session?.user?.id) {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }
 
-  if (!identifier) {
-    throw createError({ statusCode: 400, message: 'Identifier required' })
-  }
+  const { identifier } = await getValidatedRouterParams(event, (params) => {
+    const identifierParam = (params as Record<string, unknown>).identifier
+    if (typeof identifierParam !== 'string' || identifierParam.trim().length === 0) {
+      throw createError({ statusCode: 400, statusMessage: 'Missing API key identifier' })
+    }
 
-  const db = useDrizzle()
-  const key = db
-    .select()
-    .from(tables.apiKeys)
-    .where(
-      and(
-        eq(tables.apiKeys.identifier, identifier),
-        eq(tables.apiKeys.userId, user.id)
-      )
-    )
-    .get()
+    return { identifier: identifierParam }
+  })
 
-  if (!key) {
-    throw createError({ statusCode: 404, message: 'API key not found' })
-  }
-
-  db.delete(tables.apiKeys)
-    .where(eq(tables.apiKeys.identifier, identifier))
-    .run()
+  await auth.api.deleteApiKey({
+    body: {
+      keyId: identifier,
+    },
+    headers: event.req.headers,
+  })
 
   return { success: true }
 })

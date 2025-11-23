@@ -51,7 +51,7 @@ async function handleSubmit(event: FormSubmitEvent<FormSchema>) {
       method: 'POST',
       body: {
         token: event.data.token,
-        password: event.data.password,
+        newPassword: event.data.password,
       },
     })
 

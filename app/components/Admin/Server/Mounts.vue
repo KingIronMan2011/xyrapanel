@@ -11,51 +11,33 @@ const toast = useToast()
 const showAttachModal = ref(false)
 const isSubmitting = ref(false)
 
-const requestFetch = useRequestFetch() as <T>(input: string, options?: Parameters<typeof $fetch>[1]) => Promise<T>
-
 const {
   data: mountsData,
   pending: mountsPending,
   refresh,
   error: mountsError,
-} = await useAsyncData<Mount[] | null>(
-  `server-mounts-${props.serverId}`,
-  async () => {
-    try {
-      const response = await requestFetch<{ data: Mount[] }>(`/api/admin/servers/${props.serverId}/mounts`)
-      return response.data
-    }
-    catch (error) {
-      console.error('Failed to load server mounts', error)
-      return null
-    }
+} = await useFetch<{ data: Mount[] }>(`/api/admin/servers/${props.serverId}/mounts`, {
+  key: `server-mounts-${props.serverId}`,
+  transform: (response) => response.data ?? null,
+  default: () => null,
+  onResponseError({ response }) {
+    console.error('Failed to load server mounts', response._data)
   },
-  {
-    default: () => null,
-  },
-)
+})
 const serverMounts = computed(() => mountsData.value ?? [])
 
 const {
   data: availableMountsData,
   pending: availablePending,
   error: availableError,
-} = await useAsyncData<Mount[] | null>(
-  'admin-mounts-list',
-  async () => {
-    try {
-      const response = await requestFetch<{ data: Mount[] }>('/api/admin/mounts')
-      return response.data
-    }
-    catch (error) {
-      console.error('Failed to load mounts', error)
-      return null
-    }
+} = await useFetch<{ data: Mount[] }>('/api/admin/mounts', {
+  key: 'admin-mounts-list',
+  transform: (response) => response.data ?? null,
+  default: () => null,
+  onResponseError({ response }) {
+    console.error('Failed to load mounts', response._data)
   },
-  {
-    default: () => null,
-  },
-)
+})
 const availableMounts = computed(() => availableMountsData.value ?? [])
 
 const attachSchema = z.object({

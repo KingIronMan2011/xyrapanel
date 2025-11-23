@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SettingsData } from '#shared/types/server-settings'
+import type { SettingsData } from '#shared/types/server'
 
 const route = useRoute()
 

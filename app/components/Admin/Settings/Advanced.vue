@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import type { AdvancedSettings } from '#shared/types/admin-settings'
+import type { AdvancedSettings } from '#shared/types/admin'
 
 const toast = useToast()
 const isSubmitting = ref(false)

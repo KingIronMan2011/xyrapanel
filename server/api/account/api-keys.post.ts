@@ -1,17 +1,15 @@
-import { randomUUID } from 'node:crypto'
-import { getServerSession } from '#auth'
-import { getSessionUser } from '~~/server/utils/session'
-import { generateIdentifier, generateApiToken, hashApiToken } from '~~/server/utils/apiKeys'
-import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { createError } from 'h3'
+import { auth } from '~~/server/utils/auth'
 import { validateBody } from '~~/server/utils/validation'
-import { createApiKeySchema } from '~~/server/schemas/account'
-import type { ApiKeyResponse } from '#shared/types/api-responses'
+import { createApiKeySchema } from '#shared/schema/account'
+import type { ApiKeyResponse } from '#shared/types/api'
 
 export default defineEventHandler(async (event): Promise<ApiKeyResponse> => {
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  if (!user) {
+  if (!session?.user?.id) {
     throw createError({
       statusCode: 401,
       statusMessage: 'Unauthorized',
@@ -21,60 +19,27 @@ export default defineEventHandler(async (event): Promise<ApiKeyResponse> => {
 
   const body = await validateBody(event, createApiKeySchema)
 
-  const db = useDrizzle()
-  const existingKeys = db
-    .select()
-    .from(tables.apiKeys)
-    .where(eq(tables.apiKeys.userId, user.id))
-    .all()
-
-  if (existingKeys.length >= 25) {
-    throw createError({
-      statusCode: 400,
-      message: 'You have reached the account limit for number of API keys.',
-    })
-  }
-
-  const identifier = generateIdentifier()
-  const plainToken = generateApiToken()
-  const hashedToken = await hashApiToken(plainToken)
-  const now = new Date()
-
-  db.insert(tables.apiKeys)
-    .values({
-      id: randomUUID(),
-      userId: user.id,
-      keyType: 1,
-      identifier,
-      token: hashedToken,
-      memo: body.memo ?? null,
-      allowedIps: body.allowedIps && body.allowedIps.length > 0 ? JSON.stringify(body.allowedIps) : null,
-      lastUsedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run()
-
-  const key = db
-    .select()
-    .from(tables.apiKeys)
-    .where(eq(tables.apiKeys.identifier, identifier))
-    .get()
-
-  const lastUsedAt = key!.lastUsedAt instanceof Date ? key!.lastUsedAt.toISOString() : key!.lastUsedAt ?? null
-  const createdAt = key!.createdAt instanceof Date ? key!.createdAt.toISOString() : key!.createdAt
-  const allowedIps = key!.allowedIps ? (JSON.parse(key!.allowedIps) as string[]) : []
+  const result = await auth.api.createApiKey({
+    body: {
+      name: body.memo || 'API Key',
+      metadata: {
+        memo: body.memo || null,
+        allowedIps: body.allowedIps || [],
+      },
+    },
+    headers: event.req.headers,
+  })
 
   return {
     data: {
-      identifier: key!.identifier,
-      description: key!.memo,
-      allowed_ips: allowedIps,
-      last_used_at: lastUsedAt,
-      created_at: createdAt,
+      identifier: result.data?.id || result.data?.keyId || '',
+      description: result.data?.name || body.memo || null,
+      allowed_ips: result.data?.metadata?.allowedIps || body.allowedIps || [],
+      last_used_at: result.data?.lastUsedAt || null,
+      created_at: result.data?.createdAt || new Date().toISOString(),
     },
     meta: {
-      secret_token: `${identifier}.${plainToken}`,
+      secret_token: result.data?.key || result.data?.apiKey || '',
     },
   }
 })

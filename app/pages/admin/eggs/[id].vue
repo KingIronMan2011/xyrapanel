@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { EggWithVariables, CreateEggVariablePayload } from '#shared/types/admin-nests'
+import type { EggWithVariables, CreateEggVariablePayload } from '#shared/types/admin'
 import type { EggVariable } from '#shared/types/nest'
 
 definePageMeta({

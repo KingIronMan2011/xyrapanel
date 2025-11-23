@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import type { CreateBackupPayload, CreateBackupResponse } from '#shared/types/server-backups'
+import type { CreateBackupPayload, CreateBackupResponse } from '#shared/types/server'
 
 export default defineEventHandler(async (event): Promise<CreateBackupResponse> => {
   const session = await getServerSession(event)

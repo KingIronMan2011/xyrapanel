@@ -1,15 +1,14 @@
 import { assertMethod, createError, getValidatedRouterParams, parseCookies } from 'h3'
-import { getServerSession } from '#auth'
-import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
+import { auth } from '~~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
   assertMethod(event, 'DELETE')
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  if (!user?.id) {
+  if (!session?.user?.id) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }
 
@@ -22,24 +21,20 @@ export default defineEventHandler(async (event) => {
     return { token: tokenParam }
   })
 
-  const db = useDrizzle()
   const cookies = parseCookies(event)
-  const currentToken = cookies['authjs.session-token']
-    ?? cookies['next-auth.session-token']
-    ?? cookies['__Secure-next-auth.session-token']
+  const currentToken = cookies['better-auth.session_token']
 
-  const result = db.delete(tables.sessions)
-    .where(and(
-      eq(tables.sessions.userId, user.id),
-      eq(tables.sessions.sessionToken, targetToken),
-    ))
-    .run()
+  const result = await auth.api.revokeSession({
+    body: { token: targetToken },
+    headers: event.req.headers,
+  })
 
-  const removed = typeof result.changes === 'number' ? result.changes > 0 : false
-
-  if (!removed) {
-    throw createError({ statusCode: 404, statusMessage: 'Session not found' })
+  if (!result.status) {
+    throw createError({ statusCode: 404, statusMessage: 'Session not found or failed to revoke' })
   }
 
-  return { revoked: true, currentSessionRevoked: currentToken === targetToken }
+  return {
+    revoked: true,
+    currentSessionRevoked: currentToken === targetToken,
+  }
 })

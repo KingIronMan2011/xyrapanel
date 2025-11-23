@@ -1,6 +1,6 @@
 
 export default defineEventHandler(async (event) => {
-  const { getServerSession } = await import('#auth')
+  const { getServerSession } = await import('~~/server/utils/session')
   const session = await getServerSession(event)
   if (!session?.user) {
     throw createError({

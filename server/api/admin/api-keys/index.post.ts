@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { getServerSession } from '#auth'
-import { isAdmin, getSessionUser } from '~~/server/utils/session'
+import { getServerSession, isAdmin, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { generateIdentifier, generateApiToken, hashApiToken, formatApiKey } from '~~/server/utils/apiKeys'
-import type { CreateApiKeyPayload, CreateApiKeyResponse } from '#shared/types/admin-api-keys'
+import type { CreateApiKeyPayload, CreateApiKeyResponse } from '#shared/types/admin'
 
 export default defineEventHandler(async (event): Promise<CreateApiKeyResponse> => {
   const session = await getServerSession(event)

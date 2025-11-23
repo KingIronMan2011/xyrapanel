@@ -1,7 +1,6 @@
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import { isAdmin } from '~~/server/utils/session'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)

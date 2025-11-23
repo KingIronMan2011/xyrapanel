@@ -1,5 +1,4 @@
-import { getServerSession } from '#auth'
-import { getSessionUser } from '~~/server/utils/session'
+import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { getServerStatus } from '~~/server/utils/server-status'
 
 export default defineEventHandler(async (event) => {

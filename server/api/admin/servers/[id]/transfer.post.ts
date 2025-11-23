@@ -1,7 +1,6 @@
 import { createError, readBody } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { isAdmin } from '~~/server/utils/session'
 import { initiateServerTransfer, TransferError } from '~~/server/utils/transfers/initiate'
 
 export default defineEventHandler(async (event) => {

@@ -1,15 +1,24 @@
-import { getServerSession } from '#auth'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
+import { createError } from 'h3'
+import { APIError } from 'better-auth/api'
+import { getAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import bcrypt from 'bcryptjs'
 import type { UpdateUserRequest } from '#shared/types/user'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const auth = getAuth()
+  
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  if (!user || user.role !== 'admin') {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
+  if (!session?.user?.id) {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  }
+
+  const userRole = (session.user as { role?: string }).role
+  if (userRole !== 'admin') {
+    throw createError({ statusCode: 403, statusMessage: 'Forbidden', message: 'Admin access required' })
   }
 
   const userId = getRouterParam(event, 'id')
@@ -18,52 +27,107 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody<Partial<UpdateUserRequest>>(event)
-  const db = useDrizzle()
 
-  const existing = await db
-    .select()
-    .from(tables.users)
-    .where(eq(tables.users.id, userId))
-    .get()
+  try {
+    const updateData: Record<string, unknown> = {}
+    
+    if (body.nameFirst !== undefined || body.nameLast !== undefined) {
+      const name = [body.nameFirst, body.nameLast].filter(Boolean).join(' ') || undefined
+      if (name) updateData.name = name
+    }
 
-  if (!existing) {
-    throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'User not found' })
+    if (body.email !== undefined) {
+      const currentUser = await auth.api.getUser({
+        query: { userId },
+        headers: event.req.headers,
+      }).catch(() => null)
+      
+      if (currentUser && currentUser.email !== body.email) {
+        await auth.api.changeEmail({
+          body: {
+            newEmail: body.email,
+          },
+          headers: event.req.headers,
+        })
+      }
+    }
+
+    if (body.role !== undefined) {
+      await auth.api.setRole({
+        body: {
+          userId,
+          role: body.role,
+        },
+        headers: event.req.headers,
+      })
+    }
+
+    if (body.password) {
+      await auth.api.setUserPassword({
+        body: {
+          userId,
+          newPassword: body.password,
+        },
+        headers: event.req.headers,
+      })
+    }
+
+    if (body.username !== undefined || body.rootAdmin !== undefined) {
+      const db = useDrizzle()
+      const updates: Partial<typeof tables.users.$inferInsert> = {
+        updatedAt: new Date(),
+      }
+      
+      if (body.username !== undefined) updates.username = body.username
+      if (body.rootAdmin !== undefined) updates.rootAdmin = body.rootAdmin
+      
+      await db.update(tables.users)
+        .set(updates)
+        .where(eq(tables.users.id, userId))
+        .run()
+    }
+
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.user.updated',
+      targetType: 'user',
+      targetId: userId,
+      metadata: {
+        fields: Object.keys(body),
+      },
+    })
+
+    const updatedUser = await auth.api.getUser({
+      query: { userId },
+      headers: event.req.headers,
+    }).catch(() => null)
+
+    if (!updatedUser) {
+      throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'User not found after update' })
+    }
+
+    return {
+      data: {
+        id: updatedUser.id,
+        username: (updatedUser as { username?: string }).username || updatedUser.email,
+        email: updatedUser.email,
+        name: updatedUser.name || null,
+        role: (updatedUser as { role?: string }).role || 'user',
+        createdAt: updatedUser.createdAt?.toISOString() || new Date().toISOString(),
+      },
+    }
   }
-
-  const updates: Partial<typeof tables.users.$inferInsert> = {
-    updatedAt: new Date(),
-  }
-
-  if (body.username !== undefined) updates.username = body.username
-  if (body.email !== undefined) updates.email = body.email
-  if (body.nameFirst !== undefined) updates.nameFirst = body.nameFirst
-  if (body.nameLast !== undefined) updates.nameLast = body.nameLast
-  if (body.rootAdmin !== undefined) updates.rootAdmin = body.rootAdmin
-
-  if (body.password) {
-    updates.password = await bcrypt.hash(body.password, 10)
-  }
-
-  if (Object.keys(updates).length === 1) {
-    throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'No updates provided' })
-  }
-
-  await db.update(tables.users).set(updates).where(eq(tables.users.id, userId))
-
-  const updated = await db
-    .select()
-    .from(tables.users)
-    .where(eq(tables.users.id, userId))
-    .get()
-
-  return {
-    data: {
-      id: updated!.id,
-      username: updated!.username,
-      email: updated!.email,
-      name: updated!.nameFirst || updated!.nameLast || null,
-      role: updated!.rootAdmin ? 'admin' : 'user',
-      createdAt: new Date(updated!.createdAt).toISOString(),
-    },
+  catch (error) {
+    if (error instanceof APIError) {
+      throw createError({
+        statusCode: error.statusCode,
+        statusMessage: error.message || 'Failed to update user',
+      })
+    }
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to update user',
+    })
   }
 })

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { listServerSubusers } from '~~/server/utils/subusers'
 import bcrypt from 'bcryptjs'
-import type { SftpAuthRequest, SftpAuthResponse } from '#shared/types/api-responses'
+import type { SftpAuthRequest, SftpAuthResponse } from '#shared/types/api'
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
 const MAX_ATTEMPTS = 5

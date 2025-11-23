@@ -1,7 +1,14 @@
-import type { Session } from 'next-auth'
-import type { ExtendedSession as _ExtendedSession, ServerSessionUser } from '#shared/types/auth'
+import type { H3Event } from 'h3'
+import type { ServerSessionUser } from '#shared/types/auth'
+import { getAuth } from '~~/server/utils/auth'
 
-export function getSessionUser(session: Session | null): ServerSessionUser | null {
+export async function getServerSession(event: H3Event) {
+  return await getAuth().api.getSession({
+    headers: event.headers,
+  })
+}
+
+export function getSessionUser(session: Awaited<ReturnType<typeof getServerSession>> | null): ServerSessionUser | null {
   if (!session?.user) {
     return null
   }
@@ -21,10 +28,11 @@ export function getSessionUser(session: Session | null): ServerSessionUser | nul
     name: candidate.name ?? null,
     image: candidate.image ?? null,
     remember: candidate.remember ?? null,
+    passwordResetRequired: candidate.passwordResetRequired ?? false,
   }
 }
 
-export function isAdmin(session: Session | null): boolean {
+export function isAdmin(session: Awaited<ReturnType<typeof getServerSession>> | null): boolean {
   const user = getSessionUser(session)
   if (!user) return false
 

@@ -1,11 +1,10 @@
 import { createError, defineEventHandler, getQuery } from 'h3'
 import { and, desc, like, or, sql } from 'drizzle-orm'
 
-import type { AdminPaginatedMeta, AdminWingsNodeServerSummary, AdminWingsNodeServersPayload } from '#shared/types/admin-wings-node'
+import type { AdminPaginatedMeta, AdminWingsNodeServerSummary, AdminWingsNodeServersPayload } from '#shared/types/admin'
 
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 
 function toIsoTimestamp(value: unknown): string {
   if (value instanceof Date) {

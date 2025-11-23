@@ -9,7 +9,7 @@ import type {
   AdminWingsNodeDetail,
   AdminWingsNodeServerSummary,
   AdminWingsNodeServersPayload,
-} from '#shared/types/admin-wings-node'
+} from '#shared/types/admin'
 
 const route = useRoute()
 
@@ -323,7 +323,6 @@ async function handleUnlinkServer(row: AdminWingsNodeServerSummary) {
   }
 
   try {
-    // For now we'll show a warning
     toast.add({
       title: 'Unlink server',
       description: 'To unlink a server, please transfer it to another node using the server management page.',

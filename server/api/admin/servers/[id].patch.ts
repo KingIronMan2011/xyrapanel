@@ -1,8 +1,7 @@
 import { createError, assertMethod, getRequestIP, getRequestHost, readRawBody, type H3Event } from 'h3'
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import type { UpdateAdminServerPayload } from '#shared/types/admin-servers'
+import type { UpdateAdminServerPayload } from '#shared/types/admin'
 import { requireRouteParam } from '~~/server/utils/http/params'
 
 const MAX_BODY_SIZE = 16 * 1024

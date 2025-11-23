@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import type { CookieSerializeOptions } from 'cookie-es'
 import { useRuntimeConfig } from '#imports'
-import type { AuthCookieOptions, CookieSameSite, ExtendedRuntimeConfig } from '#shared/types/auth-config'
+import type { AuthCookieOptions, CookieSameSite, ExtendedRuntimeConfig } from '#shared/types/auth'
 
 const HASHED_TOKEN_REGEX = /^[a-f0-9]{64}$/i
 let cachedKey: Buffer | null = null

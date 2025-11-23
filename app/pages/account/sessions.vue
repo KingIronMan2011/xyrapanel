@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { authClient } from '~/utils/auth-client'
 import type { AccountSessionsResponse, UserSessionSummary } from '#shared/types/auth'
 
 definePageMeta({
@@ -105,11 +106,30 @@ async function handleSignOut(token: string) {
 
   updatingSessions.value = true
   try {
-    const result = await $fetch<{ revoked: boolean, currentSessionRevoked: boolean }>(`/api/account/sessions/${encodeURIComponent(token)}`, {
-      method: 'DELETE',
-    })
+    let currentSessionRevoked = false
+    
+    if (typeof authClient.revokeSession === 'function') {
+      try {
+        await authClient.revokeSession({ token })
+        const cookies = document.cookie.split(';').find(c => c.trim().startsWith('better-auth.session_token='))
+        const currentToken = cookies?.split('=')[1]
+        currentSessionRevoked = currentToken === token
+      }
+      catch {
+        const result = await $fetch<{ revoked: boolean, currentSessionRevoked: boolean }>(`/api/account/sessions/${encodeURIComponent(token)}`, {
+          method: 'DELETE',
+        })
+        currentSessionRevoked = result.currentSessionRevoked
+      }
+    }
+    else {
+      const result = await $fetch<{ revoked: boolean, currentSessionRevoked: boolean }>(`/api/account/sessions/${encodeURIComponent(token)}`, {
+        method: 'DELETE',
+      })
+      currentSessionRevoked = result.currentSessionRevoked
+    }
 
-    if (result.currentSessionRevoked) {
+    if (currentSessionRevoked) {
       await navigateTo('/auth/login')
       return
     }
@@ -137,15 +157,30 @@ async function handleSignOutAll(includeCurrent = false) {
 
   updatingSessions.value = true
   try {
-    const result = await $fetch<{ revoked: number, currentSessionRevoked: boolean }>('/api/account/sessions', {
-      method: 'DELETE',
-      query: includeCurrent ? { includeCurrent: 'true' } : undefined,
-    })
-
-    if (result.currentSessionRevoked) {
+    if (includeCurrent) {
+      await authClient.signOut()
       await navigateTo('/auth/login')
       return
     }
+
+    if (typeof authClient.revokeOtherSessions === 'function') {
+      try {
+        await authClient.revokeOtherSessions()
+        await loadSessions()
+        toast.add({
+          title: 'Sessions revoked',
+          description: 'All other sessions have been revoked.',
+        })
+        return
+      }
+      catch {
+      }
+    }
+
+    const result = await $fetch<{ revoked: number, currentSessionRevoked: boolean }>('/api/account/sessions', {
+      method: 'DELETE',
+      query: { includeCurrent: 'false' },
+    })
 
     await loadSessions()
     toast.add({
@@ -219,79 +254,93 @@ async function handleSignOutAll(includeCurrent = false) {
             description="No browser sessions found for your account"
             variant="subtle"
           />
-          <div v-else class="space-y-3">
+          <div v-else class="space-y-2">
             <div
               v-for="session in sortedSessions"
               :key="session.token"
-              class="flex flex-col gap-3 rounded-lg border border-default p-4"
+              class="flex items-center gap-3 rounded-lg border border-default p-3 transition-colors hover:bg-elevated/50"
             >
-              <div class="flex items-start justify-between">
-                <div class="space-y-2">
-                  <div class="flex items-center gap-2">
-                    <UIcon
-                      :name="session.device === 'Mobile' ? 'i-lucide-smartphone' : session.device === 'Tablet' ? 'i-lucide-tablet' : 'i-lucide-monitor'"
-                      class="size-4 text-primary"
-                    />
-                    <span class="text-sm font-semibold">{{ session.device ?? 'Unknown device' }}</span>
-                    <UBadge v-if="session.token === currentSessionToken" color="primary" variant="soft" size="xs">
-                      Current session
-                    </UBadge>
-                  </div>
+              <UIcon
+                :name="session.device === 'Mobile' ? 'i-lucide-smartphone' : session.device === 'Tablet' ? 'i-lucide-tablet' : 'i-lucide-monitor'"
+                class="size-5 shrink-0 text-primary"
+              />
+              
+              <div class="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-[auto_1fr_auto] gap-2 md:gap-4 items-center">
+                <div class="min-w-0 flex items-center gap-2 flex-wrap">
+                  <span class="text-sm font-medium">{{ session.device ?? 'Unknown' }}</span>
+                  <span class="text-xs text-muted-foreground">{{ session.os ?? 'Unknown' }} • {{ session.browser ?? 'Unknown' }}</span>
+                  <UBadge v-if="session.token === currentSessionToken" color="primary" variant="soft" size="xs" class="shrink-0">
+                    Current
+                  </UBadge>
+                </div>
 
-                  <p class="text-xs text-muted-foreground">{{ session.os }} • {{ session.browser }}</p>
-
-                  <div class="text-xs text-muted-foreground">
-                    <span>IP Address: {{ displayIp(session.ipAddress ?? 'Unknown', session.token) }}</span>
-                    <UButton variant="link" size="xs" class="ml-1" @click="toggleIpReveal(session.token)">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-muted-foreground min-w-0">
+                  <div class="flex items-center gap-1 shrink-0">
+                    <span class="truncate">IP: {{ displayIp(session.ipAddress ?? 'Unknown', session.token) }}</span>
+                    <UButton variant="link" size="xs" class="h-auto p-0 min-w-0" @click="toggleIpReveal(session.token)">
                       {{ isIpRevealed(session.token) ? 'Hide' : 'Show' }}
                     </UButton>
                   </div>
-
-                  <div class="text-xs text-muted-foreground">
-                    <p>
-                      Last active:
+                  <div class="flex items-center gap-2 shrink-0">
+                    <span class="truncate">
+                      Active:
                       <template v-if="session.lastSeenAt">
-                        <NuxtTime :datetime="session.lastSeenAt" class="ml-1 font-medium" />
+                        <NuxtTime :datetime="session.lastSeenAt" class="font-medium" />
                       </template>
-                      <span v-else class="ml-1">Unknown</span>
-                    </p>
-                    <p>
+                      <span v-else>Unknown</span>
+                    </span>
+                    <span class="hidden sm:inline">•</span>
+                    <span class="truncate">
                       Expires:
                       <template v-if="session.expiresAtTimestamp">
-                        <NuxtTime :datetime="session.expiresAtTimestamp * 1000" class="ml-1 font-medium" />
+                        <NuxtTime :datetime="session.expiresAtTimestamp * 1000" class="font-medium" />
                       </template>
-                      <span v-else class="ml-1">Unknown</span>
-                    </p>
+                      <span v-else>Unknown</span>
+                    </span>
                   </div>
                 </div>
 
-                <UButton
-                  variant="ghost"
-                  color="error"
-                  size="xs"
-                  :loading="updatingSessions"
-                  :disabled="session.token === currentSessionToken && updatingSessions"
-                  @click="handleSignOut(session.token)"
-                >
-                  Revoke
-                </UButton>
+                <div class="flex items-center gap-2 shrink-0">
+                  <UButton
+                    variant="ghost"
+                    color="error"
+                    size="xs"
+                    :loading="updatingSessions"
+                    :disabled="session.token === currentSessionToken && updatingSessions"
+                    @click="handleSignOut(session.token)"
+                  >
+                    Revoke
+                  </UButton>
+                </div>
               </div>
-
-              <details v-if="session.token === currentSessionToken" class="text-xs">
-                <summary class="cursor-pointer text-muted-foreground hover:text-foreground">
-                  Show session details
-                </summary>
-                <div class="mt-2 space-y-1 text-muted-foreground">
-                  <div><strong>Token:</strong> <code class="break-all">{{ session.token }}</code></div>
-                  <div><strong>User Agent:</strong> {{ session.userAgent }}</div>
-                  <div>
-                    <strong>Issued:</strong>
-                    <NuxtTime v-if="session.issuedAt" :datetime="session.issuedAt" relative class="font-medium" />
-                    <span v-else>Unknown</span>
-                  </div>
-                </div>
-              </details>
             </div>
+
+            <details v-if="sortedSessions.some(s => s.token === currentSessionToken)" class="text-xs border border-default rounded-lg p-3">
+              <summary class="cursor-pointer text-muted-foreground hover:text-foreground font-medium">
+                Show current session details
+              </summary>
+              <div class="mt-3 space-y-2 text-muted-foreground">
+                <div>
+                  <strong>Token:</strong>
+                  <code class="block mt-1 break-all text-xs bg-muted p-2 rounded">{{ sortedSessions.find(s => s.token === currentSessionToken)?.token }}</code>
+                </div>
+                <div>
+                  <strong>User Agent:</strong>
+                  <span class="block mt-1 break-all">{{ sortedSessions.find(s => s.token === currentSessionToken)?.userAgent }}</span>
+                </div>
+                <div>
+                  <strong>Issued:</strong>
+                  <template v-if="sortedSessions.find(s => s.token === currentSessionToken)?.issuedAt">
+                    <NuxtTime
+                      :datetime="sortedSessions.find(s => s.token === currentSessionToken)?.issuedAt || ''"
+                      relative
+                      class="ml-1 font-medium"
+                    />
+                  </template>
+                  <span v-else class="ml-1">Unknown</span>
+                </div>
+              </div>
+            </details>
           </div>
         </UCard>
       </UContainer>

@@ -1,6 +1,7 @@
 import { createTransport } from 'nodemailer'
 import type { Transporter, TransportOptions as NodemailerTransportOptions } from 'nodemailer'
 import { getSettings, getSettingWithDefault, SETTINGS_KEYS } from '~~/server/utils/settings'
+import type { EmailConfig } from '#shared/types/email'
 
 let transporter: Transporter | null = null
 
@@ -11,15 +12,6 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
-}
-
-interface EmailConfig {
-  service?: string | null
-  host?: string | null
-  port?: number | null
-  secure?: boolean
-  user?: string | null
-  pass?: string | null
 }
 
 function sanitizeService(service?: string | null): string | null {

@@ -3,7 +3,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { accountPasswordFormSchema, type AccountPasswordFormInput } from '#shared/schema/account'
-import type { TotpSetupResponse, TotpVerifyRequest, TotpDisableRequest } from '#shared/types/2fa'
+import type { TotpSetupResponse, TotpVerifyRequest, TotpDisableRequest } from '#shared/types/account'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({
   auth: true,
@@ -50,10 +51,10 @@ async function handlePasswordSubmit(event: FormSubmitEvent<PasswordFormSchema>) 
   try {
     const payload = event.data
 
-    const response = await $fetch<{ success: boolean, revokedSessions: number }>('/api/account/password', {
+    const response = await $fetch('/api/account/password', {
       method: 'PUT',
       body: payload,
-    })
+    }) as { success: boolean; revokedSessions: number }
 
     toast.add({
       title: 'Password updated',
@@ -132,6 +133,7 @@ async function beginTotpSetup() {
   try {
     const setup = await $fetch<TotpSetupResponse>('/api/user/2fa/enable', { method: 'POST' })
     totpSetup.value = setup
+
     toast.add({
       title: 'TOTP setup started',
       description: 'Scan the QR code with your authenticator app and enter the 6-digit token to confirm.',

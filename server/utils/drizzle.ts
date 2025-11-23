@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { join, resolve } from 'pathe'
 import Database from 'better-sqlite3'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3/driver'
-import { and, eq, or, ne, inArray, isNull, lt } from 'drizzle-orm'
+import { and, eq, or, inArray, isNull, lt } from 'drizzle-orm'
 import * as schema from '~~/server/database/schema'
 
 function findProjectRoot(startDir: string): string {
@@ -39,11 +39,14 @@ function getClient() {
   }
 
   if (!existsSync(dataDir)) {
-    mkdirSync(dataDir, { recursive: true })
+    mkdirSync(dataDir, { recursive: true, mode: 0o755 })
   }
 
-  sqlite = new Database(databasePath)
+  sqlite = new Database(databasePath, { 
+    verbose: process.env.NODE_ENV === 'development' ? console.log : undefined
+  })
   sqlite.pragma('foreign_keys = ON')
+  sqlite.pragma('journal_mode = WAL')
   return sqlite
 }
 
@@ -55,4 +58,4 @@ export function useDrizzle(): BetterSQLite3Database<typeof schema> {
 }
 
 export const tables = schema
-export { eq, and, or, ne, inArray, isNull, lt }
+export { eq, and, or, inArray, isNull, lt }

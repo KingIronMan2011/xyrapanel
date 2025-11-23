@@ -9,7 +9,7 @@ import type {
   WingsSystemInformation,
   WingsHttpRequestOptions,
 } from '#shared/types/wings'
-import type { ServerDirectoryListing, ServerFileContentResponse } from '#shared/types/server-pages'
+import type { ServerDirectoryListing, ServerFileContentResponse } from '#shared/types/server'
 
 function normalizeServerPath(value: string): string {
   if (!value) {

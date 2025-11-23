@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LocationWithNodeCount, CreateLocationPayload } from '#shared/types/admin-locations'
+import type { LocationWithNodeCount, CreateLocationPayload } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,

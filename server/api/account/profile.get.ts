@@ -1,5 +1,5 @@
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 

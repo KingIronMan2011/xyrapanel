@@ -1,12 +1,9 @@
 import { randomUUID } from 'crypto'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
-
-interface CreateSubuserPayload {
-  email: string
-  permissions: string[]
-}
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { createSubuserSchema } from '#shared/schema/server/subusers'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -21,7 +18,11 @@ export default defineEventHandler(async (event) => {
 
   const { server } = await getServerWithAccess(serverId, session)
 
-  const body = await readBody<CreateSubuserPayload>(event)
+  const body = await readValidatedBodyWithLimit(
+    event,
+    createSubuserSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const db = useDrizzle()
   const user = db

@@ -1,11 +1,11 @@
 import { eq, and } from 'drizzle-orm'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import type {
   UpdateStartupVariablePayload,
   UpdateStartupVariableResponse,
-} from '#shared/types/server-startup'
+} from '#shared/types/server'
 
 export default defineEventHandler(async (event): Promise<UpdateStartupVariableResponse> => {
   const session = await getServerSession(event)

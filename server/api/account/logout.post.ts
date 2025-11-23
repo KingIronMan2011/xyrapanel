@@ -1,5 +1,5 @@
 import { defineEventHandler, parseCookies, setCookie } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { eq } from 'drizzle-orm'
 
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
@@ -11,20 +11,12 @@ export default defineEventHandler(async (event) => {
 
   const db = useDrizzle()
   const cookies = parseCookies(event)
-  const sessionCookieNames = [
-    'authjs.session-token',
-    'next-auth.session-token',
-    '__Secure-next-auth.session-token',
-  ] as const
+  const sessionCookieName = 'better-auth.session_token'
+  const token = cookies[sessionCookieName]
 
   let revoked = 0
 
-  for (const cookieName of sessionCookieNames) {
-    const token = cookies[cookieName]
-    if (!token) {
-      continue
-    }
-
+  if (token) {
     const result = db.delete(tables.sessions)
       .where(eq(tables.sessions.sessionToken, token))
       .run()
@@ -33,7 +25,7 @@ export default defineEventHandler(async (event) => {
       revoked += result.changes
     }
 
-    setCookie(event, cookieName, '', {
+    setCookie(event, sessionCookieName, '', {
       path: '/',
       maxAge: 0,
       httpOnly: true,

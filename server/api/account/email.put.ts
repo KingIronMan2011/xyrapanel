@@ -1,6 +1,5 @@
-import { getServerSession } from '#auth'
+import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { getSessionUser } from '~~/server/utils/session'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import bcrypt from 'bcryptjs'
 import type { UpdateEmailPayload, UpdateEmailResponse } from '#shared/types/account'

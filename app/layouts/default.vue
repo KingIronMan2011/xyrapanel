@@ -2,9 +2,12 @@
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { NavigationMenuItem } from '@nuxt/ui'
+import { authClient } from '~/utils/auth-client'
+
+const { data: sessionData } = await authClient.useSession(useFetch)
 
 const authStore = useAuthStore()
-const { user, displayName, avatar, isAdmin: isAdminRef } = storeToRefs(authStore)
+const { user, displayName, avatar, isAdmin: isAdminRef, isAuthenticated } = storeToRefs(authStore)
 const signOutLoading = ref(false)
 
 async function handleSignOut() {
@@ -14,7 +17,7 @@ async function handleSignOut() {
 
   signOutLoading.value = true
   try {
-    await authStore.logout({ redirect: false })
+    await authStore.logout()
     await navigateTo('/auth/login')
   }
   catch (error) {
@@ -49,9 +52,33 @@ const navigationItems = computed<NavigationMenuItem[]>(() => {
   return items
 })
 
-const userLabel = computed(() => displayName.value || user.value?.email || 'Account')
-const userAvatar = computed(() => avatar.value)
-const isAdminUser = computed(() => isAdminRef.value)
+const userLabel = computed(() => {
+  if (!isAuthenticated.value || !user.value) {
+    return null
+  }
+  
+  if (displayName.value && displayName.value.length > 0) {
+    return displayName.value
+  }
+  
+  if (user.value) {
+    return user.value.username || user.value.email || user.value.name || null
+  }
+  
+  return null
+})
+
+const userAvatar = computed(() => {
+  if (!isAuthenticated.value || !user.value) {
+    return null
+  }
+  return avatar.value
+})
+const isAdminUser = computed(() => {
+  if (isAdminRef.value) return true
+  if (user.value?.role === 'admin') return true
+  return false
+})
 </script>
 
 <template>
@@ -75,32 +102,48 @@ const isAdminUser = computed(() => isAdminRef.value)
       </template>
 
       <template #footer="{ collapsed }">
-        <UDropdownMenu
-          :items="[[
-            { label: 'Profile', to: '/account/profile' },
-            { label: 'Security', to: '/account/security' },
-            { label: 'API Keys', to: '/account/api-keys' },
-            { label: 'SSH Keys', to: '/account/ssh-keys' },
-            { label: 'Sessions', to: '/account/sessions' },
-            { label: 'Activity', to: '/account/activity' }
-          ], [
-            { label: 'Sign out', click: handleSignOut, color: 'error' }
-          ]]"
-        >
+        <template v-if="isAuthenticated && user && userLabel">
+          <UDropdownMenu
+            :items="[[
+              { label: 'Profile', to: '/account/profile' },
+              { label: 'Security', to: '/account/security' },
+              { label: 'API Keys', to: '/account/api-keys' },
+              { label: 'SSH Keys', to: '/account/ssh-keys' },
+              { label: 'Sessions', to: '/account/sessions' },
+              { label: 'Activity', to: '/account/activity' }
+            ], [
+              { label: 'Sign out', click: handleSignOut, color: 'error' }
+            ]]"
+          >
+            <UButton
+              color="neutral"
+              variant="ghost"
+              class="w-full"
+              :block="collapsed"
+              type="button"
+              @click.prevent
+            >
+              <template #leading>
+                <UAvatar v-if="userAvatar" v-bind="userAvatar" size="sm" />
+              </template>
+              <span v-if="!collapsed && userLabel">{{ userLabel }}</span>
+            </UButton>
+          </UDropdownMenu>
+        </template>
+        <template v-else>
           <UButton
-            color="neutral"
+            color="error"
             variant="ghost"
             class="w-full"
             :block="collapsed"
-            type="button"
-            @click.prevent
+            to="/auth/login"
           >
             <template #leading>
-              <UAvatar v-bind="userAvatar" size="sm" />
+              <UIcon name="i-lucide-log-in" class="size-4" />
             </template>
-            <span v-if="!collapsed">{{ userLabel }}</span>
+            <span v-if="!collapsed">Sign in</span>
           </UButton>
-        </UDropdownMenu>
+        </template>
       </template>
     </UDashboardSidebar>
 

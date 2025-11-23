@@ -1,6 +1,5 @@
 import { createError, defineEventHandler, sendRedirect } from 'h3'
-import { getServerSession } from '#auth'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
+import { getAuth } from '~~/server/utils/auth'
 import type { AuthContext } from '#shared/types/auth'
 
 const PUBLIC_ASSET_PREFIXES = [
@@ -87,10 +86,12 @@ export default defineEventHandler(async (event) => {
     return
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const auth = getAuth()
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  if (!session || !user) {
+  if (!session?.user?.id) {
     if (isApiRequest) {
       throw createError({
         statusCode: 401,
@@ -99,10 +100,8 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    const hasAuthQuery = requestUrl.startsWith('/auth/login') || requestUrl.startsWith('/auth/error')
     const searchParams = new URLSearchParams()
-
-    if (!hasAuthQuery && requestUrl !== '/auth/login') {
+    if (path !== '/auth/login' && !path.startsWith('/auth/')) {
       searchParams.set('redirect', requestUrl)
     }
 
@@ -114,7 +113,9 @@ export default defineEventHandler(async (event) => {
     return
   }
 
-  (event.context as { auth?: AuthContext }).auth = {
+  const user = session.user
+
+  ;(event.context as { auth?: AuthContext }).auth = {
     session,
     user,
   }

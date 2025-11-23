@@ -1,10 +1,8 @@
-import { createError, defineEventHandler, getQuery } from 'h3'
-import { desc, eq } from 'drizzle-orm'
-
+import { createError, getQuery } from 'h3'
+import { desc, eq, or } from 'drizzle-orm'
+import { auth } from '~~/server/utils/auth'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import { getServerSession } from '#auth'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import type { AccountActivityItem, AccountActivityResponse } from '#shared/types/activity'
+import type { AccountActivityItem, AccountActivityResponse } from '#shared/types/account'
 import type { ActivityMetadata } from '#shared/types/audit'
 
 function parseMetadata(raw: string | null): ActivityMetadata | null {
@@ -25,10 +23,11 @@ function parseMetadata(raw: string | null): ActivityMetadata | null {
 }
 
 export default defineEventHandler(async (event): Promise<AccountActivityResponse> => {
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  if (!user?.username) {
+  if (!session?.user?.id) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }
 
@@ -38,16 +37,25 @@ export default defineEventHandler(async (event): Promise<AccountActivityResponse
 
   const db = useDrizzle()
 
+  const userId = session.user.id
+  const userEmail = session.user.email
+
+  const conditions = [eq(tables.auditEvents.actor, userId)]
+  if (userEmail) {
+    conditions.push(eq(tables.auditEvents.actor, userEmail))
+  }
+
   const rows = db.select({
     id: tables.auditEvents.id,
     occurredAt: tables.auditEvents.occurredAt,
     action: tables.auditEvents.action,
+    actor: tables.auditEvents.actor,
     targetType: tables.auditEvents.targetType,
     targetId: tables.auditEvents.targetId,
     metadata: tables.auditEvents.metadata,
   })
     .from(tables.auditEvents)
-    .where(eq(tables.auditEvents.actor, user.username))
+    .where(or(...conditions))
     .orderBy(desc(tables.auditEvents.occurredAt))
     .limit(limit)
     .all()
@@ -57,7 +65,7 @@ export default defineEventHandler(async (event): Promise<AccountActivityResponse
     occurredAt: row.occurredAt.toISOString(),
     action: row.action,
     target: row.targetId ? `${row.targetType}#${row.targetId}` : row.targetType,
-    actor: user.username,
+    actor: row.actor,
     metadata: parseMetadata(row.metadata),
   }))
 

@@ -1,5 +1,5 @@
 import type { WingsJWTClaims as _WingsJWTClaims } from '#shared/types/wings'
-import { ADMIN_PERMISSIONS, DEFAULT_SUBUSER_PERMISSIONS, type GetUserPermissionsOptions } from '#shared/types/server-permissions'
+import { ADMIN_PERMISSIONS, DEFAULT_SUBUSER_PERMISSIONS, type GetUserPermissionsOptions } from '#shared/types/server'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 
 export function normalizePermissionPayload(payload: unknown): string[] {

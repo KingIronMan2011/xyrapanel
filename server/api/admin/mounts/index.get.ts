@@ -1,8 +1,7 @@
 import { eq } from 'drizzle-orm'
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import type { MountWithRelations } from '#shared/types/admin-mounts'
+import type { MountWithRelations } from '#shared/types/admin'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)

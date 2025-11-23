@@ -1,5 +1,4 @@
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { SETTINGS_KEYS, getSettingWithDefault, getNumericSetting } from '~~/server/utils/settings'
 
 export default defineEventHandler(async (event) => {

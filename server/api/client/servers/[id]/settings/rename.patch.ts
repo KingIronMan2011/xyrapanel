@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import type { RenameServerPayload, RenameServerResponse } from '#shared/types/server-settings'
+import type { RenameServerPayload, RenameServerResponse } from '#shared/types/server'
 
 export default defineEventHandler(async (event): Promise<RenameServerResponse> => {
   const session = await getServerSession(event)

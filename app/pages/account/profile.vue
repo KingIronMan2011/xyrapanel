@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { accountProfileFormSchema, type AccountProfileFormInput } from '#shared/schema/account'
@@ -18,10 +18,8 @@ const {
   pending: profilePending,
   error: profileError,
   refresh: refreshProfile,
-} = await useAsyncData<AccountProfileResponse>('account-profile', () => $fetch('/api/account/profile', {
-  method: 'GET',
-  cache: 'no-cache',
-}), {
+} = await useFetch<AccountProfileResponse>('/api/account/profile', {
+  key: 'account-profile',
   server: false,
   immediate: false,
 })
@@ -122,7 +120,9 @@ async function handleSubmit(event: FormSubmitEvent<ProfileFormSchema>) {
     Object.assign(form, createFormState(updated.data))
 
     await authStore.syncSession({ force: true })
+    await nextTick()
     await refreshProfile()
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     toast.add({
       title: 'Profile updated',

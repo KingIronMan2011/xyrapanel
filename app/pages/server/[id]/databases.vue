@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ServerDatabase } from '#shared/types/server-databases'
+import type { ServerDatabase } from '#shared/types/server'
 
 const route = useRoute()
 

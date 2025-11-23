@@ -129,3 +129,26 @@ export const accountForcedPasswordSchema = forcedPasswordSchema.superRefine(
 export type AccountForcedPasswordInput = z.infer<
   typeof accountForcedPasswordSchema
 >;
+
+const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$/
+const ipValidator = z.string().regex(ipRegex, 'Invalid IP address format')
+
+export const createApiKeySchema = z.object({
+  memo: z.string().min(1, 'Description is required').max(500, 'Description too long'),
+  allowedIps: z.array(ipValidator).optional(),
+  expiresAt: z.string().datetime().optional(),
+})
+
+export const updateEmailSchema = z.object({
+  email: z.string().email('Invalid email'),
+  password: z.string().min(1, 'Password is required'),
+})
+
+export const createSshKeySchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
+  publicKey: z.string().min(1, 'Public key is required'),
+})
+
+export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>
+export type UpdateEmailInput = z.infer<typeof updateEmailSchema>
+export type CreateSshKeyInput = z.infer<typeof createSshKeySchema>

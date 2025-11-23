@@ -1,7 +1,6 @@
-import { getServerSession } from '#auth'
+import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import bcrypt from 'bcryptjs'
-import { getSessionUser } from '~~/server/utils/session'
 import { log2FA, getRequestMetadata } from '~~/server/utils/activity'
 
 export default defineEventHandler(async (event) => {

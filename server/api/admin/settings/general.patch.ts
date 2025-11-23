@@ -1,7 +1,6 @@
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { SETTINGS_KEYS, deleteSetting, setSettings } from '~~/server/utils/settings'
-import type { GeneralSettings } from '#shared/types/admin-settings'
+import type { GeneralSettings } from '#shared/types/admin'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)

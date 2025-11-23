@@ -1,5 +1,4 @@
-import { getServerSession } from '#auth'
-import { getSessionUser } from '~~/server/utils/session'
+import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEvent } from '~~/server/utils/audit'
 

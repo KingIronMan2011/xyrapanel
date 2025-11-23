@@ -5,6 +5,7 @@ export const users = sqliteTable(
   {
     id: text('id').primaryKey(),
     username: text('username').notNull(),
+    displayUsername: text('display_username'),
     email: text('email').notNull(),
     password: text('password').notNull(),
     nameFirst: text('name_first'),
@@ -18,10 +19,14 @@ export const users = sqliteTable(
     suspendedAt: integer('suspended_at', { mode: 'timestamp' }),
     suspensionReason: text('suspension_reason'),
     passwordResetRequired: integer('password_reset_required', { mode: 'boolean' }).notNull().default(false),
+    banned: integer('banned', { mode: 'boolean' }),
+    banReason: text('ban_reason'),
+    banExpires: integer('ban_expires', { mode: 'timestamp' }),
 
     useTotp: integer('use_totp', { mode: 'boolean' }).notNull().default(false),
     totpSecret: text('totp_secret'),
     totpAuthenticatedAt: integer('totp_authenticated_at', { mode: 'timestamp' }),
+    twoFactorEnabled: integer('two_factor_enabled', { mode: 'boolean' }),
     rememberToken: text('remember_token'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
@@ -29,41 +34,58 @@ export const users = sqliteTable(
   (table) => ({
     usernameUnique: uniqueIndex('users_username_unique').on(table.username),
     emailUnique: uniqueIndex('users_email_unique').on(table.email),
+    roleIndex: index('users_role_index').on(table.role),
   }),
 )
 
 export const accounts = sqliteTable(
   'accounts',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: text('id').primaryKey(),
     userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     type: text('type').notNull(),
     provider: text('provider').notNull(),
+    providerId: text('provider_id'),
     providerAccountId: text('provider_account_id').notNull(),
+    accountId: text('account_id'),
+    password: text('password'),
     refreshToken: text('refresh_token'),
     accessToken: text('access_token'),
     refreshTokenExpiresIn: integer('refresh_token_expires_in'),
     expiresAt: integer('expires_at', { mode: 'timestamp' }),
+    accessTokenExpiresAt: integer('access_token_expires_at', { mode: 'timestamp' }),
+    refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp' }),
     tokenType: text('token_type'),
     scope: text('scope'),
     idToken: text('id_token'),
     sessionState: text('session_state'),
     oauthTokenSecret: text('oauth_token_secret'),
     oauthToken: text('oauth_token'),
+    createdAt: integer('created_at', { mode: 'timestamp' }),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }),
   },
   (table) => ({
     providerProviderAccountIdIndex: uniqueIndex('accounts_provider_provider_account_id_index').on(table.provider, table.providerAccountId),
+    userIdIndex: index('accounts_user_id_index').on(table.userId),
   }),
 )
 
 export const sessions = sqliteTable('sessions', {
-  sessionToken: text('session_token').primaryKey(),
+  id: text('id').primaryKey(),
+  sessionToken: text('session_token').notNull().unique(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   expires: integer('expires', { mode: 'timestamp' }).notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
   createdAt: integer('created_at', { mode: 'timestamp' }),
   updatedAt: integer('updated_at', { mode: 'timestamp' }),
   impersonatedBy: text('impersonated_by').references(() => users.id, { onDelete: 'set null' }),
-})
+}, (table) => ({
+  userIdIndex: index('sessions_user_id_index').on(table.userId),
+  expiresIndex: index('sessions_expires_index').on(table.expires),
+  tokenIndex: index('sessions_token_index').on(table.sessionToken),
+}))
 
 export const sessionMetadata = sqliteTable('session_metadata', {
   sessionToken: text('session_token').primaryKey().references(() => sessions.sessionToken, { onDelete: 'cascade' }),
@@ -79,13 +101,18 @@ export const sessionMetadata = sqliteTable('session_metadata', {
 export const verificationTokens = sqliteTable(
   'verification_tokens',
   {
+    id: text('id').primaryKey(),
     identifier: text('identifier').notNull(),
     token: text('token').notNull(),
+    value: text('value'),
     expires: integer('expires', { mode: 'timestamp' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }),
   },
   (table) => ({
     tokenIdentifierIndex: uniqueIndex('verification_token_identifier_token_index').on(table.identifier, table.token),
-    compositePk: primaryKey({ columns: [table.identifier, table.token] }),
+    identifierIndex: index('verification_tokens_identifier_index').on(table.identifier),
   }),
 )
 
@@ -372,6 +399,9 @@ export const auditEvents = sqliteTable(
   },
   table => ({
     occurredIndex: uniqueIndex('audit_events_occurred_id').on(table.occurredAt, table.id),
+    actorIndex: index('audit_events_actor_index').on(table.actor),
+    actionIndex: index('audit_events_action_index').on(table.action),
+    occurredAtIndex: index('audit_events_occurred_at_index').on(table.occurredAt),
   }),
 )
 
@@ -382,31 +412,6 @@ export const recoveryTokens = sqliteTable('recovery_tokens', {
   usedAt: integer('used_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
-
-export const passwordResets = sqliteTable('password_resets', {
-  id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  token: text('token').notNull(),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-  usedAt: integer('used_at', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-}, table => ({
-  userIndex: uniqueIndex('password_resets_user_id_index').on(table.userId),
-  tokenIndex: index('password_resets_token_index').on(table.token),
-}))
-
-export const userImpersonationTokens = sqliteTable('user_impersonation_tokens', {
-  id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  issuedBy: text('issued_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  tokenHash: text('token_hash').notNull().unique(),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-  consumedAt: integer('consumed_at', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-}, table => ({
-  userIndex: index('user_impersonation_tokens_user_id_index').on(table.userId),
-  tokenIndex: index('user_impersonation_tokens_token_hash_index').on(table.tokenHash),
-}))
 
 export const nests = sqliteTable('nests', {
   id: text('id').primaryKey(),
@@ -504,8 +509,6 @@ export type ServerBackupRow = typeof serverBackups.$inferSelect
 export type ServerTransferRow = typeof serverTransfers.$inferSelect
 export type AuditEventRow = typeof auditEvents.$inferSelect
 export type RecoveryTokenRow = typeof recoveryTokens.$inferSelect
-export type PasswordResetRow = typeof passwordResets.$inferSelect
-export type UserImpersonationTokenRow = typeof userImpersonationTokens.$inferSelect
 export type DatabaseHostRow = typeof databaseHosts.$inferSelect
 export type NestRow = typeof nests.$inferSelect
 export type EggRow = typeof eggs.$inferSelect
@@ -541,7 +544,9 @@ export const apiKeys = sqliteTable('api_keys', {
   rServerDatabases: integer('r_server_databases').notNull().default(0),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-})
+}, (table) => ({
+  userIdIndex: index('api_keys_user_id_index').on(table.userId),
+}))
 
 export type ApiKeyRow = typeof apiKeys.$inferSelect
 
@@ -557,12 +562,43 @@ export const sshKeys = sqliteTable('ssh_keys', {
 
 export type SshKeyRow = typeof sshKeys.$inferSelect
 
+export const rateLimit = sqliteTable('rate_limit', {
+  id: text('id').primaryKey(),
+  key: text('key').notNull().unique(),
+  count: integer('count').notNull().default(0),
+  lastRequest: integer('last_request', { mode: 'number' }).notNull(),
+}, (table) => ({
+  keyIndex: index('rate_limit_key_index').on(table.key),
+  lastRequestIndex: index('rate_limit_last_request_index').on(table.lastRequest),
+}))
+
+export const twoFactor = sqliteTable('two_factor', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  secret: text('secret'),
+  backupCodes: text('backup_codes'),
+}, (table) => ({
+  secretIndex: index('two_factor_secret_idx').on(table.secret),
+  userIdIndex: index('two_factor_user_id_idx').on(table.userId),
+}))
+
+export const jwks = sqliteTable('jwks', {
+  id: text('id').primaryKey(),
+  publicKey: text('public_key').notNull(),
+  privateKey: text('private_key').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }),
+})
+
 export const tables = {
   users,
   accounts,
   sessions,
   sessionMetadata,
   verificationTokens,
+  rateLimit,
+  twoFactor,
+  jwks,
   locations,
   wingsNodes,
   serverAllocations,
@@ -579,8 +615,6 @@ export const tables = {
   serverTransfers,
   auditEvents,
   recoveryTokens,
-  passwordResets,
-  userImpersonationTokens,
   nests,
   eggs,
   eggVariables,

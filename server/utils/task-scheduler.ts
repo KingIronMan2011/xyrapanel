@@ -11,7 +11,7 @@ import type {
   ScheduleExecutionResult,
   TaskAction,
   PowerAction,
-} from '#shared/types/task-scheduler'
+} from '#shared/types/server'
 
 export class TaskScheduler {
   private db = useDrizzle()

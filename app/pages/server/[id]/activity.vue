@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ServerActivityEvent } from '#shared/types/server-activity'
+import type { ServerActivityEvent } from '#shared/types/server'
 
 const route = useRoute()
 

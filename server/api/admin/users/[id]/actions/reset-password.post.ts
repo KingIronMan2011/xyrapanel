@@ -1,31 +1,14 @@
-import { getServerSession } from '#auth'
-import { randomBytes } from 'node:crypto'
-import bcrypt from 'bcryptjs'
 import { createError } from 'h3'
-
+import { APIError } from 'better-auth/api'
+import { randomBytes } from 'node:crypto'
+import { getAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { getSessionUser } from '~~/server/utils/session'
-import { createPasswordResetToken, markPasswordResetUsed } from '~~/server/utils/password-reset'
-import { sendPasswordResetEmail, resolvePanelBaseUrl } from '~~/server/utils/email'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-
-interface ResetPasswordBody {
-  mode?: 'link' | 'temporary'
-  password?: string
-  notify?: boolean
-}
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { resetPasswordActionSchema } from '#shared/schema/admin/actions'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const admin = getSessionUser(session)
-
-  if (!admin || admin.role !== 'admin') {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Forbidden',
-      message: 'Admin privileges required',
-    })
-  }
+  const session = await requireAdmin(event)
 
   const userId = getRouterParam(event, 'id')
   if (!userId) {
@@ -36,9 +19,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody<ResetPasswordBody>(event)
-  const mode = body.mode ?? 'link'
-  const notify = body.notify !== false
+  const body = await readValidatedBodyWithLimit(
+    event,
+    resetPasswordActionSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
+  const mode = body.mode
+  const notify = body.notify
 
   const db = useDrizzle()
 
@@ -56,17 +43,60 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'User not found' })
   }
 
-  if (mode === 'link') {
-    const { token } = await createPasswordResetToken(userId)
-    if (notify && user.email) {
+  const auth = getAuth()
+
+  try {
+    if (mode === 'link') {
+      const { resolvePanelBaseUrl } = await import('~~/server/utils/email')
       const resetBaseUrl = `${resolvePanelBaseUrl()}/auth/password/reset`
-      await sendPasswordResetEmail(user.email, token, resetBaseUrl)
+      
+      await auth.api.requestPasswordReset({
+        body: {
+          email: user.email,
+          redirectTo: resetBaseUrl,
+        },
+        headers: event.req.headers,
+      })
+
+      await recordAuditEventFromRequest(event, {
+        actor: session.user.email || session.user.id,
+        actorType: 'user',
+        action: 'admin.user.reset_password_link',
+        targetType: 'user',
+        targetId: userId,
+        metadata: {
+          notify,
+        },
+      })
+
+      return {
+        success: true,
+        mode,
+      }
     }
 
+    const temporaryPassword = body.password?.trim() || randomBytes(9).toString('base64url')
+    
+    await auth.api.setUserPassword({
+      body: {
+        userId,
+        newPassword: temporaryPassword,
+      },
+      headers: event.req.headers,
+    })
+
+    await db.update(tables.users)
+      .set({
+        passwordResetRequired: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(tables.users.id, userId))
+      .run()
+
     await recordAuditEventFromRequest(event, {
-      actor: admin.username,
+      actor: session.user.email || session.user.id,
       actorType: 'user',
-      action: 'admin.user.reset_password_link',
+      action: 'admin.user.reset_password_temporary',
       targetType: 'user',
       targetId: userId,
       metadata: {
@@ -77,51 +107,21 @@ export default defineEventHandler(async (event) => {
     return {
       success: true,
       mode,
+      temporaryPassword,
+      notify,
     }
   }
-
-  const temporaryPassword = body.password?.trim() || randomBytes(9).toString('base64url')
-  const hashed = await bcrypt.hash(temporaryPassword, 12)
-  const now = new Date()
-
-  db.update(tables.users)
-    .set({
-      password: hashed,
-      passwordResetRequired: true,
-      updatedAt: now,
+  catch (error) {
+    if (error instanceof APIError) {
+      throw createError({
+        statusCode: error.statusCode,
+        statusMessage: error.message || 'Failed to reset password',
+      })
+    }
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to reset password',
     })
-    .where(eq(tables.users.id, userId))
-    .run()
-
-  db.delete(tables.sessions)
-    .where(eq(tables.sessions.userId, userId))
-    .run()
-
-  const pending = db
-    .select({ id: tables.passwordResets.id })
-    .from(tables.passwordResets)
-    .where(eq(tables.passwordResets.userId, userId))
-    .all()
-
-  for (const entry of pending) {
-    markPasswordResetUsed(entry.id, userId)
-  }
-
-  await recordAuditEventFromRequest(event, {
-    actor: admin.username,
-    actorType: 'user',
-    action: 'admin.user.reset_password_temporary',
-    targetType: 'user',
-    targetId: userId,
-    metadata: {
-      notify,
-    },
-  })
-
-  return {
-    success: true,
-    mode,
-    temporaryPassword,
-    notify,
   }
 })
+

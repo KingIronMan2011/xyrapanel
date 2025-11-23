@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import type { ServerSchedule } from '#shared/types/server-schedules'
+import type { ServerSchedule } from '#shared/types/server'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
 

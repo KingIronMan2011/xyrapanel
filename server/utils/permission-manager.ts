@@ -1,5 +1,5 @@
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
-import type { Permission, PermissionCheck, UserPermissions } from '#shared/types/server-permissions'
+import type { Permission, PermissionCheck, UserPermissions } from '#shared/types/server'
 
 export class PermissionManager {
   private db = useDrizzle()

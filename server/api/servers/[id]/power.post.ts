@@ -1,9 +1,9 @@
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
-import type { PowerActionRequest } from '#shared/types/server-console'
+import type { PowerActionRequest } from '#shared/types/server'
 
 export default defineEventHandler(async (event) => {
   const identifier = event.context.params?.id

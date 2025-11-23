@@ -1,7 +1,6 @@
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { isAdmin } from '~~/server/utils/session'
 import { createWingsClient } from '~~/server/utils/wings/client'
 import { serverStartupSchema } from '#shared/schema/admin/server'
 

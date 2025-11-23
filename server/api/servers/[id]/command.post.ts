@@ -1,12 +1,10 @@
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
-
-interface CommandBody {
-  command: string
-}
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { serverCommandSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
   const identifier = event.context.params?.id
@@ -33,15 +31,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
   }
 
-  const body = await readBody<CommandBody>(event)
-
-  if (!body.command || typeof body.command !== 'string' || body.command.trim().length === 0) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'Unprocessable Entity',
-      message: 'Command is required',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(
+    event,
+    serverCommandSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   if (!server.nodeId) {
     throw createError({ statusCode: 500, statusMessage: 'Server has no assigned node' })

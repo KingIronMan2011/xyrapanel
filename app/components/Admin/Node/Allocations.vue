@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import type { Allocation } from '#shared/types/allocation'
+import type { Allocation } from '#shared/types/server'
 
 const props = defineProps<{
   nodeId: string
@@ -13,35 +13,15 @@ const pageSize = ref(50)
 const filter = ref<'all' | 'assigned' | 'unassigned'>('all')
 const isCreating = ref(false)
 
-type SimpleRequestFetch = <T = unknown>(
-  input: string,
-  options?: {
-    method?: string
-    body?: unknown
-    signal?: AbortSignal
-  }
-) => Promise<T>
-
-const requestFetch = useRequestFetch() as SimpleRequestFetch
-
 const {
   data: allocationsData,
   pending,
   refresh,
-} = await useAsyncData<Allocation[]>(
-  `node-allocations-${props.nodeId}`,
-  async (_nuxtApp, { signal }) => {
-    const response = await requestFetch<{ data: Allocation[] }>(
-      `/api/admin/nodes/${props.nodeId}/allocations`,
-      { signal },
-    )
-
-    return response?.data ?? []
-  },
-  {
-    default: () => [],
-  },
-)
+} = await useFetch<{ data: Allocation[] }>(`/api/admin/nodes/${props.nodeId}/allocations`, {
+  key: `node-allocations-${props.nodeId}`,
+  transform: (response) => response.data ?? [],
+  default: () => [],
+})
 
 const allocations = computed<Allocation[]>(() => allocationsData.value ?? [])
 
@@ -113,7 +93,7 @@ async function createAllocations(event: FormSubmitEvent<CreateFormSchema>) {
   try {
     const ports = parsePorts(event.data.ports)
 
-    await requestFetch(`/api/admin/nodes/${props.nodeId}/allocations`, {
+    await $fetch(`/api/admin/nodes/${props.nodeId}/allocations`, {
       method: 'POST',
       body: {
         ip: event.data.ip,
@@ -148,10 +128,16 @@ async function createAllocations(event: FormSubmitEvent<CreateFormSchema>) {
 
 const updatingAlias = ref<string | null>(null)
 
+function handleAliasBlur(allocation: Allocation, event: Event) {
+  const target = event.target as HTMLInputElement
+  const newAlias = target?.value || ''
+  updateAlias(allocation, newAlias)
+}
+
 async function updateAlias(allocation: Allocation, newAlias: string) {
   updatingAlias.value = allocation.id
   try {
-    await requestFetch(`/api/admin/allocations/${allocation.id}`, {
+    await $fetch(`/api/admin/allocations/${allocation.id}`, {
       method: 'PATCH',
       body: { ipAlias: newAlias || null },
     })
@@ -179,7 +165,7 @@ async function deleteAllocation(allocation: Allocation) {
   }
 
   try {
-    await requestFetch(`/api/admin/allocations/${allocation.id}`, {
+    await $fetch(`/api/admin/allocations/${allocation.id}`, {
       method: 'DELETE',
     })
 
@@ -206,6 +192,9 @@ const columns: Array<{ key: string, label: string }> = [
   { key: 'server', label: 'Assigned To' },
   { key: 'actions', label: '' },
 ]
+
+const assignedCount = computed(() => allocations.value.filter(a => a.serverId !== null).length)
+const unassignedCount = computed(() => allocations.value.filter(a => a.serverId === null).length)
 </script>
 
 <template>
@@ -217,10 +206,10 @@ const columns: Array<{ key: string, label: string }> = [
           All ({{ allocations.length }})
         </UButton>
         <UButton :color="filter === 'assigned' ? 'primary' : 'neutral'" variant="soft" @click="filter = 'assigned'">
-          Assigned ({{allocations.filter((a: Allocation) => a.serverId).length}})
+          Assigned ({{ assignedCount }})
         </UButton>
         <UButton :color="filter === 'unassigned' ? 'primary' : 'neutral'" variant="soft" @click="filter = 'unassigned'">
-          Unassigned ({{allocations.filter((a: Allocation) => !a.serverId).length}})
+          Unassigned ({{ unassignedCount }})
         </UButton>
       </div>
 
@@ -230,32 +219,45 @@ const columns: Array<{ key: string, label: string }> = [
     </div>
 
     <UCard>
-      <UTable :rows="paginatedAllocations as Allocation[]" :columns="columns as any" :loading="pending">
+      <UTable :rows="paginatedAllocations" :columns="columns" :loading="pending">
         <template #ip-data="{ row }">
-          <code class="text-sm">{{ (row as unknown as Allocation).ip }}</code>
+          <code class="text-sm">{{ row.ip }}</code>
         </template>
 
         <template #ipAlias-data="{ row }">
-          <UInput :model-value="(row as unknown as Allocation).ipAlias || ''" placeholder="none" size="sm"
-            :loading="updatingAlias === (row as unknown as Allocation).id"
-            @blur="updateAlias(row as unknown as Allocation, ($event.target as HTMLInputElement).value)" />
+          <UInput 
+            :model-value="row.ipAlias || ''" 
+            placeholder="none" 
+            size="sm"
+            :loading="updatingAlias === row.id"
+            @blur="handleAliasBlur(row, $event)" 
+          />
         </template>
 
         <template #port-data="{ row }">
-          <code class="text-sm">{{ (row as unknown as Allocation).port }}</code>
+          <code class="text-sm">{{ row.port }}</code>
         </template>
 
         <template #server-data="{ row }">
-          <NuxtLink v-if="(row as unknown as Allocation).serverId"
-            :to="`/admin/servers/${(row as unknown as Allocation).serverId}`" class="text-primary hover:underline">
+          <NuxtLink 
+            v-if="row.serverId"
+            :to="`/admin/servers/${row.serverId}`" 
+            class="text-primary hover:underline"
+          >
             Server
           </NuxtLink>
           <span v-else class="text-sm text-muted-foreground">-</span>
         </template>
 
         <template #actions-data="{ row }">
-          <UButton v-if="!(row as unknown as Allocation).serverId" icon="i-lucide-trash-2" color="error" variant="ghost"
-            size="sm" @click="deleteAllocation(row as unknown as Allocation)" />
+          <UButton 
+            v-if="!row.serverId" 
+            icon="i-lucide-trash-2" 
+            color="error" 
+            variant="ghost"
+            size="sm" 
+            @click="deleteAllocation(row)" 
+          />
         </template>
       </UTable>
 

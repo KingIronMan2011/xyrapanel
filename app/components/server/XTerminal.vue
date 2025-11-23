@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import type { ServerTerminalProps } from '#shared/types/server-console'
+import type { ServerTerminalProps } from '#shared/types/server'
 import type { Terminal } from 'xterm'
 
 const props = defineProps<ServerTerminalProps>()

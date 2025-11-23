@@ -1,17 +1,12 @@
 import { createError } from 'h3'
 import { eq, and } from 'drizzle-orm'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
-
-interface UpdateScheduleBody {
-  name?: string
-  cron?: string
-  action?: string
-  enabled?: boolean
-}
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { updateScheduleSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
   const identifier = event.context.params?.id
@@ -59,7 +54,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Schedule not found' })
   }
 
-  const body = await readBody<UpdateScheduleBody>(event)
+  const body = await readValidatedBodyWithLimit(
+    event,
+    updateScheduleSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const updateData: Record<string, unknown> = {
     updatedAt: new Date(),

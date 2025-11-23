@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ServerStatsChartProps } from '#shared/types/server-console'
+import type { ServerStatsChartProps } from '#shared/types/server'
 
 const props = defineProps<ServerStatsChartProps>()
 

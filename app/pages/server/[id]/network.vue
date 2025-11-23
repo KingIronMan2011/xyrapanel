@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ServerAllocation, NetworkData } from '#shared/types/server-network'
+import type { ServerAllocation, NetworkData } from '#shared/types/server'
 
 const route = useRoute()
 

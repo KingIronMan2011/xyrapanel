@@ -2,9 +2,9 @@ import { createError, defineEventHandler, getQuery } from 'h3'
 import { desc, eq } from 'drizzle-orm'
 
 import { tables, useDrizzle } from '~~/server/utils/drizzle'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import type { AccountActivityItem, AccountActivityResponse } from '#shared/types/activity'
+import type { AccountActivityItem, AccountActivityResponse } from '#shared/types/account'
 import type { ActivityMetadata } from '#shared/types/audit'
 
 function parseMetadata(raw: string | null): ActivityMetadata | null {

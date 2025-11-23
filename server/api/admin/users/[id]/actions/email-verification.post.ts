@@ -1,35 +1,29 @@
-import { getServerSession } from '#auth'
 import { createError } from 'h3'
-
+import { APIError } from 'better-auth/api'
+import { getAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { getSessionUser } from '~~/server/utils/session'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-import { createEmailVerificationToken } from '~~/server/utils/email-verification'
-import { sendEmailVerificationEmail } from '~~/server/utils/email'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { z } from 'zod'
 
-interface EmailVerificationBody {
-  action: 'mark-verified' | 'mark-unverified' | 'resend-link'
-}
+const emailVerificationActionSchema = z.object({
+  action: z.enum(['mark-verified', 'mark-unverified', 'resend-link']),
+})
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const admin = getSessionUser(session)
-
-  if (!admin || admin.role !== 'admin') {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden', message: 'Admin privileges required' })
-  }
+  const session = await requireAdmin(event)
+  const auth = getAuth()
 
   const userId = getRouterParam(event, 'id')
   if (!userId) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'User ID is required' })
   }
 
-  const body = await readBody<EmailVerificationBody>(event)
-  const action = body.action
-
-  if (!action) {
-    throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Action is required' })
-  }
+  const body = await readValidatedBodyWithLimit(
+    event,
+    emailVerificationActionSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const db = useDrizzle()
 
@@ -47,27 +41,40 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'User not found' })
   }
 
-  const now = new Date()
-
-  switch (action) {
-    case 'mark-verified':
-      db.update(tables.users)
-        .set({ emailVerified: now, updatedAt: now })
-        .where(eq(tables.users.id, userId))
-        .run()
-      break
-    case 'mark-unverified':
-      db.update(tables.users)
-        .set({ emailVerified: null, updatedAt: now })
-        .where(eq(tables.users.id, userId))
-        .run()
-      break
-    case 'resend-link':
-      {
+  try {
+    switch (body.action) {
+      case 'mark-verified': {
+        await auth.api.adminUpdateUser({
+          body: {
+            userId,
+            data: {
+              emailVerified: new Date(),
+            },
+          },
+          headers: event.req.headers,
+        })
+        break
+      }
+      case 'mark-unverified': {
+        await auth.api.adminUpdateUser({
+          body: {
+            userId,
+            data: {
+              emailVerified: null,
+            },
+          },
+          headers: event.req.headers,
+        })
+        break
+      }
+      case 'resend-link': {
         if (!user.email) {
           throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'User is missing an email address' })
         }
 
+        const { sendEmailVerificationEmail } = await import('~~/server/utils/email')
+        const { createEmailVerificationToken } = await import('~~/server/utils/email-verification')
+        
         const { token, expiresAt } = await createEmailVerificationToken(user.id)
         await sendEmailVerificationEmail({
           to: user.email,
@@ -77,18 +84,31 @@ export default defineEventHandler(async (event) => {
         })
         break
       }
+    }
+
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: `admin.user.email.${body.action}`,
+      targetType: 'user',
+      targetId: userId,
+    })
+
+    return {
+      success: true,
+      action: body.action,
+    }
   }
-
-  await recordAuditEventFromRequest(event, {
-    actor: admin.username,
-    actorType: 'user',
-    action: `admin.user.email.${action}`,
-    targetType: 'user',
-    targetId: userId,
-  })
-
-  return {
-    success: true,
-    action,
+  catch (error) {
+    if (error instanceof APIError) {
+      throw createError({
+        statusCode: error.statusCode,
+        statusMessage: error.message || 'Failed to perform email verification action',
+      })
+    }
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to perform email verification action',
+    })
   }
 })

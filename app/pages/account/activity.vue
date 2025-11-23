@@ -1,37 +1,26 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import type { AccountActivityItem, AccountActivityResponse } from '#shared/types/activity'
+import { computed } from 'vue'
+import type { AccountActivityResponse } from '#shared/types/account'
 
 definePageMeta({
   auth: true,
 })
 
-const entries = ref<AccountActivityItem[]>([])
-const loading = ref(false)
-const error = ref<string | null>(null)
-const generatedAt = ref<string | null>(null)
+const {
+  data: activityResponse,
+  pending: loading,
+  error: fetchError,
+} = await useFetch<AccountActivityResponse>('/api/account/activity', {
+  key: 'account-activity',
+})
 
-const requestFetch = useRequestFetch()
-
+const entries = computed(() => activityResponse.value?.data ?? [])
+const generatedAt = computed(() => activityResponse.value?.generatedAt ?? null)
 const generatedAtDate = computed(() => (generatedAt.value ? new Date(generatedAt.value) : null))
-
-async function fetchActivity() {
-  loading.value = true
-  error.value = null
-  try {
-    const response = await requestFetch<AccountActivityResponse>('/api/account/activity')
-    entries.value = response.data
-    generatedAt.value = response.generatedAt
-  }
-  catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load account activity.'
-  }
-  finally {
-    loading.value = false
-  }
-}
-
-fetchActivity()
+const error = computed(() => {
+  if (!fetchError.value) return null
+  return fetchError.value instanceof Error ? fetchError.value.message : 'Failed to load account activity.'
+})
 
 function formatTarget(target: string | null) {
   return target ?? 'No target recorded'

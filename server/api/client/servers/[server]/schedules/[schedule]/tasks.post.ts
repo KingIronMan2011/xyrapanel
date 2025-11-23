@@ -1,14 +1,9 @@
 import { randomUUID } from 'crypto'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
-
-interface CreateTaskPayload {
-  action: string
-  payload: string
-  time_offset?: number
-  continue_on_failure?: boolean
-}
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { createTaskSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -43,7 +38,11 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody<CreateTaskPayload>(event)
+  const body = await readValidatedBodyWithLimit(
+    event,
+    createTaskSchema,
+    BODY_SIZE_LIMITS.MEDIUM,
+  )
 
   const existingTasks = db
     .select()

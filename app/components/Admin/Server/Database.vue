@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import type { AdminServerDatabaseListResponse, AdminServerDatabase } from '#shared/types/admin-servers'
+import type { AdminServerDatabaseListResponse, AdminServerDatabase } from '#shared/types/admin'
 
 const props = defineProps<{
   serverId: string

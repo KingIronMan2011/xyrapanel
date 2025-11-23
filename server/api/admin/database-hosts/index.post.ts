@@ -1,7 +1,6 @@
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import type { CreateDatabaseHostPayload } from '#shared/types/admin-database-hosts'
+import type { CreateDatabaseHostPayload } from '#shared/types/admin'
 import { randomUUID } from 'crypto'
 
 export default defineEventHandler(async (event) => {

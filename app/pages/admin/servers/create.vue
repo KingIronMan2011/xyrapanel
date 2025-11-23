@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import type { CreateServerPayload } from '#shared/types/admin-servers'
+import type { CreateServerPayload } from '#shared/types/admin'
 import type { Nest, Egg, EggVariable } from '#shared/types/nest'
+
+
+import type { NodeOption, UserOption } from '#shared/types/ui'
 
 definePageMeta({
   auth: true,
@@ -39,16 +42,6 @@ const { data: nestsData } = await useAsyncData(
   'admin-nests-for-server',
   () => $fetch<{ data: Nest[] }>('/api/admin/nests'),
 )
-
-interface NodeOption {
-  id: string
-  name: string
-}
-
-interface UserOption {
-  id: string
-  username: string
-}
 
 const { data: nodesData } = await useAsyncData(
   'admin-nodes-for-server',

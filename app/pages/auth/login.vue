@@ -91,16 +91,11 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
       throw new Error('Two-factor authentication token required.')
     }
 
-    const result = await authStore.login('credentials', {
-      redirect: false,
-      identity,
-      password,
-      token,
-    })
+    const result = await authStore.login(identity, password, token)
 
     if (result?.error) {
       const errorMessage = result.error.toLowerCase()
-      const indicatesTwoFactor = errorMessage.includes('two-factor') || errorMessage.includes('recovery token')
+      const indicatesTwoFactor = errorMessage.includes('two-factor') || errorMessage.includes('recovery token') || errorMessage.includes('2fa')
       const missingToken = indicatesTwoFactor && submittedToken.length === 0
 
       if (indicatesTwoFactor)

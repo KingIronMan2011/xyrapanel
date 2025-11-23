@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import * as tables from '~~/server/database/schema'
 import { useDrizzle } from '~~/server/utils/drizzle'
-import type { ServerSubuser } from '#shared/types/server-subusers'
+import type { ServerSubuser } from '#shared/types/server'
 
 export async function listServerSubusers(serverId: string): Promise<ServerSubuser[]> {
   const db = useDrizzle()

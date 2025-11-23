@@ -78,3 +78,72 @@ export const serverDatabaseCreateSchema = z.object({
 })
 
 export type ServerDatabaseCreateInput = z.infer<typeof serverDatabaseCreateSchema>
+
+export const createServerSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().optional(),
+  userId: z.string().uuid(),
+  eggId: z.string().uuid(),
+  nodeId: z.string().uuid(),
+  allocationId: z.string().uuid(),
+  memory: z.number().int().positive(),
+  swap: z.number().int().min(0).default(0),
+  disk: z.number().int().positive(),
+  io: z.number().int().min(10).max(1000).default(500),
+  cpu: z.number().int().min(0).default(0),
+  threads: z.string().optional(),
+  databases: z.number().int().min(0).default(0),
+  allocations: z.number().int().min(0).default(0),
+  backups: z.number().int().min(0).default(0),
+  startup: z.string().optional(),
+  environment: z.record(z.string()).optional(),
+  skipScripts: z.boolean().default(false),
+  startOnCompletion: z.boolean().default(true),
+})
+
+export const updateServerBuildSchema = z.object({
+  memory: z.number().int().positive().optional(),
+  swap: z.number().int().min(0).optional(),
+  disk: z.number().int().positive().optional(),
+  io: z.number().int().min(10).max(1000).optional(),
+  cpu: z.number().int().min(0).optional(),
+  threads: z.string().optional(),
+  allocationId: z.string().uuid().optional(),
+  addAllocations: z.array(z.string().uuid()).optional(),
+  removeAllocations: z.array(z.string().uuid()).optional(),
+})
+
+export const updateServerStartupSchema = z.object({
+  startup: z.string().optional(),
+  environment: z.record(z.string()).optional(),
+  eggId: z.string().uuid().optional(),
+  dockerImage: z.string().optional(),
+  skipScripts: z.boolean().optional(),
+})
+
+export const updateServerDetailsSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().optional(),
+  userId: z.string().uuid().optional(),
+})
+
+export const createServerDatabaseSchema = z.object({
+  database: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_]+$/),
+  remote: z.string().default('%'),
+})
+
+const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$/
+
+const ipValidator = z.string().regex(ipRegex, 'Invalid IP address format')
+
+export const createAdminApiKeySchema = z.object({
+  memo: z.string().min(1).max(500),
+  allowedIps: z.array(ipValidator).optional(),
+  expiresAt: z.string().datetime().optional(),
+})
+
+export type CreateServerInput = z.infer<typeof createServerSchema>
+export type UpdateServerBuildInput = z.infer<typeof updateServerBuildSchema>
+export type UpdateServerStartupInput = z.infer<typeof updateServerStartupSchema>
+export type UpdateServerDetailsInput = z.infer<typeof updateServerDetailsSchema>
+export type CreateAdminApiKeyInput = z.infer<typeof createAdminApiKeySchema>

@@ -16,7 +16,6 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const requestFetch = useRequestFetch() as <T>(input: string, options?: Parameters<typeof $fetch>[1]) => Promise<T>
 const actionLoading = ref<string | null>(null)
 const isActionRunning = (key: string) => actionLoading.value === key
 
@@ -128,7 +127,7 @@ async function sendResetLink(notify = true) {
     return
 
   await runAction('reset-link', async () => {
-    return await requestFetch<{ success: boolean }>(
+    return await $fetch<{ success: boolean }>(
       `/api/admin/users/${userId.value}/actions/reset-password`,
       {
         method: 'POST',
@@ -150,7 +149,7 @@ async function setTemporaryPassword() {
     return
 
   const response = await runAction('reset-temp', async () => {
-    return await requestFetch<{ success: boolean; temporaryPassword: string }>(
+    return await $fetch<{ success: boolean; temporaryPassword: string }>(
       `/api/admin/users/${userId.value}/actions/reset-password`,
       {
         method: 'POST',
@@ -194,7 +193,7 @@ async function disableTwoFactor() {
     return
 
   await runAction('disable-2fa', async () => {
-    return await requestFetch<{ success: boolean }>(
+    return await $fetch<{ success: boolean }>(
       `/api/admin/users/${userId.value}/actions/disable-2fa`,
       {
         method: 'POST',
@@ -210,7 +209,7 @@ async function markEmailVerified() {
     return
 
   await runAction('email-verify', async () => {
-    return await requestFetch<{ success: boolean }>(
+    return await $fetch<{ success: boolean }>(
       `/api/admin/users/${userId.value}/actions/email-verification`,
       {
         method: 'POST',
@@ -227,7 +226,7 @@ async function markEmailUnverified() {
     return
 
   await runAction('email-unverify', async () => {
-    return await requestFetch<{ success: boolean }>(
+    return await $fetch<{ success: boolean }>(
       `/api/admin/users/${userId.value}/actions/email-verification`,
       {
         method: 'POST',
@@ -253,7 +252,7 @@ async function resendVerificationEmail() {
   }
 
   await runAction('email-resend', async () => {
-    return await requestFetch<{ success: boolean }>(
+    return await $fetch<{ success: boolean }>(
       `/api/admin/users/${userId.value}/actions/email-verification`,
       {
         method: 'POST',
@@ -275,7 +274,7 @@ async function toggleSuspension() {
       return
 
     await runAction('unsuspend', async () => {
-      return await requestFetch<{ success: boolean }>(
+      return await $fetch<{ success: boolean }>(
         `/api/admin/users/${userId.value}/actions/suspension`,
         {
           method: 'POST',
@@ -299,7 +298,7 @@ async function toggleSuspension() {
   }
 
   await runAction('suspend', async () => {
-    return await requestFetch<{ success: boolean }>(
+    return await $fetch<{ success: boolean }>(
       `/api/admin/users/${userId.value}/actions/suspension`,
       {
         method: 'POST',
@@ -319,7 +318,7 @@ async function impersonateUser() {
     return
 
   const response = await runAction('impersonate', async () => {
-    return await requestFetch<{ impersonateUrl: string; expiresAt: string }>(
+    return await $fetch<{ impersonateUrl: string; expiresAt: string }>(
       `/api/admin/users/${userId.value}/actions/impersonate`,
       {
         method: 'POST',

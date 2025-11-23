@@ -1,10 +1,8 @@
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
-
-interface UpdateAllocationPayload {
-  notes?: string
-}
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { updateAllocationSchema } from '#shared/schema/server/subusers'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -20,7 +18,11 @@ export default defineEventHandler(async (event) => {
 
   const { server } = await getServerWithAccess(serverId, session)
 
-  const body = await readBody<UpdateAllocationPayload>(event)
+  const body = await readValidatedBodyWithLimit(
+    event,
+    updateAllocationSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const db = useDrizzle()
   const allocation = db

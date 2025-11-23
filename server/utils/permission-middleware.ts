@@ -1,13 +1,10 @@
 import type { H3Event } from 'h3'
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { permissionManager } from '~~/server/utils/permission-manager'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import type { Permission, PermissionContext, PermissionMiddlewareOptions } from '#shared/types/server-permissions'
+import type { Permission, PermissionContext, PermissionMiddlewareOptions } from '#shared/types/server'
 
-/**
- * Middleware to check user permissions for server operations
- */
 export async function requireServerPermission(
   event: H3Event,
   options: PermissionMiddlewareOptions
@@ -87,9 +84,6 @@ export async function requireServerPermission(
   }
 }
 
-/**
- * Helper to check a single permission
- */
 export async function requirePermission(
   event: H3Event,
   permission: Permission,
@@ -101,9 +95,6 @@ export async function requirePermission(
   })
 }
 
-/**
- * Helper to check multiple permissions (all required)
- */
 export async function requireAllPermissions(
   event: H3Event,
   permissions: Permission[],
@@ -115,9 +106,6 @@ export async function requireAllPermissions(
   })
 }
 
-/**
- * Helper to check if user has any of the specified permissions
- */
 export async function requireAnyPermission(
   event: H3Event,
   permissions: Permission[],
@@ -174,9 +162,6 @@ export async function requireAnyPermission(
   }
 }
 
-/**
- * Helper to check admin permissions
- */
 export async function requireAdminPermission(event: H3Event): Promise<PermissionContext> {
   const session = await getServerSession(event)
   const user = resolveSessionUser(session)

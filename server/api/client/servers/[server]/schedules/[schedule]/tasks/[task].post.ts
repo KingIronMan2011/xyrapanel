@@ -1,15 +1,10 @@
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { updateTaskSchema } from '#shared/schema/server/operations'
 
 type ScheduleTaskUpdate = typeof tables.serverScheduleTasks.$inferInsert
-
-interface UpdateTaskPayload {
-  action?: string
-  payload?: string
-  time_offset?: number
-  continue_on_failure?: boolean
-}
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -26,7 +21,11 @@ export default defineEventHandler(async (event) => {
 
   const { server } = await getServerWithAccess(serverId, session)
 
-  const body = await readBody<UpdateTaskPayload>(event)
+  const body = await readValidatedBodyWithLimit(
+    event,
+    updateTaskSchema,
+    BODY_SIZE_LIMITS.MEDIUM,
+  )
 
   const db = useDrizzle()
   const schedule = db

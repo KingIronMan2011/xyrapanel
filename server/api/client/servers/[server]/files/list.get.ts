@@ -1,5 +1,4 @@
-import { getServerSession } from '#auth'
-import { getSessionUser } from '~~/server/utils/session'
+import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { getWingsClientForServer, WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
 
 function sanitizePath(path: string): string {

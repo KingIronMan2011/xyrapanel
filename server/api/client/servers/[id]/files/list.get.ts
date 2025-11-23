@@ -1,8 +1,8 @@
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import type { FileEntry } from '#shared/types/api-responses'
+import type { FileEntry } from '#shared/types/api'
 
 export default defineEventHandler(async (event): Promise<FileEntry[]> => {
   const session = await getServerSession(event)

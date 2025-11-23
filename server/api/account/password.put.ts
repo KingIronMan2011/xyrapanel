@@ -1,7 +1,7 @@
-import { createError } from 'h3'
-import { getServerSession } from '#auth'
-import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import bcrypt from 'bcryptjs'
+import { createError, assertMethod } from 'h3'
+import { APIError } from 'better-auth/api'
+import { getAuth } from '~~/server/utils/auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { accountPasswordUpdateSchema } from '#shared/schema/account'
@@ -9,56 +9,57 @@ import { accountPasswordUpdateSchema } from '#shared/schema/account'
 export default defineEventHandler(async (event) => {
   assertMethod(event, 'PUT')
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const auth = getAuth()
+  
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  if (!user?.id) {
+  if (!session?.user?.id) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }
 
   const body = await readValidatedBody(event, payload => accountPasswordUpdateSchema.parse(payload))
 
-  const db = useDrizzle()
-
-  const userRow = db.select({ password: tables.users.password })
-    .from(tables.users)
-    .where(eq(tables.users.id, user.id))
-    .get()
-
-  if (!userRow || !bcrypt.compareSync(body.currentPassword, userRow.password)) {
-    throw createError({ statusCode: 400, statusMessage: 'Current password is incorrect' })
-  }
-
-  const hashedPassword = bcrypt.hashSync(body.newPassword, 12)
-
-  db.update(tables.users)
-    .set({
-      password: hashedPassword,
-      passwordResetRequired: false,
-      updatedAt: new Date(),
+  try {
+    const result = await auth.api.changePassword({
+      body: {
+        currentPassword: body.currentPassword,
+        newPassword: body.newPassword,
+        revokeOtherSessions: true,
+      },
+      headers: event.req.headers,
     })
-    .where(eq(tables.users.id, user.id))
-    .run()
 
-  const revokedSessions = db.delete(tables.sessions)
-    .where(eq(tables.sessions.userId, user.id))
-    .run()
+    const resolvedUser = resolveSessionUser(await getServerSession(event))
+    if (resolvedUser) {
+      await recordAuditEventFromRequest(event, {
+        actor: resolvedUser.email || resolvedUser.id,
+        actorType: 'user',
+        action: 'account.password.update',
+        targetType: 'user',
+        targetId: resolvedUser.id,
+        metadata: {
+          revokedSessions: result.revokedSessions || 0,
+        },
+      })
+    }
 
-  const revokedCount = typeof revokedSessions.changes === 'number' ? revokedSessions.changes : 0
-
-  await recordAuditEventFromRequest(event, {
-    actor: user.email || user.id,
-    actorType: 'user',
-    action: 'account.password.update',
-    targetType: 'user',
-    targetId: user.id,
-    metadata: {
-      revokedSessions: revokedCount,
-    },
-  })
-
-  return {
-    success: true,
-    revokedSessions: revokedCount,
+    return {
+      success: true,
+      revokedSessions: result.revokedSessions || 0,
+    }
+  }
+  catch (error) {
+    if (error instanceof APIError) {
+      throw createError({
+        statusCode: error.statusCode,
+        statusMessage: error.message || 'Failed to change password',
+      })
+    }
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Failed to change password',
+    })
   }
 })

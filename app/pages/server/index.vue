@@ -9,14 +9,10 @@ definePageMeta({
   auth: true,
 })
 
-const servers = ref<ServersResponse['data']>([])
-const loading = ref(false)
-const error = ref<string | null>(null)
-const generatedAt = ref<string | null>(null)
-const generatedAtDate = computed(() => (generatedAt.value ? new Date(generatedAt.value) : null))
-
-const { data: me } = await useAsyncData('me', () => $fetch<{ user: { role: string } }>('/api/me'), {
+const { data: me } = await useFetch<{ user: { role: string } }>('/api/me', {
+  key: 'user-role',
   default: () => ({ user: { role: 'user' } }),
+  pick: ['user'],
 })
 
 const isAdmin = computed(() => me.value?.user.role === 'admin')
@@ -29,25 +25,23 @@ watch(isAdmin, (admin) => {
 
 const scope = computed<'own' | 'all'>(() => (showAll.value && isAdmin.value ? 'all' : 'own'))
 
-async function fetchServers(scope: 'own' | 'all') {
-  loading.value = true
-  error.value = null
-  try {
-    const response = await $fetch<ServersResponse>('/api/servers', {
-      query: { scope },
-    })
-    servers.value = response.data
-    generatedAt.value = response.generatedAt
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load servers'
-  } finally {
-    loading.value = false
-  }
-}
+const {
+  data: serversResponse,
+  pending: loading,
+  error: fetchError,
+} = await useFetch<ServersResponse>('/api/servers', {
+  key: 'servers-list',
+  query: computed(() => ({ scope: scope.value })),
+  watch: [scope],
+})
 
-watch(scope, (value) => {
-  fetchServers(value)
-}, { immediate: true })
+const servers = computed(() => serversResponse.value?.data ?? [])
+const generatedAt = computed(() => serversResponse.value?.generatedAt ?? null)
+const generatedAtDate = computed(() => (generatedAt.value ? new Date(generatedAt.value) : null))
+const error = computed(() => {
+  if (!fetchError.value) return null
+  return fetchError.value instanceof Error ? fetchError.value.message : 'Failed to load servers'
+})
 
 const filteredServers = computed(() => {
   const term = search.value.trim().toLowerCase()

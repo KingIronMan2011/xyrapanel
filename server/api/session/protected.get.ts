@@ -1,4 +1,4 @@
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 
 export default defineEventHandler(async (event) => {

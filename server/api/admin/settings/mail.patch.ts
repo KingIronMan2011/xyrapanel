@@ -1,8 +1,7 @@
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { SETTINGS_KEYS, setSettings } from '~~/server/utils/settings'
 import { refreshEmailService } from '~~/server/utils/email'
-import type { MailSettings } from '#shared/types/admin-settings'
+import type { MailSettings } from '#shared/types/admin'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)

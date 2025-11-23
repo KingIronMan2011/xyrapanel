@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { AdminActivityEntry } from '#shared/types/admin'
-import type { AuditEventsPayload } from '#shared/types/admin-audit'
+import type { AdminActivityEntry, AuditEventsPayload } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,

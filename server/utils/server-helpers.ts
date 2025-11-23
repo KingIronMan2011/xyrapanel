@@ -1,10 +1,10 @@
-import type { Session } from 'next-auth'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { buildCacheKey, withCache } from '~~/server/utils/cache'
+import type { getServerSession } from '~~/server/utils/session'
 
 const NODE_CACHE_TTL = 30
 
-export async function getServerWithAccess(identifier: string, session: Session | null) {
+export async function getServerWithAccess(identifier: string, session: Awaited<ReturnType<typeof getServerSession>> | null) {
   if (!session?.user?.email) {
     throw createError({
       statusCode: 401,

@@ -1,15 +1,25 @@
-import { getServerSession } from '#auth'
+import { createError } from 'h3'
+import { getAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { count, desc, eq, like, or, and } from 'drizzle-orm'
-import { isAdmin } from '~~/server/utils/session'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const auth = getAuth()
+  
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  if (!isAdmin(session)) {
+  if (!session?.user?.id) {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  }
+
+  const userRole = (session.user as { role?: string }).role
+  if (userRole !== 'admin') {
     throw createError({
       statusCode: 403,
-      message: 'Unauthorized: Admin access required',
+      statusMessage: 'Forbidden',
+      message: 'Admin access required',
     })
   }
 

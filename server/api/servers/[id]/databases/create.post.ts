@@ -1,14 +1,11 @@
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
-
-interface CreateDatabaseBody {
-  name: string
-  remote: string
-}
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { createServerDatabaseSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
   const identifier = event.context.params?.id
@@ -35,15 +32,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
   }
 
-  const body = await readBody<CreateDatabaseBody>(event)
-
-  if (!body.name || !body.remote) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'Unprocessable Entity',
-      message: 'Database name and remote are required',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(
+    event,
+    createServerDatabaseSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const db = useDrizzle()
 

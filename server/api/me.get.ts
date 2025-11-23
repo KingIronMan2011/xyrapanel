@@ -1,31 +1,21 @@
 import { createError } from 'h3'
-import { getServerSession } from '#auth'
-import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
+import { auth } from '~~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const resolvedUser = resolveSessionUser(session)
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  if (!resolvedUser?.id) {
+  if (!session?.user?.id) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }
 
-  const db = useDrizzle()
-
-  const user = db
-    .select({
-      id: tables.users.id,
-      username: tables.users.username,
-      email: tables.users.email,
-      role: tables.users.role,
-    })
-    .from(tables.users)
-    .where(eq(tables.users.id, resolvedUser.id))
-    .get()
-
-  if (!user)
-    throw createError({ statusCode: 404, statusMessage: 'User not found' })
-
-  return { data: user }
+  return {
+    data: {
+      id: session.user.id,
+      username: session.user.username || null,
+      email: session.user.email || null,
+      role: (session.user as { role?: string }).role || 'user',
+    },
+  }
 })

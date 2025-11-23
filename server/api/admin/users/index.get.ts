@@ -1,71 +1,73 @@
-import { getServerSession } from '#auth'
-import { useDrizzle, tables, or } from '~~/server/utils/drizzle'
-import { like, count } from 'drizzle-orm'
-import { getSessionUser } from '~~/server/utils/session'
+import { createError } from 'h3'
+import { APIError } from 'better-auth/api'
+import { getAuth } from '~~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
+  const auth = getAuth()
+  
+  const session = await auth.api.getSession({
+    headers: event.req.headers,
+  })
 
-  if (user?.role !== 'admin') {
+  if (!session?.user?.id) {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  }
+
+  const userRole = (session.user as { role?: string }).role
+  if (userRole !== 'admin') {
     throw createError({
       statusCode: 403,
-      message: 'Unauthorized: Admin access required',
+      statusMessage: 'Forbidden',
+      message: 'Admin access required',
     })
   }
 
   const query = getQuery(event)
-  const page = Number(query.page) || 1
-  const limit = Number(query.limit) || 25
-  const search = query.search as string | undefined
-  const offset = (page - 1) * limit
+  
+  const searchValue = query.search as string | undefined
+  const searchField = (query.searchField as 'email' | 'name' | undefined) || 'name'
+  const searchOperator = (query.searchOperator as 'contains' | 'starts_with' | 'ends_with' | undefined) || 'contains'
+  const limit = query.limit ? Number(query.limit) : 25
+  const offset = query.offset ? Number(query.offset) : (query.page ? (Number(query.page) - 1) * limit : 0)
+  const sortBy = (query.sortBy as string | undefined) || 'createdAt'
+  const sortDirection = (query.sortDirection as 'asc' | 'desc' | undefined) || 'desc'
+  const filterField = query.filterField as string | undefined
+  const filterValue = query.filterValue as string | number | boolean | undefined
+  const filterOperator = (query.filterOperator as 'eq' | 'ne' | 'lt' | 'lte' | 'gt' | 'gte' | undefined) || 'eq'
 
-  const db = useDrizzle()
-
-  const whereConditions = search
-    ? or(
-      like(tables.users.email, `%${search}%`),
-      like(tables.users.username, `%${search}%`),
-      like(tables.users.nameFirst, `%${search}%`),
-      like(tables.users.nameLast, `%${search}%`),
-    )
-    : undefined
-
-  const [{ total }] = db
-    .select({ total: count() })
-    .from(tables.users)
-    .where(whereConditions)
-    .all()
-
-  const users = db
-    .select({
-      id: tables.users.id,
-      username: tables.users.username,
-      email: tables.users.email,
-      nameFirst: tables.users.nameFirst,
-      nameLast: tables.users.nameLast,
-      language: tables.users.language,
-      rootAdmin: tables.users.rootAdmin,
-      emailVerified: tables.users.emailVerified,
-      image: tables.users.image,
-      createdAt: tables.users.createdAt,
-      updatedAt: tables.users.updatedAt,
-
+  try {
+    const result = await auth.api.listUsers({
+      query: {
+        ...(searchValue && { searchValue, searchField, searchOperator }),
+        limit,
+        offset,
+        sortBy,
+        sortDirection,
+        ...(filterField && filterValue !== undefined && { filterField, filterValue, filterOperator }),
+      },
+      headers: event.req.headers,
     })
-    .from(tables.users)
-    .where(whereConditions)
-    .limit(limit)
-    .offset(offset)
-    .orderBy(tables.users.createdAt)
-    .all()
 
-  return {
-    users,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
+    return {
+      data: result.users || [],
+      pagination: {
+        page: Math.floor(offset / limit) + 1,
+        limit,
+        total: result.total || 0,
+        totalPages: Math.ceil((result.total || 0) / limit),
+      },
+    }
+  }
+  catch (error) {
+    if (error instanceof APIError) {
+      throw createError({
+        statusCode: error.statusCode,
+        statusMessage: error.message || 'Failed to list users',
+      })
+    }
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to list users',
+    })
   }
 })

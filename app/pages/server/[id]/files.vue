@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ServerFileEntry, ServerFileListItem } from '#shared/types/server-pages'
+import type { ServerFileEntry, ServerFileListItem } from '#shared/types/server'
 
 const route = useRoute()
 

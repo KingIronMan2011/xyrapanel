@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ServerBackup } from '#shared/types/server-backups'
+import type { ServerBackup } from '#shared/types/server'
 
 const route = useRoute()
 

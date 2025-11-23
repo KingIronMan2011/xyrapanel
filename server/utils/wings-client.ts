@@ -1,4 +1,4 @@
-export type { WingsNode, WingsServerDetails, WingsFileObject, WingsBackup } from '#shared/types/wings-client'
+import type { WingsNode, WingsServerDetails, WingsFileObject, WingsBackup } from '#shared/types/wings-client'
 
 export class WingsConnectionError extends Error {
   constructor(message: string, public override cause?: Error) {
@@ -62,7 +62,6 @@ export class WingsClient {
               errorMessage += ` - ${errorBody}`
             }
           } catch {
-            // Ignore body parsing failures rely on status code instead
           }
 
           throw new WingsConnectionError(errorMessage)

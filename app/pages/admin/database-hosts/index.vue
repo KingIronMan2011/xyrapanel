@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DatabaseHostWithStats, CreateDatabaseHostPayload } from '#shared/types/admin-database-hosts'
+import type { DatabaseHostWithStats, CreateDatabaseHostPayload } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,

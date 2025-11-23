@@ -1,5 +1,5 @@
 import { onUnmounted, ref } from 'vue'
-import type { ServerStats, ServerState } from '#shared/types/server-console'
+import type { ServerStats, ServerState } from '#shared/types/server'
 import type { ServerEventDetails, WebSocketMessage, WingsStatsPayload } from '#shared/types/websocket'
 
 const MAX_HISTORY_POINTS = 60

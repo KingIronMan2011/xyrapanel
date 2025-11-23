@@ -1,12 +1,12 @@
 import { eq } from 'drizzle-orm'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { randomUUID } from 'crypto'
 import type {
   CreateServerDatabasePayload,
   ServerDatabaseCreateResponse,
-} from '#shared/types/server-databases'
+} from '#shared/types/server'
 
 export default defineEventHandler(async (event): Promise<ServerDatabaseCreateResponse> => {
   const session = await getServerSession(event)

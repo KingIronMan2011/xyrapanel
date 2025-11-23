@@ -1,8 +1,9 @@
 import { useDrizzle, tables, eq, inArray } from '~~/server/utils/drizzle'
 import { getWingsClient } from '~~/server/utils/wings-client'
-import type { WingsClient, WingsNode } from '~~/server/utils/wings-client'
+import type { WingsClient } from '~~/server/utils/wings-client'
+import type { WingsNode } from '#shared/types/wings-client'
 import type { WingsServerConfiguration } from '#shared/types/wings-config'
-import type { ServerProvisioningConfig, ServerProvisioningContext as SharedServerProvisioningContext } from '#shared/types/server-provisioning'
+import type { ServerProvisioningConfig, ServerProvisioningContext as SharedServerProvisioningContext } from '#shared/types/server'
 
 type ServerProvisioningContext = SharedServerProvisioningContext<
   typeof tables.servers.$inferSelect,

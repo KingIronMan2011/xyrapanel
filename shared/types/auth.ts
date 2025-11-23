@@ -1,5 +1,3 @@
-import type { Session } from 'next-auth'
-
 export type Role = 'admin' | 'user'
 
 export interface SanitizedUser {
@@ -52,7 +50,7 @@ export interface ExtendedSession {
 }
 
 export interface AuthContext {
-  session: Session
+  session: Awaited<ReturnType<typeof import('~~/server/utils/session').getServerSession>>
   user: ResolvedSessionUser
 }
 
@@ -140,4 +138,26 @@ export interface AuthExtendedUser {
   useTotp: boolean
   totpAuthenticatedAt: number | null
   passwordResetRequired: boolean
+}
+
+
+export type CookieSameSite = 'lax' | 'strict' | 'none'
+
+export interface RuntimeAuthConfig {
+  tokenSecret?: string
+  cookie?: {
+    secure?: boolean
+    sameSite?: CookieSameSite
+    domain?: string
+  }
+}
+
+export interface ExtendedRuntimeConfig {
+  auth?: RuntimeAuthConfig
+}
+
+export interface AuthCookieOptions {
+  secure: boolean
+  sameSite: CookieSameSite
+  domain?: string
 }

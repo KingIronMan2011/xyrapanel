@@ -5,7 +5,7 @@ import { provisionServerOnWings, waitForServerInstall } from '~~/server/utils/se
 import { recordAuditEvent } from '~~/server/utils/audit'
 import { sendServerReinstalledEmail, sendServerSuspendedEmail } from '~~/server/utils/email'
 import type { WingsClient } from '~~/server/utils/wings-client'
-import type { ServerManagerOptions } from '#shared/types/server-manager'
+import type { ServerManagerOptions } from '#shared/types/server'
 
 export class ServerManager {
   private db = useDrizzle()

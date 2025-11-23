@@ -1,6 +1,6 @@
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { recordAuditEvent } from '~~/server/utils/audit'
-import type { FileManagerOptions, FileUploadResult } from '#shared/types/file-manager'
+import type { FileManagerOptions, FileUploadResult } from '#shared/types/server'
 
 export class FileManager {
   private readonly MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -93,7 +93,6 @@ export class FileManager {
         { from: filename, to: backupFilename }
       ])
     } catch {
-      // File did not exist skip
     }
 
     await client.writeFileContents(serverUuid, sanitizedPath, content)

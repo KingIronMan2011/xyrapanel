@@ -1,11 +1,10 @@
 import { createError, defineEventHandler, getQuery } from 'h3'
 import { asc, desc, sql } from 'drizzle-orm'
 
-import type { AdminPaginatedMeta, AdminWingsNodeAllocationSummary, AdminWingsNodeAllocationsPayload } from '#shared/types/admin-wings-node'
+import type { AdminPaginatedMeta, AdminWingsNodeAllocationSummary, AdminWingsNodeAllocationsPayload } from '#shared/types/admin'
 
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 
 export default defineEventHandler(async (event): Promise<AdminWingsNodeAllocationsPayload> => {
   const { id } = event.context.params ?? {}

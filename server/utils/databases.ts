@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import type { ServerDatabase } from '#shared/types/server-databases'
+import type { ServerDatabase } from '#shared/types/server'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
 

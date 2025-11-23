@@ -1,6 +1,6 @@
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { getWingsClientForServer, WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
-import type { ServerStatus } from '#shared/types/server-status'
+import type { ServerStatus } from '#shared/types/server'
 
 export async function getServerStatus(serverUuid: string): Promise<ServerStatus> {
   const db = useDrizzle()

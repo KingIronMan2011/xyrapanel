@@ -1,37 +1,12 @@
-import type { Session } from 'next-auth'
-
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { parseCookies, getRequestIP, getHeader } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
+import { parseUserAgent } from '~~/server/utils/user-agent'
 
 type AuthContext = {
-  session: Session
+  session: Awaited<ReturnType<typeof getServerSession>>
   user: NonNullable<ReturnType<typeof resolveSessionUser>>
-}
-
-function parseUserAgent(userAgent: string | undefined | null) {
-  const ua = userAgent || ''
-
-  let browser = 'Unknown'
-  if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome'
-  else if (ua.includes('Firefox')) browser = 'Firefox'
-  else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari'
-  else if (ua.includes('Edg')) browser = 'Edge'
-  else if (ua.includes('Opera')) browser = 'Opera'
-
-  let os = 'Unknown'
-  if (ua.includes('Windows')) os = 'Windows'
-  else if (ua.includes('Mac OS X')) os = 'macOS'
-  else if (ua.includes('Linux')) os = 'Linux'
-  else if (ua.includes('Android')) os = 'Android'
-  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS'
-
-  let device = 'Desktop'
-  if (ua.includes('Mobile') || ua.includes('Android')) device = 'Mobile'
-  else if (ua.includes('Tablet') || ua.includes('iPad')) device = 'Tablet'
-
-  return { browser, os, device }
 }
 
 export default defineEventHandler(async (event) => {
@@ -48,9 +23,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const cookies = parseCookies(event)
-  const token = cookies['authjs.session-token']
-    ?? cookies['next-auth.session-token']
-    ?? cookies['__Secure-next-auth.session-token']
+  const token = cookies['better-auth.session_token']
 
   if (!token) {
     return

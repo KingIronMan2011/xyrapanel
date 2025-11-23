@@ -1,5 +1,4 @@
-import type { AdminActivityEntry } from './admin'
-import type { DashboardResponse } from './admin-dashboard'
+import type { AdminActivityEntry, DashboardResponse } from './admin'
 import type { ServerListEntry } from './server'
 
 export interface ServersStoreState {

@@ -148,8 +148,8 @@ export async function syncWingsNodeConfiguration(id: string, panelUrl: string): 
     }
   }
   finally {
-    // no-op
   }
+
 }
 
 export function listWingsNodes(): StoredWingsNode[] {

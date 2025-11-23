@@ -1,8 +1,7 @@
-import { getServerSession } from '#auth'
+import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { generateTotpSecret, generateTotpUri, generateRecoveryTokens, hashRecoveryToken } from '~~/server/utils/totp'
 import { randomUUID } from 'node:crypto'
-import { getSessionUser } from '~~/server/utils/session'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)

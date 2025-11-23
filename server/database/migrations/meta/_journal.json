@@ -5,29 +5,15 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1762748392105,
-      "tag": "0000_talented_namor",
+      "when": 1763917009286,
+      "tag": "0000_polite_longshot",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "6",
-      "when": 1763228585207,
-      "tag": "0001_useful_mercury",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1763670691323,
-      "tag": "0002_spooky_red_ghost",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1763699051415,
-      "tag": "0003_premium_magik",
+      "when": 1763935540045,
+      "tag": "0001_large_karma",
       "breakpoints": true
     }
   ]

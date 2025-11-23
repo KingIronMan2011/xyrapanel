@@ -1,27 +1,30 @@
-import { createError, getQuery } from 'h3'
-import { getServerSession } from '#auth'
+import { createError } from 'h3'
+import { z } from 'zod'
+import { requireAuth, getValidatedQuerySafe } from '~~/server/utils/security'
 
 import { listWingsNodes } from '~~/server/utils/wings/nodesStore'
 import { remoteListServers } from '~~/server/utils/wings/registry'
 import { toWingsHttpError } from '~~/server/utils/wings/http'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 
 import type { ServerListEntry, ServersResponse } from '#shared/types/server'
 
+const serversQuerySchema = z.object({
+  scope: z.enum(['own', 'all']).optional().default('own'),
+})
+
 export default defineEventHandler(async (event): Promise<ServersResponse> => {
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const session = await requireAuth(event)
+  const user = session.user
 
-  if (!user?.id) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const query = getQuery(event)
-  const scope = typeof query.scope === 'string' ? query.scope : 'own'
+  const query = await getValidatedQuerySafe(event, serversQuerySchema)
+  const scope = query.scope
   const includeAll = scope === 'all'
 
-  if (includeAll && user.role !== 'admin') {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
+  if (includeAll) {
+    const userRole = (user as { role?: string }).role
+    if (userRole !== 'admin') {
+      throw createError({ statusCode: 403, statusMessage: 'Forbidden', message: 'Admin access required to view all servers' })
+    }
   }
 
   const nodes = listWingsNodes()

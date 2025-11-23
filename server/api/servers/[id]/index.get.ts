@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { findServerByIdentifier, getServerLimits, listServerAllocations } from '~~/server/utils/serversStore'
-import type { PanelServerDetails, ServerAllocationSummary } from '#shared/types/server-pages'
+import type { PanelServerDetails, ServerAllocationSummary } from '#shared/types/server'
 
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id

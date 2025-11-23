@@ -1,4 +1,4 @@
-import type { BrandingSettings } from '#shared/types/branding'
+import type { BrandingSettings } from '#shared/types/admin'
 import { SETTINGS_KEYS, getSetting, getSettingWithDefault } from '~~/server/utils/settings'
 
 export default defineEventHandler((): BrandingSettings => {

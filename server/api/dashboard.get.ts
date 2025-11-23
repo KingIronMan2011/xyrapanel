@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3'
+import { requireAuth } from '~~/server/utils/security'
 
 import { tables, useDrizzle } from '~~/server/utils/drizzle'
 import { listWingsNodes } from '~~/server/utils/wings/nodesStore'
@@ -70,7 +71,9 @@ function parseMetadata(raw: string | null): string {
   }
 }
 
-export default defineEventHandler(async (): Promise<ClientDashboardResponse> => {
+export default defineEventHandler(async (event): Promise<ClientDashboardResponse> => {
+  await requireAuth(event)
+
   const db = useDrizzle()
 
   const nodes = listWingsNodes()

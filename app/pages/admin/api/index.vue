@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ApiKey, ApiKeyWithToken, CreateApiKeyPayload } from '#shared/types/admin-api-keys'
+import type { ApiKey, ApiKeyWithToken, CreateApiKeyPayload } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,

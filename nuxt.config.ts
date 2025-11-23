@@ -8,11 +8,10 @@ const redisStorageConfig = {
   tls: process.env.REDIS_TLS === 'true',
 }
 
-const authOrigin = process.env.AUTH_ORIGIN
+const authOrigin = process.env.BETTER_AUTH_URL
+  || process.env.AUTH_ORIGIN
   || process.env.NUXT_AUTH_ORIGIN
   || 'http://localhost:3000'
-
-const authBaseUrl = `${authOrigin.replace(/\/$/, '')}/api/auth`
 
 const appOrigin = process.env.NUXT_SECURITY_CORS_ORIGIN
   || authOrigin
@@ -46,7 +45,6 @@ export default defineNuxtConfig({
     '@nuxt/ui',
     'nuxt-qrcode',
     '@nuxt/eslint',
-    '@sidebase/nuxt-auth',
     'nuxt-security',
     '@nuxt/test-utils/module',
     '@nuxt/hints',
@@ -57,34 +55,9 @@ export default defineNuxtConfig({
     '@pinia/colada-nuxt',
   ],
 
-  auth: {
-    origin: authOrigin,
-    originEnvKey: 'AUTH_ORIGIN',
-    baseURL: authBaseUrl,
-    disableInternalRouting: true,
-    provider: {
-      type: 'authjs',
-      trustHost: isDev,
-      defaultProvider: 'credentials',
-      addDefaultCallbackUrl: false,
-      pages: {
-        signIn: '/auth/login',
-      },
-    },
-    sessionRefresh: {
-      enablePeriodically: true,
-      enableOnWindowFocus: true,
-    },
-    globalAppMiddleware: {
-      isEnabled: true,
-      allow404WithoutAuth: true,
-      addDefaultCallbackUrl: false,
-    },
-  },
-
   runtimeConfig: {
     authOrigin,
-    authSecret: process.env.NUXT_AUTH_SECRET,
+    authSecret: process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET || process.env.NUXT_AUTH_SECRET,
     redis: redisStorageConfig,
     public: {
       appName: process.env.NUXT_APP_NAME
@@ -99,13 +72,6 @@ export default defineNuxtConfig({
         crossOriginEmbedderPolicy: 'unsafe-none',
         crossOriginOpenerPolicy: 'unsafe-none',
         crossOriginResourcePolicy: 'same-origin',
-        permissionsPolicy: {
-          camera: [],
-          'display-capture': [],
-          fullscreen: [],
-          geolocation: [],
-          microphone: [],
-        },
       },
       corsHandler: {
         origin: '*',
@@ -133,7 +99,25 @@ export default defineNuxtConfig({
           'img-src': ["'self'", 'data:', 'https:', 'blob:'],
           'style-src': ["'self'", 'https:', "'unsafe-inline'"],
           'font-src': ["'self'", 'https:', 'data:'],
+          'script-src': ["'self'", "'unsafe-inline'"],
+          'object-src': ["'none'"],
+          'base-uri': ["'self'"],
+          'form-action': ["'self'"],
+          'frame-ancestors': ["'none'"],
+          'upgrade-insecure-requests': true,
         },
+        crossOriginEmbedderPolicy: 'require-corp',
+        crossOriginOpenerPolicy: 'same-origin',
+        crossOriginResourcePolicy: 'same-origin',
+        strictTransportSecurity: {
+          maxAge: 31536000,
+          includeSubdomains: true,
+          preload: true,
+        },
+        xContentTypeOptions: 'nosniff',
+        xFrameOptions: 'DENY',
+        xXSSProtection: '1; mode=block',
+        referrerPolicy: 'strict-origin-when-cross-origin',
       },
       corsHandler: {
         origin: appOrigin,

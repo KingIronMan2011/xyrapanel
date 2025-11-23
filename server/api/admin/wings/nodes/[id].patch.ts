@@ -1,9 +1,8 @@
 import type { H3Event } from 'h3'
-import { getServerSession } from '#auth'
-import { isAdmin } from '~~/server/utils/session'
+import { getServerSession, isAdmin  } from '~~/server/utils/session'
 import { updateWingsNode } from '~~/server/utils/wings/nodesStore'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-import type { UpdateWingsNodePayload, UpdateWingsNodeResponse } from '#shared/types/admin-wings-node'
+import type { UpdateWingsNodePayload, UpdateWingsNodeResponse } from '#shared/types/admin'
 
 const MAX_BODY_SIZE = 32 * 1024
 

@@ -4,7 +4,7 @@ import { getNodeResourceUsage, canNodeFitResources } from '~~/server/utils/nodes
 import { resolveNodeConnection } from '~~/server/utils/wings/nodesStore'
 import { generateWingsJWT } from '~~/server/utils/wings/jwt'
 import { createWingsTransferClient } from '~~/server/utils/wings/transfer'
-import type { TransferOptions, TransferResult } from '#shared/types/server-transfers'
+import type { TransferOptions, TransferResult } from '#shared/types/server'
 
 export class TransferError extends Error {
   constructor(message: string, public statusCode = 400) {

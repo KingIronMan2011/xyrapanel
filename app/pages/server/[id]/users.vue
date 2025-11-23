@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ServerSubuser } from '#shared/types/server-subusers'
+import type { ServerSubuser } from '#shared/types/server'
 
 const route = useRoute()
 

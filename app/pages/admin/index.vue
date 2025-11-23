@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { DashboardResponse } from '#shared/types/admin-dashboard'
+import type { DashboardResponse } from '#shared/types/admin'
 
 definePageMeta({
-  auth: true,
+  middleware: 'admin',
   layout: 'admin',
   adminTitle: 'Dashboard',
   adminSubtitle: 'Infrastructure overview sourced from Wings metrics',

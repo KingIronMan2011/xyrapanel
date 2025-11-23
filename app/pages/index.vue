@@ -2,7 +2,7 @@
   <UPage>
     <UContainer>
       <UPageHeader
-        :title="`Welcome back, ${userName}`"
+        :title="userName ? `Welcome back, ${userName}` : 'Welcome'"
         description="Manage your servers and recent activity from one place."
         :links="headerLinks"
       />
@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import type { ButtonProps } from '#ui/types'
@@ -126,6 +126,7 @@ import type {
   DashboardData,
 } from '#shared/types/dashboard'
 import type { AccountSessionsResponse } from '#shared/types/auth'
+import type { AccountActivityResponse } from '#shared/types/account'
 
 definePageMeta({
   auth: true,
@@ -151,70 +152,130 @@ const headerLinks: ButtonProps[] = [
 const authStore = useAuthStore()
 const { displayName } = storeToRefs(authStore)
 
-const requestFetch = useRequestFetch()
-
-const defaultDashboard: ClientDashboardResponse = {
-  metrics: [],
-  activity: [],
-  quickLinks: [],
-  maintenance: [],
-  nodes: [],
-  generatedAt: '',
-}
+const {
+  data: meData,
+  error: meError,
+  refresh: refreshMe,
+} = await useFetch<MeResponse>('/api/me', { key: 'dashboard-me' })
 
 const {
-  data: dashboardData,
-  pending: dashboardPending,
+  data: dashboardResponse,
   error: dashboardError,
-} = await useAsyncData<DashboardData>(
-  'client-dashboard',
-  async () => {
-    const [meResponse, dashboardResponse, sessionsResponse] = await Promise.all([
-      requestFetch<MeResponse>('/api/me'),
-      requestFetch<ClientDashboardResponse>('/api/dashboard'),
-      requestFetch<AccountSessionsResponse>('/api/account/sessions'),
-    ])
+  refresh: refreshDashboardData,
+} = await useFetch<ClientDashboardResponse>('/api/dashboard', { key: 'dashboard-data' })
 
-    const activeSessions = Array.isArray((sessionsResponse as AccountSessionsResponse).data)
-      ? (sessionsResponse as AccountSessionsResponse).data.length
-      : 0
+const {
+  data: sessionsResponse,
+  refresh: refreshSessions,
+} = await useFetch<AccountSessionsResponse>('/api/account/sessions', { key: 'dashboard-sessions' })
 
-    const description = activeSessions === 0
-      ? 'No active sessions'
-      : `${activeSessions} device${activeSessions === 1 ? '' : 's'} signed in`
+const {
+  data: accountActivityResponse,
+  refresh: refreshActivity,
+} = await useFetch<AccountActivityResponse>('/api/account/activity', { key: 'dashboard-activity' })
 
-    const metrics = [...(dashboardResponse as ClientDashboardResponse).metrics]
-    const replacementIndex = metrics.findIndex(metric => ['automationSchedules', 'automation_schedules', 'schedules-active'].includes(metric.key))
-    const sessionsMetric: ClientDashboardMetric = {
-      key: 'activeSessions',
-      label: 'Active sessions',
-      value: activeSessions,
-      delta: description,
-      icon: 'i-lucide-users',
-    }
+const dashboardData = computed<DashboardData | null>(() => {
+  if (!meData.value || !dashboardResponse.value || !sessionsResponse.value || !accountActivityResponse.value) {
+    return null
+  }
 
-    if (replacementIndex >= 0) {
-      metrics.splice(replacementIndex, 1, sessionsMetric)
-    }
-    else {
-      metrics.push(sessionsMetric)
-    }
+  const activeSessions = Array.isArray(sessionsResponse.value.data)
+    ? sessionsResponse.value.data.length
+    : 0
 
-    return {
-      user: (meResponse as MeResponse).user,
-      dashboard: {
-        ...(dashboardResponse as ClientDashboardResponse),
-        metrics,
-      },
-    }
-  },
-  {
-    default: () => ({
-      user: null,
-      dashboard: defaultDashboard,
-    }),
-  },
+  const description = activeSessions === 0
+    ? 'No active sessions'
+    : `${activeSessions} device${activeSessions === 1 ? '' : 's'} signed in`
+
+  const metrics = [...dashboardResponse.value.metrics]
+  const replacementIndex = metrics.findIndex(metric => ['automationSchedules', 'automation_schedules', 'schedules-active'].includes(metric.key))
+  const sessionsMetric: ClientDashboardMetric = {
+    key: 'activeSessions',
+    label: 'Active sessions',
+    value: activeSessions,
+    delta: description,
+    icon: 'i-lucide-users',
+  }
+
+  if (replacementIndex >= 0) {
+    metrics.splice(replacementIndex, 1, sessionsMetric)
+  }
+  else {
+    metrics.push(sessionsMetric)
+  }
+
+  const meUser = meData.value.data || meData.value.user || null
+  
+  const accountActivity: ClientDashboardActivity[] = (accountActivityResponse.value.data || []).slice(0, 5).map((item) => {
+      let icon = 'i-lucide-activity'
+      const actionLower = item.action.toLowerCase()
+      if (actionLower.includes('backup')) icon = 'i-lucide-archive-restore'
+      else if (actionLower.includes('install') || actionLower.includes('deploy')) icon = 'i-lucide-rocket'
+      else if (actionLower.includes('restart') || actionLower.includes('power')) icon = 'i-lucide-power'
+      else if (actionLower.includes('node')) icon = 'i-lucide-hard-drive'
+      else if (actionLower.includes('schedule')) icon = 'i-lucide-calendar-clock'
+      else if (actionLower.includes('user') || actionLower.includes('team')) icon = 'i-lucide-users'
+      else if (actionLower.includes('sign') || actionLower.includes('login') || actionLower.includes('auth')) icon = 'i-lucide-log-in'
+      else if (actionLower.includes('password') || actionLower.includes('security')) icon = 'i-lucide-lock'
+      else if (actionLower.includes('email') || actionLower.includes('verify')) icon = 'i-lucide-mail'
+      
+      const metadata = item.metadata
+      const serverUuid = metadata && typeof metadata === 'object' && 'serverUuid' in metadata
+        ? String(metadata.serverUuid)
+        : undefined
+      const nodeId = metadata && typeof metadata === 'object' && 'nodeId' in metadata
+        ? String(metadata.nodeId)
+        : undefined
+      
+      return {
+        id: item.id,
+        title: item.action,
+        description: item.target || 'No additional details',
+        occurredAt: item.occurredAt,
+        actor: item.actor,
+        icon,
+        serverUuid,
+        nodeId,
+        target: item.target,
+      }
+    })
+    
+  return {
+    user: meUser,
+    dashboard: {
+      ...dashboardResponse.value,
+      metrics,
+      activity: accountActivity,
+    },
+  }
+})
+
+const dashboardPending = computed(() => 
+  !meData.value || !dashboardResponse.value || !sessionsResponse.value || !accountActivityResponse.value
 )
+
+const refreshDashboard = async () => {
+  await Promise.all([
+    refreshMe(),
+    refreshDashboardData(),
+    refreshSessions(),
+    refreshActivity(),
+  ])
+}
+
+watch(() => authStore.user?.username, async (newUsername, oldUsername) => {
+  if (newUsername && newUsername !== oldUsername && oldUsername !== undefined) {
+    await nextTick()
+    await refreshDashboard()
+  }
+}, { immediate: false })
+
+watch(() => authStore.displayName, async (newDisplayName, oldDisplayName) => {
+  if (newDisplayName && newDisplayName !== oldDisplayName && oldDisplayName !== undefined) {
+    await nextTick()
+    await refreshDashboard()
+  }
+}, { immediate: false })
 
 const metrics = computed<ClientDashboardMetric[]>(() => dashboardData.value?.dashboard.metrics ?? [])
 const activity = computed<ClientDashboardActivity[]>(() => dashboardData.value?.dashboard.activity ?? [])
@@ -239,15 +300,41 @@ function toErrorMessage(err: unknown, fallback: string) {
 }
 
 const loading = computed(() => dashboardPending.value)
-const error = computed<string | null>(() => toErrorMessage(dashboardError.value, 'Failed to load dashboard overview.'))
+const error = computed<string | null>(() => {
+  if (meError.value) return toErrorMessage(meError.value, 'Failed to load user data.')
+  if (dashboardError.value) return toErrorMessage(dashboardError.value, 'Failed to load dashboard overview.')
+  return null
+})
 
 const userName = computed(() => {
+  if (!authStore.isAuthenticated || !authStore.user) {
+    return null
+  }
+  
+  const authUser = authStore.user
+  
+  if (authUser.username) {
+    return authUser.username
+  }
+  
+  if (authUser.email) {
+    return authUser.email
+  }
+  
+  if (authUser.name) {
+    return authUser.name
+  }
+
   const resolved = displayName.value
   if (resolved && resolved.length > 0) {
     return resolved
   }
 
   const meUser = dashboardData.value?.user ?? null
-  return meUser?.username || meUser?.email || ''
+  if (meUser && typeof meUser === 'object' && 'username' in meUser) {
+    return (meUser as { username?: string; email?: string }).username || (meUser as { email?: string }).email || null
+  }
+
+  return null
 })
 </script>

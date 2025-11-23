@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { getServerSession } from '#auth'
+import { getServerSession } from '~~/server/utils/session'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { permissionManager } from '~~/server/utils/permission-manager'
 
