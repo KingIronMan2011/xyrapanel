@@ -19,12 +19,14 @@ const {
   pending,
   error: fetchError,
   refresh,
-} = await useFetch<AuditEventsPayload>('/api/admin/audit', {
-  query: computed(() => ({ limit: limit.value, page: page.value })),
+} = await useFetch('/api/admin/audit', {
+  query: { limit, page },
   key: 'admin-activity',
 })
 
-watch(data, (newData: AuditEventsPayload | null) => {
+const auditData = computed(() => data.value as AuditEventsPayload | null)
+
+watch(auditData, (newData) => {
   if (newData?.data) {
     if (page.value === 1) {
       allActivities.value = newData.data
@@ -40,7 +42,7 @@ watch(data, (newData: AuditEventsPayload | null) => {
 }, { immediate: true })
 
 const activities = computed<AdminActivityEntry[]>(() => allActivities.value)
-const pagination = computed(() => data.value?.pagination)
+const pagination = computed(() => auditData.value?.pagination)
 const hasMore = computed(() => Boolean(pagination.value?.hasMore))
 
 async function loadMore() {
