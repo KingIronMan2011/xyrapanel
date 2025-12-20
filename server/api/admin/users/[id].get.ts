@@ -1,27 +1,10 @@
 import { createError } from 'h3'
-import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables, eq, or } from '~~/server/utils/drizzle'
 import { desc } from 'drizzle-orm'
+import { requireAdmin } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const auth = getAuth()
-  
-  const session = await auth.api.getSession({
-    headers: normalizeHeadersForAuth(event.node.req.headers),
-  })
-
-  if (!session?.user?.id) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const userRole = (session.user as { role?: string }).role
-  if (userRole !== 'admin') {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Forbidden',
-      message: 'Admin access required',
-    })
-  }
+  await requireAdmin(event)
 
   const id = getRouterParam(event, 'id')
   if (!id) {

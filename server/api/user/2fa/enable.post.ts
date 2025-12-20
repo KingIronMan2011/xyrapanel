@@ -1,20 +1,11 @@
 import { createError } from 'h3'
 import { APIError } from 'better-auth/api'
 import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
+import { requireAuth } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
+  await requireAuth(event)
   const auth = getAuth()
-  
-  const session = await auth.api.getSession({
-    headers: normalizeHeadersForAuth(event.node.req.headers),
-  })
-
-  if (!session?.user?.id) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Unauthorized',
-    })
-  }
 
   const body = await readBody(event)
   const { password } = body

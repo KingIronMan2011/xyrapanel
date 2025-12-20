@@ -1,17 +1,12 @@
 import { assertMethod, createError, getValidatedRouterParams, parseCookies } from 'h3'
 import { auth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAuth } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
   assertMethod(event, 'DELETE')
 
-  const session = await auth.api.getSession({
-    headers: normalizeHeadersForAuth(event.node.req.headers),
-  })
-
-  if (!session?.user?.id) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const session = await requireAuth(event)
 
   const { token: targetToken } = await getValidatedRouterParams(event, (params) => {
     const tokenParam = (params as Record<string, unknown>).token

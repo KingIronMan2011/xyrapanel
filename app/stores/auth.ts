@@ -50,8 +50,10 @@ export const useAuthStore = defineStore('auth', () => {
     return values.includes(required)
   }
 
-  async function syncSession() {
-    await authClient.getSession()
+  async function syncSession(options?: { disableCookieCache?: boolean }) {
+    const query = options?.disableCookieCache ? { disableCookieCache: 'true' } : undefined
+    const fetchOptions = query ? { query } : undefined
+    await authClient.getSession({ fetchOptions })
   }
 
   async function logout(options?: { revokeOthersFirst?: boolean }) {
@@ -68,7 +70,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function login(identity: string, password: string, token?: string, captchaToken?: string) {
+  async function login(identity: string, password: string, token?: string, captchaToken?: string, options?: { revokeOthersFirst?: boolean }) {
     const isEmail = identity.includes('@')
     
     const fetchOptions = captchaToken ? {
@@ -78,53 +80,43 @@ export const useAuthStore = defineStore('auth', () => {
     } : undefined
     
     let result
-    
     if (isEmail) {
       result = await authClient.signIn.email({
         email: identity,
         password,
         fetchOptions,
       })
-
-      if (result.error) {
-        result = await authClient.signIn.username({
-          username: identity,
-          password,
-          fetchOptions,
-        })
-      }
-    } else {
+    }
+    else {
       result = await authClient.signIn.username({
         username: identity,
         password,
         fetchOptions,
       })
-
-      if (result.error) {
-        result = await authClient.signIn.email({
-          email: identity,
-          password,
-          fetchOptions,
-        })
-      }
     }
 
     if (result.error) {
       return { error: result.error.message }
     }
 
-    if (token) {
+    const requiresTwoFactor = Boolean(result.data && typeof result.data === 'object' && 'twoFactorRedirect' in result.data && (result.data as Record<string, unknown>).twoFactorRedirect === true)
+
+    if (requiresTwoFactor) {
+      if (!token) {
+        return { error: 'Two-factor authentication required', twoFactorRedirect: true }
+      }
+
       const twoFactorResult = await authClient.twoFactor.verifyTotp({
         code: token,
         trustDevice: true,
       })
 
       if (twoFactorResult.error) {
-        return { error: twoFactorResult.error.message }
+        return { error: twoFactorResult.error.message, twoFactorRedirect: true }
       }
     }
 
-    if (typeof authClient.revokeOtherSessions === 'function') {
+    if (options?.revokeOthersFirst && typeof authClient.revokeOtherSessions === 'function') {
       try {
         await authClient.revokeOtherSessions()
       }

@@ -30,7 +30,6 @@ useHead(() => ({
 <template>
   <UApp :locale="currentLocale">
     <NuxtLoadingIndicator color="#16a34a" error-color="#ef4444" :height="3" />
-    <PasswordCompromisedModal />
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>

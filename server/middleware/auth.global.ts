@@ -1,6 +1,8 @@
-import { createError, type H3Event } from 'h3'
+import { createError, sendRedirect, defineEventHandler, type H3Event } from 'h3'
 import type { AuthContext, ResolvedSessionUser } from '#shared/types/auth'
 import { getServerSession } from '~~/server/utils/session'
+import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
+import { requireSessionUser } from '~~/server/utils/auth/sessionUser'
 
 const PUBLIC_ASSET_PREFIXES = [
   '/_nuxt/',
@@ -108,47 +110,46 @@ export default defineEventHandler(async (event) => {
     const hasApiKeyHeader = Boolean(event.node.req.headers['x-api-key'])
 
     if (hasApiKeyHeader || (hasAuthHeader && event.node.req.headers.authorization?.startsWith('Bearer '))) {
-      const { useDrizzle, tables, eq } = await import('~~/server/utils/drizzle')
-      const db = useDrizzle()
-
       const rawKeyHeader = event.node.req.headers['x-api-key']
-      const apiKeyValue = typeof rawKeyHeader === 'string' ? rawKeyHeader : Array.isArray(rawKeyHeader) ? rawKeyHeader[0] : (event.node.req.headers.authorization?.startsWith('Bearer ') ? event.node.req.headers.authorization.slice(7) : null)
+      const apiKeyValue = typeof rawKeyHeader === 'string'
+        ? rawKeyHeader
+        : Array.isArray(rawKeyHeader)
+          ? rawKeyHeader[0]
+          : (event.node.req.headers.authorization?.startsWith('Bearer ') ? event.node.req.headers.authorization.slice(7) : null)
 
       if (!apiKeyValue || typeof apiKeyValue !== 'string') {
         return
       }
 
+      const auth = getAuth()
+      const headers = normalizeHeadersForAuth(event.node.req.headers)
+      type AuthApiWithApiKey = typeof auth.api & {
+        verifyApiKey: (options: {
+          body: { key: string }
+          headers?: Record<string, string>
+        }) => Promise<{
+          valid: boolean
+          key: { userId?: string; id?: string } | null
+        }>
+      }
+      const authApi = auth.api as AuthApiWithApiKey
+
       try {
-        const apiKeyRecord = db
-          .select({
-            id: tables.apiKeys.id,
-            userId: tables.apiKeys.userId,
-            expiresAt: tables.apiKeys.expiresAt,
-            enabled: tables.apiKeys.enabled,
-          })
-          .from(tables.apiKeys)
-          .where(eq(tables.apiKeys.key, apiKeyValue))
-          .get()
+        const verification = await authApi.verifyApiKey({
+          body: { key: apiKeyValue },
+          headers,
+        })
 
-        if (!apiKeyRecord) {
-          return
-        }
-
-        if (!apiKeyRecord.enabled) {
+        if (!verification.valid || !verification.key?.userId) {
           throw createError({
-            statusCode: 403,
-            statusMessage: 'Forbidden',
-            message: 'API key is disabled',
+            statusCode: 401,
+            statusMessage: 'Unauthorized',
+            message: 'Invalid API key',
           })
         }
 
-        if (apiKeyRecord.expiresAt && new Date() > apiKeyRecord.expiresAt) {
-          throw createError({
-            statusCode: 403,
-            statusMessage: 'Forbidden',
-            message: 'API key has expired',
-          })
-        }
+        const { useDrizzle, tables, eq } = await import('~~/server/utils/drizzle')
+        const db = useDrizzle()
 
         const dbUser = db
           .select({
@@ -160,7 +161,7 @@ export default defineEventHandler(async (event) => {
             passwordResetRequired: tables.users.passwordResetRequired,
           })
           .from(tables.users)
-          .where(eq(tables.users.id, apiKeyRecord.userId))
+          .where(eq(tables.users.id, verification.key.userId))
           .get()
 
         if (!dbUser) {
@@ -191,45 +192,46 @@ export default defineEventHandler(async (event) => {
         try {
           const { recordAuditEventFromRequest } = await import('~~/server/utils/audit')
           recordAuditEventFromRequest(event, {
-            actor: apiKeyRecord.userId,
+            actor: verification.key.userId,
             actorType: 'user',
             action: 'account.api_key.used',
             targetType: 'api_key',
-            targetId: apiKeyRecord.id,
+            targetId: verification.key.id,
             metadata: {
               endpoint: event.node.req.url,
               method: event.method,
             },
           }).catch(err => console.error('Failed to log API key usage:', err))
-        } catch (logError) {
+        }
+        catch (logError) {
           console.error('Failed to import audit logging:', logError)
         }
 
         return
       }
       catch (error) {
-        if (apiKeyValue) {
-          try {
-            const { recordAuditEventFromRequest } = await import('~~/server/utils/audit')
-            recordAuditEventFromRequest(event, {
-              actor: 'unknown',
-              actorType: 'system',
-              action: 'account.api_key.invalid',
-              targetType: 'api_key',
-              metadata: {
-                endpoint: event.node.req.url,
-                method: event.method,
-                reason: error instanceof Error ? error.message : 'unknown_error',
-              },
-            }).catch(err => console.error('Failed to log failed API key attempt:', err))
-          } catch (logError) {
-            console.error('Failed to import audit logging:', logError)
-          }
+        try {
+          const { recordAuditEventFromRequest } = await import('~~/server/utils/audit')
+          recordAuditEventFromRequest(event, {
+            actor: 'unknown',
+            actorType: 'system',
+            action: 'account.api_key.invalid',
+            targetType: 'api_key',
+            metadata: {
+              endpoint: event.node.req.url,
+              method: event.method,
+              reason: error instanceof Error ? error.message : 'unknown_error',
+            },
+          }).catch(err => console.error('Failed to log failed API key attempt:', err))
+        }
+        catch (logError) {
+          console.error('Failed to import audit logging:', logError)
         }
 
         if (error && typeof error === 'object' && 'statusCode' in error) {
           throw error
         }
+
         console.error('API key verification failed:', error)
       }
     }
@@ -271,7 +273,10 @@ export default defineEventHandler(async (event) => {
     return sendRedirect(event, '/', 302)
   }
 
-  if (user.passwordResetRequired && !path.startsWith('/auth/password/force')) {
+  const isForcedResetPage = path.startsWith('/auth/password/force')
+  const isForcedResetApi = path.startsWith('/api/account/password/force')
+
+  if (user.passwordResetRequired && !isForcedResetPage && !isForcedResetApi) {
     if (isApiRequest) {
       throw createError({
         statusCode: 403,

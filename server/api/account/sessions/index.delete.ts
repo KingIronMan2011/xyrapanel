@@ -1,15 +1,10 @@
-import { createError, getQuery, parseCookies } from 'h3'
+import { getQuery, parseCookies } from 'h3'
 import { auth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAuth } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await auth.api.getSession({
-    headers: normalizeHeadersForAuth(event.node.req.headers),
-  })
-
-  if (!session?.user?.id) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const session = await requireAuth(event)
 
   const query = getQuery(event)
   const includeCurrent = query.includeCurrent === 'true'

@@ -25,11 +25,6 @@ const { status, user } = storeToRefs(authStore)
 const passwordError = ref<string | null>(null)
 const isSavingPassword = ref(false)
 
-const passwordCompromised = computed(() => {
-  if (!user.value) return false
-  return Boolean((user.value as { passwordCompromised?: boolean }).passwordCompromised)
-})
-
 const passwordSchema = accountPasswordFormSchema
 
 type PasswordFormSchema = AccountPasswordFormInput
@@ -309,16 +304,6 @@ async function disableTotp() {
 
             <UAlert v-if="passwordErrorMessage" icon="i-lucide-alert-triangle" color="error" :title="passwordErrorMessage" />
             
-            <UAlert
-              v-if="isMounted && passwordCompromised"
-              icon="i-lucide-shield-alert"
-              color="warning"
-              variant="subtle"
-              :title="t('account.security.password.passwordMarkedCompromised')"
-              :description="t('account.security.password.compromisedChangePassword')"
-              class="mb-4"
-            />
-
             <UForm
               :schema="passwordSchema"
               :state="passwordForm"

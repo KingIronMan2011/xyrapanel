@@ -1,12 +1,10 @@
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { admin, haveIBeenPwned, bearer, multiSession, customSession, captcha, username, twoFactor } from "better-auth/plugins"
-import { createAuthMiddleware, APIError } from 'better-auth/api'
+import { admin, bearer, multiSession, customSession, captcha, username, twoFactor, apiKey } from "better-auth/plugins"
 import type { AuthContext } from '@better-auth/core'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import type { Role } from '#shared/types/auth'
 import bcrypt from 'bcryptjs'
-import { createHash } from 'node:crypto'
 
 let authInstance: ReturnType<typeof betterAuth> | null = null
 
@@ -22,61 +20,6 @@ const ADMIN_PANEL_PERMISSIONS = [
   'admin.settings.read',
 ]
 
-/**
- * Checks existing passwords on login against Have I Been Pwned API and sets database flag.
- */
-export async function checkPasswordCompromised(userId: string, password: string): Promise<void> {
-  try {
-    // CodeQL [js/insufficient-password-hash] SHA1 required by HIBP API, not for password storage
-    const sha1Hash = createHash('sha1').update(password, 'utf8').digest('hex').toUpperCase()
-    const prefix = sha1Hash.substring(0, 5)
-    const suffix = sha1Hash.substring(5)
-
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000)
-
-    try {
-      const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
-        headers: { 'User-Agent': 'XyraPanel' },
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        return
-      }
-
-      const data = await response.text()
-      const lines = data.split(/\r?\n/).filter(line => line.trim().length > 0)
-      const hashes = lines.map(line => {
-        const trimmed = line.trim()
-        const colonIndex = trimmed.indexOf(':')
-        return colonIndex > 0 ? trimmed.substring(0, colonIndex) : trimmed
-      }).filter(Boolean)
-      
-      const isCompromised = hashes.includes(suffix)
-      
-      if (isCompromised) {
-        const db = useDrizzle()
-        await db.update(tables.users)
-          .set({ passwordCompromised: true, updatedAt: new Date() })
-          .where(eq(tables.users.id, userId))
-          .run()
-      }
-    } catch (fetchError) {
-      clearTimeout(timeoutId)
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        return
-      }
-      throw fetchError
-    }
-  }
-  catch {
-    // Silently fail password compromise check
-  }
-}
-
 async function getUserPermissionsAndRole(userId: string) {
   const db = useDrizzle()
   const dbUser = db
@@ -85,7 +28,6 @@ async function getUserPermissionsAndRole(userId: string) {
       role: tables.users.role,
       rootAdmin: tables.users.rootAdmin,
       passwordResetRequired: tables.users.passwordResetRequired,
-      passwordCompromised: tables.users.passwordCompromised,
       nameFirst: tables.users.nameFirst,
       nameLast: tables.users.nameLast,
     })
@@ -104,7 +46,6 @@ async function getUserPermissionsAndRole(userId: string) {
     role: derivedRole,
     permissions,
     passwordResetRequired: Boolean(dbUser.passwordResetRequired),
-    passwordCompromised: Boolean(dbUser.passwordCompromised),
   }
 }
 
@@ -255,7 +196,7 @@ function createAuth() {
         hash: async (password: string) => {
           return await bcrypt.hash(password, 12)
         },
-        verify: async ({ hash, password }: { hash: string; password: string; userId?: string }) => {
+        verify: async ({ hash, password }: { hash: string; password: string }) => {
           return await bcrypt.compare(password, hash)
         },
       },
@@ -274,7 +215,6 @@ function createAuth() {
         await db.update(tables.users)
           .set({ 
             passwordResetRequired: false,
-            passwordCompromised: false,
           })
           .where(eq(tables.users.id, user.id))
           .run()
@@ -282,13 +222,15 @@ function createAuth() {
     },
     session: {
       expiresIn: 14 * 24 * 60 * 60,
-      updateAge: 24 * 60 * 60,
-      freshAge: 60 * 60 * 24,
+      updateAge: 12 * 60 * 60,
+      freshAge: 5 * 60,
       cookieCache: {
         enabled: true,
         maxAge: 5 * 60,
         strategy: 'compact',
-        refreshCache: false,
+        refreshCache: {
+          updateAge: 60,
+        },
       },
       fields: {
         token: 'sessionToken',
@@ -362,16 +304,46 @@ function createAuth() {
     onAPIError: {
       throw: false,
       onError: (error: unknown, ctx: AuthContext) => {
-        const request = (ctx as { request?: { url?: string; method?: string } }).request
+        const request = (ctx as { request?: Request }).request
         const isProduction = process.env.NODE_ENV === 'production'
-        const path = request?.url || 'unknown'
+        let path = 'unknown'
+        if (request?.url) {
+          try {
+            path = new URL(request.url).pathname
+          }
+          catch {
+            path = request.url
+          }
+        }
         const isAuthPath = path.startsWith('/api/auth')
-        
+
+        if (path.startsWith('/api/auth/sign-in')) {
+          const identifier = (ctx as { body?: { email?: string; username?: string } }).body
+            ? ((ctx as { body?: { email?: string; username?: string } }).body!.email
+              || (ctx as { body?: { email?: string; username?: string } }).body!.username
+              || null)
+            : null
+          const headers = request?.headers
+          const ip = headers
+            ? ipAddressHeaders
+              .map(header => headers.get(header))
+              .find(value => Boolean(value))
+            : null
+          const reason = error instanceof Error ? error.message : String(error)
+          console.warn('[auth][sign-in-failed]', {
+            path,
+            method: request?.method || 'UNKNOWN',
+            identifier,
+            ip: ip?.split(',')[0]?.trim() || null,
+            reason,
+          })
+        }
+
         if (isProduction) {
           if (isAuthPath) {
             return
           }
-          
+
           const errorName = error instanceof Error ? error.name : 'UnknownError'
           if (errorName === 'APIError' || errorName === 'ValidationError') {
             return
@@ -383,54 +355,7 @@ function createAuth() {
       disabled: false,
       level: isProduction ? 'error' : 'warn',
     },
-    hooks: {
-      before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path.startsWith('/sign-in')) {
-          const { getSetting, SETTINGS_KEYS } = await import('~~/server/utils/settings')
-          const maintenanceMode = getSetting(SETTINGS_KEYS.MAINTENANCE_MODE) === 'true'
-          
-          if (maintenanceMode) {
-            const requestBody = (ctx as { body?: { email?: string; username?: string } }).body
-            const identifier = requestBody?.email || requestBody?.username
-            
-            if (identifier) {
-              const db = useDrizzle()
-              const user = db
-                .select({
-                  role: tables.users.role,
-                  rootAdmin: tables.users.rootAdmin,
-                })
-                .from(tables.users)
-                .where(
-                  identifier.includes('@')
-                    ? eq(tables.users.email, identifier)
-                    : eq(tables.users.username, identifier)
-                )
-                .get()
-              
-              const isAdmin = user?.rootAdmin || user?.role === 'admin'
-              
-              if (!isAdmin) {
-                throw new APIError('FORBIDDEN', {
-                  message: 'The panel is currently under maintenance. Please try again later.',
-                })
-              }
-            }
-          }
-        }
-      }),
-      after: createAuthMiddleware(async (ctx) => {
-        if (ctx.path.startsWith('/sign-in')) {
-          const newSession = ctx.context.newSession
-          const requestBody = (ctx as { body?: { password?: string } }).body
-          const password = requestBody?.password
-
-          if (newSession?.user?.id && password) {
-            await checkPasswordCompromised(newSession.user.id, password)
-          }
-        }
-      }),
-    },
+    hooks: undefined,
     plugins: [
       ...(runtimeConfig.turnstile.secretKey ? [captcha({
         provider: 'cloudflare-turnstile',
@@ -443,9 +368,6 @@ function createAuth() {
       twoFactor({
         issuer: runtimeConfig.public.appName || 'XyraPanel',
       }),
-      haveIBeenPwned({
-        customPasswordCompromisedMessage: 'This password has been found in a data breach. Please choose a more secure password.',
-      }),
       admin({
         adminRoles: ['admin'],
         defaultRole: 'user',
@@ -453,14 +375,24 @@ function createAuth() {
         defaultBanReason: 'No reason provided',
         bannedUserMessage: 'You have been banned from this application. Please contact support if you believe this is an error.',
       }),
-      // API key plugin disabled 
-      // Better Auth's drizzle adapter can't query the apikey table properly
-      // apiKey({
-      //   enableSessionForAPIKeys: true,
-      //   apiKeyHeaders: ['x-api-key', 'authorization'],
-      //   enableMetadata: true,
-      //   disableKeyHashing: true,
-      // }),
+      apiKey({
+        apiKeyHeaders: ['x-api-key'],
+        customAPIKeyGetter: (ctx) => {
+          const bearer = ctx.headers?.get('authorization')
+          if (bearer?.startsWith('Bearer ')) {
+            const token = bearer.slice(7).trim()
+            if (token) {
+              return token
+            }
+          }
+          const headerKey = ctx.headers?.get('x-api-key')
+          return headerKey || null
+        },
+        enableSessionForAPIKeys: true,
+        disableKeyHashing: true,
+        defaultKeyLength: 16,
+        fallbackToDatabase: true,
+      }),
       bearer(),
       multiSession({
         maximumSessions: 5,
@@ -496,7 +428,6 @@ function createAuth() {
             role: userData.role,
             permissions: userData.permissions,
             passwordResetRequired: userData.passwordResetRequired,
-            passwordCompromised: userData.passwordCompromised,
             name,
           },
           session,

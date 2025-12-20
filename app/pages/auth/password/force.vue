@@ -8,7 +8,7 @@ import type { PasswordForceBody } from '#shared/types/account'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
-const { status, requiresPasswordReset } = storeToRefs(authStore)
+const { status, requiresPasswordReset, isAuthenticated } = storeToRefs(authStore)
 const route = useRoute()
 const toast = useToast()
 
@@ -59,26 +59,43 @@ const redirectPath = computed(() => {
   return '/'
 })
 
-watch(status, async (value) => {
-  if (value === 'authenticated' && !requiresPasswordReset.value)
+async function redirectAfterReset() {
+  if (status.value === 'authenticated' && isAuthenticated.value) {
     await navigateTo(redirectPath.value)
+  }
+  else {
+    await navigateTo('/auth/login')
+  }
+}
+
+watch(requiresPasswordReset, async (value) => {
+  if (value === false) {
+    await redirectAfterReset()
+  }
 }, { immediate: true })
 
 async function onSubmit(event: FormSubmitEvent<PasswordForceBody>) {
   loading.value = true
   errorMessage.value = null
   try {
+    if (!requiresPasswordReset.value) {
+      await redirectAfterReset()
+      return
+    }
+
     const newPassword = String(event.data.newPassword)
     const confirmPassword = event.data.confirmPassword ? String(event.data.confirmPassword) : undefined
     const body: PasswordForceBody = {
       newPassword,
       confirmPassword,
     }
-    await $fetch<{ success: boolean }>('/api/account/password/force', {
+    // @ts-expect-error - Nuxt typed routes cause deep type instantiation here
+    await $fetch<{ success: boolean }, { method: 'PUT'; body: PasswordForceBody }>('/api/account/password/force', {
       method: 'PUT',
       body,
     })
 
+    await authStore.syncSession({ disableCookieCache: true })
 
     toast.add({
       title: t('auth.passwordUpdated'),
@@ -86,7 +103,8 @@ async function onSubmit(event: FormSubmitEvent<PasswordForceBody>) {
       color: 'success',
     })
 
-    await navigateTo(redirectPath.value)
+    await redirectAfterReset()
+    return
   }
   catch (error) {
     const fetchError = error as FetchError<{ message?: string }>

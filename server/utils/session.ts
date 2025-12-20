@@ -1,8 +1,8 @@
 import type { H3Event } from 'h3'
 import type { ServerSessionUser } from '#shared/types/auth'
-import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
+import { normalizeHeadersForAuth, auth } from '~~/server/utils/auth'
 
-type SessionType = Awaited<ReturnType<ReturnType<typeof getAuth>['api']['getSession']>>
+type SessionType = Awaited<ReturnType<typeof auth.api.getSession>>
 
 export async function getServerSession(event: H3Event): Promise<SessionType | null> {
   const contextAuth = (event.context as { auth?: { session?: SessionType } }).auth
@@ -10,7 +10,7 @@ export async function getServerSession(event: H3Event): Promise<SessionType | nu
     return contextAuth.session
   }
 
-  return await getAuth().api.getSession({
+  return await auth.api.getSession({
     headers: normalizeHeadersForAuth(event.node.req.headers),
   })
 }

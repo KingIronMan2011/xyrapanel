@@ -1,22 +1,11 @@
 import { createError } from 'h3'
-import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import bcrypt from 'bcryptjs'
+import { requireAuth } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const auth = getAuth()
-  
-  const session = await auth.api.getSession({
-    headers: normalizeHeadersForAuth(event.node.req.headers),
-  })
-
-  if (!session?.user?.id) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Unauthorized',
-    })
-  }
+  const session = await requireAuth(event)
 
   const body = await readBody(event)
   const { password } = body

@@ -4,6 +4,7 @@
     "source.fixAll.eslint": "explicit",
   },
   "conventionalCommits.scopes": [
-    "deps"
+    "deps",
+    "auth"
   ],
 }

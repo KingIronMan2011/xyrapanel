@@ -178,28 +178,37 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAuthForm :schema="schema" :fields="fields" :submit="submitProps" @submit="onSubmit as any">
-      <template #title>
-        <h1 class="text-3xl font-semibold text-white">
-          {{ appName }}
-        </h1>
-      </template>
-      <template #password-hint>
-        <NuxtLink to="/auth/password/request" class="text-primary font-medium" tabindex="-1">
-          {{ t('auth.forgotPassword') }}?
-        </NuxtLink>
-      </template>
-    </UAuthForm>
-    <div v-if="hasTurnstile" class="flex flex-col items-center gap-2 mt-4">
-      <NuxtTurnstile
-        ref="turnstileRef"
-        v-model="turnstileToken"
-        :options="{
-          theme: 'dark',
-          size: 'normal',
-        }"
-      />
+  <ClientOnly>
+    <div class="space-y-6">
+      <UAuthForm :schema="schema" :fields="fields" :submit="submitProps" @submit="onSubmit as any">
+        <template #title>
+          <h1 class="text-3xl font-semibold text-white">
+            {{ appName }}
+          </h1>
+        </template>
+        <template #password-hint>
+          <NuxtLink to="/auth/password/request" class="text-primary font-medium" tabindex="-1">
+            {{ t('auth.forgotPassword') }}?
+          </NuxtLink>
+        </template>
+      </UAuthForm>
+      <div v-if="hasTurnstile" class="flex flex-col items-center gap-2 mt-4">
+        <NuxtTurnstile
+          ref="turnstileRef"
+          v-model="turnstileToken"
+          :options="{
+            theme: 'dark',
+            size: 'normal',
+          }"
+        />
+      </div>
     </div>
-  </div>
+    <template #fallback>
+      <div class="space-y-4">
+        <div class="h-8 w-1/2 bg-default/40 animate-pulse rounded" />
+        <div class="h-40 w-full bg-default/30 animate-pulse rounded" />
+        <div class="h-10 w-full bg-default/30 animate-pulse rounded" />
+      </div>
+    </template>
+  </ClientOnly>
 </template>
