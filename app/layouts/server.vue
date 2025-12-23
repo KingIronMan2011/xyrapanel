@@ -128,19 +128,19 @@ const navItems = computed(() => {
 
     <UDashboardPanel :ui="{ body: 'flex flex-1 flex-col p-0' }">
       <template #body>
-        <header class="border-b border-default bg-background/70 backdrop-blur">
-          <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-5">
-            <div>
-              <h1 class="text-xl font-semibold text-foreground">{{ serverName }}</h1>
-              <p class="text-xs text-muted-foreground">{{ serverIdentifier }}</p>
-            </div>
-            <div class="flex items-center gap-2">
+        <UDashboardNavbar>
+          <div class="flex flex-col gap-1">
+            <h1 class="text-xl font-semibold text-foreground">{{ serverName }}</h1>
+            <p class="text-xs text-muted-foreground">{{ serverIdentifier }}</p>
+          </div>
+          <template #right>
+            <div class="flex flex-wrap items-center gap-2">
               <UButton icon="i-lucide-cog" variant="ghost" color="neutral" :to="settingsPath">
                 {{ t('server.settings.title') }}
               </UButton>
             </div>
-          </div>
-        </header>
+          </template>
+        </UDashboardNavbar>
 
         <main class="flex-1 overflow-y-auto">
           <div class="mx-auto w-full max-w-7xl px-6 py-10">

@@ -18,7 +18,6 @@ const isSubmitting = ref(false)
 const { data, refresh } = await useAsyncData(
   'admin-api-keys',
   async () => {
-    // @ts-expect-error - Nuxt typed routes cause deep type inference, waiting on Nitro v3 fix
     const response = await $fetch('/api/admin/api-keys')
     return response
   },

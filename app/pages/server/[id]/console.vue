@@ -425,12 +425,59 @@ function handleSearch() {
           </UCard>
 
           <ServerStatsChart v-if="showStats && stats" :stats="stats" :history="statsHistory" />
+          <div class="lg:hidden">
+            <UCard>
+              <template #header>
+                <h3 class="text-sm font-semibold">{{ t('server.console.connected') }}</h3>
+              </template>
+
+              <div class="space-y-3 text-xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-muted-foreground">{{ t('common.status') }}</span>
+                  <UBadge :color="connected ? 'success' : 'error'" size="xs">
+                    {{ connected ? t('server.console.connected') : t('server.console.disconnected') }}
+                  </UBadge>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-muted-foreground">{{ t('common.status') }}</span>
+                  <UBadge :color="getStateColor(serverState)" size="xs">
+                    <UIcon
+                      :name="getStateIcon(serverState)"
+                      :class="{ 'animate-spin': serverState === 'starting' || serverState === 'stopping' }"
+                    />
+                    <span class="ml-1 capitalize">{{ serverState }}</span>
+                  </UBadge>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-muted-foreground">{{ t('server.console.ipPort') }}</span>
+                  <span v-if="primaryAllocation" class="font-mono">{{ primaryAllocation.ip }}:{{ primaryAllocation.port }}</span>
+                  <span v-else class="text-muted-foreground">{{ t('common.notAssigned') }}</span>
+                </div>
+                <div v-if="stats && stats.uptime" class="flex items-center justify-between">
+                  <span class="text-muted-foreground">{{ t('server.console.uptime') }}</span>
+                  <span class="font-mono">{{ formattedUptime }}</span>
+                </div>
+                <div v-if="stats && stats.memoryLimitBytes" class="flex items-center justify-between">
+                  <span class="text-muted-foreground">{{ t('server.console.memory') }}</span>
+                  <span>{{ formatBytes(stats.memoryBytes) }} / {{ formatBytes(stats.memoryLimitBytes) }}</span>
+                </div>
+                <div v-if="stats && serverLimits?.disk" class="flex items-center justify-between">
+                  <span class="text-muted-foreground">{{ t('server.console.disk') }}</span>
+                  <span>{{ formatBytes(stats.diskBytes) }} / {{ formatBytes((serverLimits.disk || 0) * 1024 * 1024) }}</span>
+                </div>
+                <div v-if="stats" class="flex items-center justify-between">
+                  <span class="text-muted-foreground">{{ t('server.console.network') }}</span>
+                  <span>{{ formatBytes(stats.networkRxBytes) }} / {{ formatBytes(stats.networkTxBytes) }}</span>
+                </div>
+              </div>
+            </UCard>
+          </div>
         </div>
       </UContainer>
     </UPageBody>
 
     <template #right>
-      <UPageAside>
+      <UPageAside class="hidden lg:block">
         <UCard>
           <template #header>
             <h3 class="text-sm font-semibold">{{ t('server.console.connected') }}</h3>

@@ -518,12 +518,12 @@ const dashboardSearchGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]
     />
     <UDashboardPanel :ui="{ body: 'flex flex-1 flex-col p-0' }">
       <template #body>
-        <header class="border-b border-default bg-background/70 backdrop-blur">
-          <div class="mx-auto flex w-full flex-wrap items-center justify-between gap-4 px-6 py-5">
-            <div>
-              <h1 class="text-xl font-semibold text-foreground">{{ adminTitle }}</h1>
-              <p class="text-xs text-muted-foreground">{{ adminSubtitle }}</p>
-            </div>
+        <UDashboardNavbar>
+          <div class="flex flex-col gap-1">
+            <h1 class="text-xl font-semibold text-foreground">{{ adminTitle }}</h1>
+            <p class="text-xs text-muted-foreground">{{ adminSubtitle }}</p>
+          </div>
+          <template #right>
             <div class="flex flex-wrap items-center gap-3">
               <ClientOnly>
                 <template v-if="authStatus === 'authenticated' && sessionUser && userLabel">
@@ -532,31 +532,39 @@ const dashboardSearchGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]
                       <span class="font-medium text-foreground">{{ userLabel }}</span>
                       <span v-if="sessionUser.email" class="text-muted-foreground">{{ sessionUser.email }}</span>
                     </div>
-                    <UBadge v-if="sessionUser.role" size="xs" variant="subtle"
-                      color="error" class="uppercase tracking-wide text-[10px]">
+                    <UBadge
+                      v-if="sessionUser.role"
+                      size="xs"
+                      variant="subtle"
+                      color="error"
+                      class="uppercase tracking-wide text-[10px]"
+                    >
                       {{ sessionUser.role }}
                     </UBadge>
-                    <UButton size="xs" variant="ghost" color="error"
-                      icon="i-lucide-log-out" @click="handleSignOut" />
+                    <UButton
+                      size="xs"
+                      variant="ghost"
+                      color="error"
+                      icon="i-lucide-log-out"
+                      @click="handleSignOut"
+                    />
                   </div>
                 </template>
                 <template v-else>
-                  <UButton size="xs" variant="ghost" color="error" to="/auth/login"
-                    icon="i-lucide-log-in">
+                  <UButton size="xs" variant="ghost" color="error" to="/auth/login" icon="i-lucide-log-in">
                     {{ t('auth.signIn') }}
                   </UButton>
                 </template>
                 <template #fallback>
-                  <UButton size="xs" variant="ghost" color="error" to="/auth/login"
-                    icon="i-lucide-log-in">
+                  <UButton size="xs" variant="ghost" color="error" to="/auth/login" icon="i-lucide-log-in">
                     {{ t('auth.signIn') }}
                   </UButton>
                 </template>
               </ClientOnly>
             </div>
-          </div>
-          <USeparator />
-        </header>
+          </template>
+        </UDashboardNavbar>
+        <USeparator />
 
         <main class="flex-1 overflow-y-auto">
           <div class="mx-auto w-full px-6 py-10 space-y-6">
