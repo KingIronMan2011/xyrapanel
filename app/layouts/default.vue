@@ -99,6 +99,13 @@ const isAdminUser = computed(() => {
 const { locale, locales } = useI18n()
 const switchLocalePath = useSwitchLocalePath()
 
+const sidebarToggleProps = computed(() => ({
+  icon: 'i-lucide-menu',
+  color: 'neutral' as const,
+  variant: 'ghost' as const,
+  'aria-label': t('common.navigation'),
+}))
+
 const uiLocales = computed(() => {
   return locales.value.map(loc => {
     const dir = typeof loc === 'string' ? 'ltr' : (loc.dir || 'ltr')
@@ -137,7 +144,7 @@ async function handleLocaleChange(newLocale: string | undefined) {
   <UDashboardGroup class="min-h-screen bg-muted/30" storage="local" storage-key="client-dashboard">
     <UDashboardSidebar
       collapsible
-      :toggle="{ icon: 'i-lucide-menu', label: t('common.navigation'), color: 'neutral', variant: 'ghost' }"
+      :toggle="sidebarToggleProps"
       :ui="{ footer: 'border-t border-default' }"
     >
       <template #header="{ collapsed }">

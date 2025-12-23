@@ -31,6 +31,13 @@ const serverIdentifier = computed(() => {
 
 const settingsPath = computed(() => `/server/${serverId.value}/settings`)
 
+const sidebarToggleProps = computed(() => ({
+  icon: 'i-lucide-menu',
+  color: 'neutral' as const,
+  variant: 'ghost' as const,
+  'aria-label': t('common.navigation'),
+}))
+
 const navItems = computed(() => {
   const basePath = `/server/${serverId.value}`
   const currentPath = route.path
@@ -104,7 +111,7 @@ const navItems = computed(() => {
   <UDashboardGroup class="min-h-screen bg-muted/20" storage="local" storage-key="server-dashboard">
     <UDashboardSidebar
       collapsible
-      :toggle="{ icon: 'i-lucide-menu', label: t('layout.serverNavigation'), color: 'neutral', variant: 'ghost' }"
+      :toggle="sidebarToggleProps"
       :ui="{ body: 'flex flex-col gap-1 px-2 pb-4', header: 'px-4 py-4', footer: 'border-t border-default px-4 py-3' }"
     >
       <template #header="{ collapsed }">

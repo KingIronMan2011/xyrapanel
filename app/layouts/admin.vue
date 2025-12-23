@@ -328,6 +328,13 @@ const dashboardSearchOpen = ref(false)
 const dashboardSearchTerm = ref('')
 const dashboardSearchShortcut = 'meta_k'
 
+const sidebarToggleProps = computed(() => ({
+  icon: 'i-lucide-menu',
+  color: 'neutral' as const,
+  variant: 'ghost' as const,
+  'aria-label': t('common.navigation'),
+}))
+
 const dashboardSearchGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => {
   const navigationItems: CommandPaletteItem[] = navItems.value.map(item => ({
     id: item.id,
@@ -406,7 +413,7 @@ const dashboardSearchGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]
   <UDashboardGroup class="admin-layout min-h-screen bg-muted/15" storage="local" storage-key="admin-dashboard">
     <UDashboardSidebar
       collapsible
-      :toggle="{ icon: 'i-lucide-menu', label: t('common.navigation'), color: 'neutral', variant: 'ghost' }"
+      :toggle="sidebarToggleProps"
       :ui="{ footer: 'border-t border-default' }"
     >
       <template #header="{ collapsed }">
