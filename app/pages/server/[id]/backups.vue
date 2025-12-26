@@ -11,9 +11,14 @@ definePageMeta({
 const { t } = useI18n()
 const serverId = computed(() => route.params.id as string)
 
-const { data: backupsData, pending, error } = await useAsyncData(
+const {
+  data: backupsData,
+  pending,
+  error,
+  refresh: refreshBackups,
+} = await useAsyncData(
   `server-${serverId.value}-backups`,
-  () => $fetch<{ data: ServerBackup[] }>(`/api/servers/${serverId.value}/backups`),
+  () => $fetch<{ data: ServerBackup[] }>(`/api/client/servers/${serverId.value}/backups`),
   {
     watch: [serverId],
   },
@@ -59,6 +64,7 @@ function getStorageLabel(disk: string): string {
 
 const creating = ref(false)
 const operatingBackupId = ref<string | null>(null)
+const toast = useToast()
 
 async function createBackup() {
   creating.value = true
@@ -71,16 +77,16 @@ async function createBackup() {
       },
     })
 
-    useToast().add({
+    toast.add({
       title: t('common.success'),
       description: t('server.backups.backupStartedDescription'),
       color: 'success',
     })
 
-    await refreshNuxtData(`server-${serverId.value}-backups`)
+    await refreshBackups()
   }
   catch (err) {
-    useToast().add({
+    toast.add({
       title: t('common.error'),
       description: err instanceof Error ? err.message : t('server.backups.backupFailed'),
       color: 'error',
@@ -101,7 +107,7 @@ async function downloadBackup(backupId: string) {
     window.open(response.data.url, '_blank')
   }
   catch (err) {
-    useToast().add({
+    toast.add({
       title: t('common.error'),
       description: err instanceof Error ? err.message : t('server.backups.downloadFailed'),
       color: 'error',
@@ -123,14 +129,14 @@ async function restoreBackup(backupId: string) {
       method: 'POST',
     })
 
-    useToast().add({
+    toast.add({
       title: t('common.success'),
       description: t('server.backups.restoreStartedDescription'),
       color: 'success',
     })
   }
   catch (err) {
-    useToast().add({
+    toast.add({
       title: t('common.error'),
       description: err instanceof Error ? err.message : t('server.backups.restoreFailed'),
       color: 'error',
@@ -148,16 +154,16 @@ async function toggleLock(backupId: string) {
       method: 'POST',
     })
 
-    useToast().add({
+    toast.add({
       title: t('common.success'),
       description: t('server.backups.lockToggledDescription'),
       color: 'success',
     })
 
-    await refreshNuxtData(`server-${serverId.value}-backups`)
+    await refreshBackups()
   }
   catch (err) {
-    useToast().add({
+    toast.add({
       title: t('common.error'),
       description: err instanceof Error ? err.message : t('server.backups.lockFailed'),
       color: 'error',
@@ -179,16 +185,16 @@ async function deleteBackup(backupId: string) {
       method: 'DELETE',
     })
 
-    useToast().add({
+    toast.add({
       title: t('common.success'),
       description: t('server.backups.backupDeletedDescription'),
       color: 'success',
     })
 
-    await refreshNuxtData(`server-${serverId.value}-backups`)
+    await refreshBackups()
   }
   catch (err) {
-    useToast().add({
+    toast.add({
       title: t('common.error'),
       description: err instanceof Error ? err.message : t('server.backups.deleteFailed'),
       color: 'error',

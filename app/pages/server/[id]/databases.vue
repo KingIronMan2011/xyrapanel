@@ -15,7 +15,7 @@ const { data: databasesData, pending, error } = await useAsyncData(
   `server-${serverId.value}-databases`,
   () =>
     // @ts-expect-error - Nuxt typed routes trigger deep inference
-    $fetch<{ data: ServerDatabase[] }>(`/api/servers/${serverId.value}/databases`),
+    $fetch<{ data: ServerDatabase[] }>(`/api/client/servers/${serverId.value}/databases`),
   {
     watch: [serverId],
   },
@@ -400,12 +400,12 @@ async function deleteDatabase() {
       </template>
     </UModal>
 
-    <UModal v-model="showDeleteModal">
-      <UCard>
-        <template #header>
-          <h3 class="text-lg font-semibold">{{ t('server.databases.deleteDatabase') }}</h3>
-        </template>
-
+    <UModal
+      v-model:open="showDeleteModal"
+      :title="t('server.databases.deleteDatabase')"
+      :description="t('server.databases.confirmDeleteDatabaseDescription')"
+    >
+      <template #body>
         <div class="space-y-4">
           <UAlert color="error" icon="i-lucide-alert-triangle">
             <template #title>{{ t('common.warning') }}</template>
@@ -418,26 +418,28 @@ async function deleteDatabase() {
           <p class="text-sm text-muted-foreground">
             {{ t('server.databases.confirmDeleteDatabaseQuestion') }}
           </p>
-
-          <div class="flex justify-end gap-2">
-            <UButton
-              variant="ghost"
-              :disabled="operatingDatabaseId !== null"
-              @click="showDeleteModal = false"
-            >
-              {{ t('common.cancel') }}
-            </UButton>
-            <UButton
-              color="error"
-              :loading="operatingDatabaseId !== null"
-              :disabled="operatingDatabaseId !== null"
-              @click="deleteDatabase"
-            >
-              {{ t('server.databases.yesDeleteDatabase') }}
-            </UButton>
-          </div>
         </div>
-      </UCard>
+      </template>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton
+            variant="ghost"
+            :disabled="operatingDatabaseId !== null"
+            @click="showDeleteModal = false"
+          >
+            {{ t('common.cancel') }}
+          </UButton>
+          <UButton
+            color="error"
+            :loading="operatingDatabaseId !== null"
+            :disabled="operatingDatabaseId !== null"
+            @click="deleteDatabase"
+          >
+            {{ t('server.databases.yesDeleteDatabase') }}
+          </UButton>
+        </div>
+      </template>
     </UModal>
   </UPage>
 </template>

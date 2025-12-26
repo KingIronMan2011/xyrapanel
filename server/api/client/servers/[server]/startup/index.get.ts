@@ -16,52 +16,68 @@ export default defineEventHandler(async (event) => {
   const { server } = await getServerWithAccess(serverId, session)
 
   const db = useDrizzle()
-  const [egg] = db.select()
-    .from(tables.eggs)
-    .where(eq(tables.eggs.id, server.eggId!))
-    .limit(1)
+
+  const egg = server.eggId
+    ? db
+        .select()
+        .from(tables.eggs)
+        .where(eq(tables.eggs.id, server.eggId))
+        .get()
+    : null
+
+  const envVars = db
+    .select()
+    .from(tables.serverStartupEnv)
+    .where(eq(tables.serverStartupEnv.serverId, server.id))
     .all()
 
-  if (!egg) {
-    throw createError({
-      statusCode: 404,
-      message: 'Egg not found',
-    })
-  }
-
-  const envVars = db.select()
-    .from(tables.serverEnvironmentVariables)
-    .where(eq(tables.serverEnvironmentVariables.serverId, server.id))
-    .all()
-
-  const envMap: Record<string, string> = {}
+  const serverEnvMap = new Map<string, string>()
   for (const envVar of envVars) {
-    envMap[envVar.key] = envVar.value
+    serverEnvMap.set(envVar.key, envVar.value || '')
   }
 
-  const eggVariables = db.select()
-    .from(tables.eggVariables)
-    .where(eq(tables.eggVariables.eggId, egg.id))
-    .all()
+  const environment: Record<string, string> = {}
 
-  const variables = eggVariables.map(variable => ({
-    name: variable.name,
-    description: variable.description,
-    env_variable: variable.envVariable,
-    default_value: variable.defaultValue,
-    server_value: envMap[variable.envVariable] || variable.defaultValue || '',
-    is_editable: variable.userEditable,
-    rules: variable.rules || '',
-  }))
+  if (egg?.id) {
+    const eggVariables = db
+      .select()
+      .from(tables.eggVariables)
+      .where(eq(tables.eggVariables.eggId, egg.id))
+      .all()
+
+    for (const eggVar of eggVariables) {
+      const value = serverEnvMap.get(eggVar.envVariable) ?? eggVar.defaultValue ?? ''
+      environment[eggVar.envVariable] = value
+    }
+  }
+
+  for (const [key, value] of serverEnvMap.entries()) {
+    if (!environment[key]) {
+      environment[key] = value
+    }
+  }
+
+  let dockerImages: Record<string, string> = {}
+  if (egg?.dockerImages) {
+    try {
+      dockerImages = typeof egg.dockerImages === 'string'
+        ? JSON.parse(egg.dockerImages)
+        : egg.dockerImages
+    } catch (error) {
+      console.warn('[client/startup] Failed to parse egg dockerImages:', error)
+    }
+  }
+
+  if (Object.keys(dockerImages).length === 0 && egg?.dockerImage) {
+    dockerImages = { [egg.name || 'Default']: egg.dockerImage }
+  }
 
   return {
     data: {
-      startup_command: server.startup || egg.startup || '',
-      raw_startup_command: egg.startup || '',
-      docker_images: {
-        [egg.name]: egg.dockerImage || server.image || '',
-      },
-      variables,
+      startup: server.startup || egg?.startup || '',
+      dockerImage: server.dockerImage || server.image || egg?.dockerImage || '',
+      dockerImages,
+      environment,
     },
   }
 })

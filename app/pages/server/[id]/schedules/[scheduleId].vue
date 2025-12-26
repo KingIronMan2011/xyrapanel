@@ -53,7 +53,7 @@ async function loadSchedule() {
 
   try {
     const response = await $fetch<{ data: { id: string; name: string; cron: string; action: string; enabled: boolean } }>(
-      `/api/servers/${serverId.value}/schedules/${scheduleId.value}`,
+      `/api/client/servers/${serverId.value}/schedules/${scheduleId.value}`,
     )
 
     form.value = {
@@ -83,7 +83,7 @@ async function saveSchedule() {
   try {
     if (isNew.value) {
 
-      await $fetch(`/api/servers/${serverId.value}/schedules/create`, {
+      await $fetch(`/api/client/servers/${serverId.value}/schedules`, {
         method: 'POST',
         body: form.value,
       })
@@ -96,8 +96,8 @@ async function saveSchedule() {
     }
     else {
 
-      await $fetch(`/api/servers/${serverId.value}/schedules/${scheduleId.value}/update`, {
-        method: 'PUT',
+      await $fetch(`/api/client/servers/${serverId.value}/schedules/${scheduleId.value}`, {
+        method: 'POST',
         body: form.value,
       })
 
@@ -127,7 +127,7 @@ async function deleteSchedule() {
   if (!confirm(t('server.schedules.confirmDeleteSchedule'))) return
 
   try {
-    await $fetch(`/api/servers/${serverId.value}/schedules/${scheduleId.value}/delete`, {
+    await $fetch(`/api/client/servers/${serverId.value}/schedules/${scheduleId.value}`, {
       method: 'DELETE',
     })
 

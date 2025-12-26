@@ -2,14 +2,14 @@ import { eq } from 'drizzle-orm'
 import type { ServerDatabase } from '#shared/types/server'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
-import { withCache, buildCacheKey } from './cache'
+import { withCache, buildCacheKey, setCacheItem } from './cache'
 
 const SERVER_DATABASES_CACHE_TTL = 60
 
 export async function listServerDatabases(serverId: string): Promise<ServerDatabase[]> {
   const cacheKey = buildCacheKey('server', serverId, 'databases')
 
-  return withCache(cacheKey, async () => {
+  const data = await withCache<ServerDatabase[] | { data?: ServerDatabase[] }>(cacheKey, async () => {
     const db = useDrizzle()
     const databases = await db
       .select({
@@ -48,4 +48,14 @@ export async function listServerDatabases(serverId: string): Promise<ServerDatab
       updatedAt: new Date(row.updatedAt).toISOString(),
     }))
   }, { ttl: SERVER_DATABASES_CACHE_TTL })
+
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  const normalized = Array.isArray(data?.data) ? data.data : []
+  console.warn(`[databases] Unexpected cached databases shape for ${cacheKey}, normalizing to array`)
+  await setCacheItem(cacheKey, normalized, { ttl: SERVER_DATABASES_CACHE_TTL })
+
+  return normalized
 }

@@ -27,7 +27,7 @@ async function fetchServerActivity(page: number, limit: number): Promise<Paginat
     page: String(page),
     limit: String(limit),
   })
-  const url = `/api/servers/${serverId.value}/activity?${params.toString()}`
+  const url = `/api/client/servers/${serverId.value}/activity?${params.toString()}`
   return await requestFetch(url) as PaginatedServerActivityResponse
 }
 
@@ -47,7 +47,7 @@ const {
   pending,
   error,
 } = await useAsyncData<PaginatedServerActivityResponse>(
-  'server-activity',
+  () => `server-${serverId.value}-activity`,
   () => fetchServerActivity(currentPage.value, itemsPerPage.value),
   {
     default: defaultResponse,

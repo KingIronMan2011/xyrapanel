@@ -32,6 +32,7 @@ const uploadInProgress = ref(false)
 const pullInProgress = ref(false)
 
 let currentFileRequest: AbortController | null = null
+const lastRequestedDirectory = ref<string | null>(null)
 
 const newFileModal = reactive({
   open: false,
@@ -88,7 +89,7 @@ const decompressStatus = reactive({
 
 const visibleEntries = computed<ServerFileListItem[]>(() => {
   const sourceEntries = directoryEntries.value ?? []
-  const entries = sourceEntries.map((entry): ServerFileListItem => ({
+  const files = sourceEntries.map((entry): ServerFileListItem => ({
     name: entry.name,
     type: entry.isDirectory ? 'directory' : 'file',
     size: entry.isDirectory ? t('common.na') : formatBytes(entry.size),
@@ -96,7 +97,7 @@ const visibleEntries = computed<ServerFileListItem[]>(() => {
     path: entry.path,
   }))
 
-  return entries.sort((a, b) => {
+  return files.sort((a, b) => {
     if (a.type === b.type)
       return a.name.localeCompare(b.name)
     return a.type === 'directory' ? -1 : 1
@@ -311,6 +312,31 @@ async function handleBulkCopy() {
   }
 }
 
+async function fetchDirectory(directory = currentDirectory.value) {
+  if (lastRequestedDirectory.value === directory) {
+    return
+  }
+  lastRequestedDirectory.value = directory
+  directoryPending.value = true
+  directoryError.value = null
+  try {
+    const response = await requestFetch<{ data: ServerDirectoryListing }>(`${clientApiBase.value}/files/list`, {
+      method: 'GET',
+      query: { directory },
+    })
+    directoryEntries.value = response.data.entries
+  } catch (error) {
+    directoryError.value = error as Error
+    toast.add({
+      color: 'error',
+      title: t('common.error'),
+      description: error instanceof Error ? error.message : t('server.files.failedToLoad'),
+    })
+  } finally {
+    directoryPending.value = false
+  }
+}
+
 async function submitBulkMove() {
   const items = [...selectedItems.value]
   if (!items.length)
@@ -484,10 +510,9 @@ async function handleBulkUnarchive() {
     decompressStatus.target = ''
   }
 }
-const queryKey = computed(() => ({
-  id: serverId.value,
-  directory: currentDirectory.value,
-}))
+watch(currentDirectory, (directory) => {
+  fetchDirectory(directory)
+}, { immediate: true })
 
 function openNewFileModal() {
   newFileModal.name = ''
@@ -507,9 +532,8 @@ async function _submitNewFile() {
     return
   }
 
-  const targetPath = currentDirectory.value.endsWith('/')
-    ? `${currentDirectory.value}${name}`
-    : `${currentDirectory.value}/${name}`
+  const normalizedDir = normalizeDirectoryPath(currentDirectory.value)
+  const targetPath = normalizedDir === '/' ? `/${name}` : `${normalizedDir}/${name}`
 
   try {
     newFileModal.loading = true
@@ -562,7 +586,7 @@ async function _submitNewFolder() {
     await requestFetch(`${clientApiBase.value}/files/create-directory`, {
       method: 'POST',
       body: {
-        root: currentDirectory.value,
+        root: normalizeDirectoryPath(currentDirectory.value),
         name,
       },
     })
@@ -866,30 +890,6 @@ function availableFileActions(file: ServerFileListItem | null) {
 
   return actions
 }
-
-const fetchDirectory = async () => {
-  directoryPending.value = true
-  directoryError.value = null
-
-  try {
-    const { data } = await $fetch<{ data: { directory: string; entries: ServerFileEntry[] } }>(`${clientApiBase.value}/files/list`, {
-      query: { directory: currentDirectory.value },
-    })
-
-    currentDirectory.value = data.directory || '/'
-    directoryEntries.value = data.entries
-  }
-  catch (error) {
-    directoryError.value = error instanceof Error ? error : new Error('Failed to load directory listing.')
-  }
-  finally {
-    directoryPending.value = false
-  }
-}
-
-watch(queryKey, () => {
-  fetchDirectory()
-}, { immediate: true })
 
 const currentEntries = computed<ServerFileListItem[]>(() => directoryEntries.value
   .map((entry): ServerFileListItem => ({

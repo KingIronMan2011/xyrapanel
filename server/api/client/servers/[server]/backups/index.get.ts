@@ -18,20 +18,6 @@ export default defineEventHandler(async (event) => {
   const backups = await listServerBackups(server.id)
 
   return {
-    object: 'list',
-    data: backups.map(backup => ({
-      object: 'backup',
-      attributes: {
-        uuid: backup.uuid,
-        name: backup.name,
-        ignored_files: backup.ignoredFiles,
-        sha256_hash: backup.checksum,
-        bytes: backup.bytes,
-        created_at: backup.createdAt,
-        completed_at: backup.completedAt,
-        is_successful: backup.isSuccessful,
-        is_locked: backup.isLocked,
-      },
-    })),
+    data: backups,
   }
 })

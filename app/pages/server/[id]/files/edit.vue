@@ -69,7 +69,7 @@ async function loadFile() {
 
   try {
     const response = await $fetch<{ data: { path: string; content: string } }>(
-      `/api/servers/${serverId.value}/files/contents`,
+      `/api/client/servers/${serverId.value}/files/contents`,
       {
         query: { file: filePath.value },
       },
@@ -91,7 +91,7 @@ async function saveFile() {
   error.value = null
 
   try {
-    await $fetch(`/api/servers/${serverId.value}/files/write`, {
+    await $fetch(`/api/client/servers/${serverId.value}/files/write`, {
       method: 'POST',
       body: {
         file: filePath.value,

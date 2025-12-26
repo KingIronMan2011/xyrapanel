@@ -1,6 +1,6 @@
 import { desc, eq, or } from 'drizzle-orm'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import { buildCacheKey, deleteCacheItems, withCache } from '~~/server/utils/cache'
+import { buildCacheKey, deleteCacheItems, setCacheItem, withCache } from '~~/server/utils/cache'
 import { buildScheduleListCacheKey, buildScheduleTasksCacheKey } from './cache-keys'
 
 const SERVER_CACHE_TTL = 30
@@ -50,10 +50,12 @@ export async function getServerLimits(serverId: string) {
   }, { ttl: SERVER_LIMITS_CACHE_TTL })
 }
 
-export async function listServerAllocations(serverId: string) {
+type ServerAllocationRow = typeof tables.serverAllocations.$inferSelect
+
+export async function listServerAllocations(serverId: string): Promise<ServerAllocationRow[]> {
   const cacheKey = buildCacheKey('server', serverId, 'allocations')
 
-  return withCache(cacheKey, async () => {
+  const data = await withCache<ServerAllocationRow[] | { data?: ServerAllocationRow[] }>(cacheKey, async () => {
     const db = useDrizzle()
 
     return db
@@ -62,6 +64,17 @@ export async function listServerAllocations(serverId: string) {
       .where(eq(tables.serverAllocations.serverId, serverId))
       .all()
   }, { ttl: SERVER_ALLOCATIONS_CACHE_TTL })
+
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  const normalized = Array.isArray(data?.data) ? data.data : []
+
+  console.warn(`[serversStore] Unexpected cached allocations shape for ${cacheKey}, normalizing to array`)
+  await setCacheItem(cacheKey, normalized, { ttl: SERVER_ALLOCATIONS_CACHE_TTL })
+
+  return normalized
 }
 
 export async function listServerStartupEnv(serverId: string) {

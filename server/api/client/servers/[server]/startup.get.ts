@@ -16,37 +16,68 @@ export default defineEventHandler(async (event) => {
   const { server } = await getServerWithAccess(serverId, session)
 
   const db = useDrizzle()
-  const eggVariables = db
-    .select()
-    .from(tables.eggVariables)
-    .where(eq(tables.eggVariables.eggId, server.eggId!))
-    .all()
 
-  const serverEnv = db
+  const egg = server.eggId
+    ? db
+        .select()
+        .from(tables.eggs)
+        .where(eq(tables.eggs.id, server.eggId))
+        .get()
+    : null
+
+  const envVars = db
     .select()
     .from(tables.serverStartupEnv)
     .where(eq(tables.serverStartupEnv.serverId, server.id))
     .all()
 
-  const serverValues = new Map(
-    serverEnv.map(env => [env.key, env.value])
-  )
+  const serverEnvMap = new Map<string, string>()
+  for (const envVar of envVars) {
+    serverEnvMap.set(envVar.key, envVar.value || '')
+  }
 
-  const variables = eggVariables.map(eggVar => ({
-    name: eggVar.name,
-    description: eggVar.description,
-    env_variable: eggVar.envVariable,
-    default_value: eggVar.defaultValue,
-    server_value: serverValues.get(eggVar.envVariable) || eggVar.defaultValue,
-    is_editable: eggVar.userEditable,
-    rules: eggVar.rules,
-  }))
+  const environment: Record<string, string> = {}
+
+  if (egg?.id) {
+    const eggVariables = db
+      .select()
+      .from(tables.eggVariables)
+      .where(eq(tables.eggVariables.eggId, egg.id))
+      .all()
+
+    for (const eggVar of eggVariables) {
+      const value = serverEnvMap.get(eggVar.envVariable) ?? eggVar.defaultValue ?? ''
+      environment[eggVar.envVariable] = value
+    }
+  }
+
+  for (const [key, value] of serverEnvMap.entries()) {
+    if (!environment[key]) {
+      environment[key] = value
+    }
+  }
+
+  let dockerImages: Record<string, string> = {}
+  if (egg?.dockerImages) {
+    try {
+      dockerImages = typeof egg.dockerImages === 'string'
+        ? JSON.parse(egg.dockerImages)
+        : egg.dockerImages
+    } catch (error) {
+      console.warn('[client/startup] Failed to parse egg dockerImages:', error)
+    }
+  }
+
+  if (Object.keys(dockerImages).length === 0 && egg?.dockerImage) {
+    dockerImages = { [egg.name || 'Default']: egg.dockerImage }
+  }
 
   return {
     data: {
-      startup_command: server.startup,
-      docker_image: server.dockerImage || server.image,
-      variables,
+      startup: server.startup || egg?.startup || '',
+      dockerImage: server.dockerImage || server.image || egg?.dockerImage || '',
+      dockerImages,
+      environment,
     },
   }
 })

@@ -4,10 +4,12 @@ import { invalidateServerSubusersCache } from './subusers'
 import { buildUserPermissionsMapCacheKey } from './cache-keys'
 import { withCache } from './cache'
 
+type PermissionHierarchy = Record<string, Permission[]>
+
 export class PermissionManager {
   private db = useDrizzle()
 
-  private permissionHierarchy: Record<string, Permission[]> = {
+  private permissionHierarchy: PermissionHierarchy = {
     'admin.*': [
       'admin.servers.*', 'admin.users.*', 'admin.nodes.*', 
       'admin.locations.*', 'admin.nests.*', 'admin.eggs.*', 
@@ -22,7 +24,10 @@ export class PermissionManager {
       'server.database.update', 'server.database.delete', 'server.schedule.create',
       'server.schedule.read', 'server.schedule.update', 'server.schedule.delete',
       'server.settings.read', 'server.settings.update', 'server.users.read',
-      'server.users.create', 'server.users.update', 'server.users.delete'
+      'server.users.create', 'server.users.update', 'server.users.delete',
+      'admin.*', 'admin.servers.*', 'admin.users.*', 'admin.nodes.*',
+      'admin.locations.*', 'admin.nests.*', 'admin.eggs.*', 'admin.mounts.*',
+      'admin.settings.*'
     ],
     'server.files.*': [
       'server.files.read', 'server.files.write', 'server.files.delete',
@@ -84,7 +89,13 @@ export class PermissionManager {
 
   async getUserPermissions(userId: string): Promise<UserPermissions> {
     const cacheKey = buildUserPermissionsMapCacheKey(userId)
-    return withCache(cacheKey, () => this.computeUserPermissions(userId), { ttl: 60 })
+    const cached = await withCache<SerializedUserPermissions>(
+      cacheKey,
+      async () => this.serializeUserPermissions(await this.computeUserPermissions(userId)),
+      { ttl: 60 },
+    )
+
+    return this.deserializeUserPermissions(cached)
   }
 
   private async computeUserPermissions(userId: string): Promise<UserPermissions> {
@@ -354,6 +365,32 @@ export class PermissionManager {
       'admin.settings.*'
     ]
   }
+
+  private serializeUserPermissions(userPermissions: UserPermissions): SerializedUserPermissions {
+    return {
+      ...userPermissions,
+      serverPermissions: Array.from(userPermissions.serverPermissions.entries()),
+    }
+  }
+
+  private deserializeUserPermissions(userPermissions: SerializedUserPermissions | UserPermissions): UserPermissions {
+    if (userPermissions.serverPermissions instanceof Map) {
+      return userPermissions as UserPermissions
+    }
+
+    const entries = Array.isArray(userPermissions.serverPermissions)
+      ? userPermissions.serverPermissions
+      : Object.entries(userPermissions.serverPermissions ?? {})
+
+    return {
+      ...userPermissions,
+      serverPermissions: new Map(entries as Array<[string, Permission[]]>),
+    }
+  }
+}
+
+type SerializedUserPermissions = Omit<UserPermissions, 'serverPermissions'> & {
+  serverPermissions: Map<string, Permission[]> | Array<[string, Permission[]]> | Record<string, Permission[]>
 }
 
 export const permissionManager = new PermissionManager()

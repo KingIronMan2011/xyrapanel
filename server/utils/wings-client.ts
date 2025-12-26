@@ -358,12 +358,17 @@ export class WingsClient {
 
   async createBackup(
     serverUuid: string,
-    name?: string,
-    ignored?: string
-  ): Promise<WingsBackup> {
-    return this.request<WingsBackup>(`/api/servers/${serverUuid}/backups`, {
+    backupUuid: string,
+    ignored?: string,
+    adapter: 'wings' | 's3' = 'wings'
+  ): Promise<void> {
+    await this.request(`/api/servers/${serverUuid}/backup`, {
       method: 'POST',
-      body: JSON.stringify({ name, ignored }),
+      body: JSON.stringify({
+        adapter,
+        uuid: backupUuid,
+        ignore: ignored ?? '',
+      }),
     })
   }
 

@@ -1,6 +1,7 @@
 import type { CacheOptions, CacheSetOptions } from '#shared/types/cache'
 
 const CACHE_NAMESPACE = 'xyra'
+const CACHE_SEPARATOR = '__'
 const DEFAULT_CACHE_TTL = 60
 
 function getCacheStorage() {
@@ -8,16 +9,20 @@ function getCacheStorage() {
 }
 
 function normalizePart(part: string | number): string {
-  return String(part).trim().toLowerCase()
+  return String(part)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
 }
 
 export function buildCacheKey(...parts: Array<string | number | null | undefined>): string {
-  const suffix = parts
+  const normalizedParts = parts
     .filter((part) => part !== undefined && part !== null && String(part).length > 0)
     .map((part) => normalizePart(part as string | number))
-    .join(':')
 
-  return suffix.length > 0 ? `${CACHE_NAMESPACE}:${suffix}` : CACHE_NAMESPACE
+  return normalizedParts.length > 0
+    ? [CACHE_NAMESPACE, ...normalizedParts].join(CACHE_SEPARATOR)
+    : CACHE_NAMESPACE
 }
 
 export async function getCacheItem<T>(key: string): Promise<T | null> {

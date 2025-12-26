@@ -12,7 +12,7 @@ const toast = useToast()
 
 const { data: startupData, pending, error, refresh } = await useAsyncData(
   `server-${serverId.value}-startup`,
-  () => $fetch<{ data: { startup: string; dockerImage?: string; dockerImages?: Record<string, string>; environment?: Record<string, string> } }>(`/api/servers/${serverId.value}/startup`),
+  () => $fetch<{ data: { startup: string; dockerImage?: string; dockerImages?: Record<string, string>; environment?: Record<string, string> } }>(`/api/client/servers/${serverId.value}/startup`),
   {
     watch: [serverId],
   },
@@ -86,9 +86,9 @@ async function updateDockerImage() {
 
   isChangingDockerImage.value = true
   try {
-    console.log('[Client Startup] Making PUT request to:', `/api/servers/${serverId.value}/settings/docker-image`)
+    console.log('[Client Startup] Making PUT request to:', `/api/client/servers/${serverId.value}/settings/docker-image`)
     
-    const response = await $fetch(`/api/servers/${serverId.value}/docker-image`, {
+    const response = await $fetch(`/api/client/servers/${serverId.value}/settings/docker-image`, {
       method: 'PUT',
       body: { dockerImage: selectedDockerImage.value },
     })

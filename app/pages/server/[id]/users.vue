@@ -11,9 +11,11 @@ definePageMeta({
 const { t } = useI18n()
 const serverId = computed(() => route.params.id as string)
 
-const { data: subusersData, pending, error } = await useAsyncData(
+const toast = useToast()
+
+const { data: subusersData, pending, error, refresh: refreshSubusers } = await useAsyncData(
   `server-${serverId.value}-users`,
-  () => $fetch<{ data: ServerSubuser[] }>(`/api/servers/${serverId.value}/users`),
+  () => $fetch<{ data: ServerSubuser[] }>(`/api/client/servers/${serverId.value}/users`),
   {
     watch: [serverId],
   },
@@ -37,30 +39,120 @@ function formatRelativeTime(dateString: string): string {
 
 const permissionGroups = computed(() => [
   {
+    key: 'console',
     title: t('server.users.console'),
     perms: ['control.console'],
   },
   {
+    key: 'power',
     title: t('server.users.power'),
     perms: ['control.power', 'control.start', 'control.stop', 'control.restart'],
   },
   {
+    key: 'files',
     title: t('server.users.fileManager'),
     perms: ['files.read', 'files.write', 'files.delete'],
   },
   {
+    key: 'backups',
     title: t('server.users.backups'),
     perms: ['backups.read', 'backups.create', 'backups.delete', 'backups.restore'],
   },
   {
+    key: 'databases',
     title: t('server.users.databases'),
     perms: ['databases.read', 'databases.create', 'databases.delete'],
   },
   {
+    key: 'schedules',
     title: t('server.users.schedules'),
     perms: ['schedules.read', 'schedules.create', 'schedules.update', 'schedules.delete'],
   },
 ])
+
+const showInviteModal = ref(false)
+const inviting = ref(false)
+const inviteForm = reactive({
+  email: '',
+  permissions: [] as string[],
+})
+
+function openInviteModal() {
+  inviteForm.email = ''
+  inviteForm.permissions = []
+  showInviteModal.value = true
+}
+
+function closeInviteModal() {
+  showInviteModal.value = false
+}
+
+function isGroupSelected(group: { perms: string[] }) {
+  return group.perms.every((perm) => inviteForm.permissions.includes(perm))
+}
+
+function togglePermissionGroup(group: { perms: string[] }) {
+  const set = new Set(inviteForm.permissions)
+  const selected = isGroupSelected(group)
+
+  if (selected) {
+    group.perms.forEach((perm) => set.delete(perm))
+  } else {
+    group.perms.forEach((perm) => set.add(perm))
+  }
+
+  inviteForm.permissions = Array.from(set)
+}
+
+async function submitInvite() {
+  const email = inviteForm.email.trim()
+
+  if (!email) {
+    toast.add({
+      title: t('common.error'),
+      description: t('validation.required'),
+      color: 'error',
+    })
+    return
+  }
+
+  if (!inviteForm.permissions.length) {
+    toast.add({
+      title: t('common.error'),
+      description: t('server.users.permissionRequired'),
+      color: 'error',
+    })
+    return
+  }
+
+  inviting.value = true
+  try {
+    await $fetch(`/api/client/servers/${serverId.value}/users`, {
+      method: 'POST',
+      body: {
+        email,
+        permissions: inviteForm.permissions,
+      },
+    })
+
+    toast.add({
+      title: t('server.users.userInvited'),
+      description: t('server.users.userInvitedDescription', { email }),
+      color: 'success',
+    })
+
+    closeInviteModal()
+    await refreshSubusers()
+  } catch (err) {
+    toast.add({
+      title: t('common.error'),
+      description: err instanceof Error ? err.message : t('server.users.inviteFailed'),
+      color: 'error',
+    })
+  } finally {
+    inviting.value = false
+  }
+}
 </script>
 
 <template>
@@ -74,7 +166,14 @@ const permissionGroups = computed(() => [
             <h1 class="text-xl font-semibold">{{ t('server.users.collaborators') }}</h1>
           </div>
           <div class="flex gap-2">
-            <UButton icon="i-lucide-user-plus" color="primary" variant="soft">{{ t('server.users.inviteUser') }}</UButton>
+            <UButton
+              icon="i-lucide-user-plus"
+              color="primary"
+              variant="soft"
+              @click="openInviteModal"
+            >
+              {{ t('server.users.inviteUser') }}
+            </UButton>
           </div>
         </header>
 
@@ -130,20 +229,78 @@ const permissionGroups = computed(() => [
       </UContainer>
     </UPageBody>
 
-    <template #right>
-      <UPageAside>
-        <div class="space-y-4">
-          <UCard :ui="{ body: 'space-y-2' }">
-            <h3 class="text-sm font-semibold">{{ t('server.users.permissionGroups') }}</h3>
-            <div v-for="group in permissionGroups" :key="group.title" class="rounded-md border border-default px-3 py-2">
-              <p class="text-xs font-semibold text-muted-foreground">{{ group.title }}</p>
-              <div class="mt-1 flex flex-wrap gap-1 text-[11px] text-muted-foreground">
-                <code v-for="perm in group.perms" :key="perm" class="rounded bg-muted px-1.5 py-0.5">{{ perm }}</code>
-              </div>
+    <UModal
+      v-model:open="showInviteModal"
+      :title="t('server.users.inviteUser')"
+      :description="t('server.users.noCollaboratorsDescription')"
+      :ui="{ footer: 'justify-end gap-2' }"
+    >
+      <template #body>
+        <div class="space-y-5">
+          <UFormField :label="t('server.users.email')" required>
+            <UInput
+              v-model="inviteForm.email"
+              type="email"
+              autocomplete="email"
+              :placeholder="t('server.users.emailPlaceholder')"
+            />
+          </UFormField>
+
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <p class="text-sm font-semibold text-foreground">{{ t('server.users.permissionGroups') }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ t('server.users.selectedPermissionCount', { count: inviteForm.permissions.length }) }}
+              </p>
             </div>
-          </UCard>
+
+            <div class="grid gap-3 lg:grid-cols-2">
+              <UCard
+                v-for="group in permissionGroups"
+                :key="group.key"
+                :ui="{ body: 'space-y-2' }"
+                :class="[
+                  'border transition',
+                  isGroupSelected(group)
+                    ? 'border-primary shadow-sm bg-primary/5'
+                    : 'border-default hover:border-primary/60',
+                ]"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-semibold text-foreground">{{ group.title }}</p>
+                    <p class="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {{ t('server.users.permissionsInGroup', { count: group.perms.length }) }}
+                    </p>
+                  </div>
+                  <USwitch
+                    :model-value="isGroupSelected(group)"
+                    @update:model-value="() => togglePermissionGroup(group)"
+                  />
+                </div>
+                <div class="flex flex-wrap gap-1 text-[11px] text-muted-foreground">
+                  <code
+                    v-for="perm in group.perms"
+                    :key="perm"
+                    class="rounded bg-muted px-1.5 py-0.5 font-mono"
+                  >
+                    {{ perm }}
+                  </code>
+                </div>
+              </UCard>
+            </div>
+          </div>
         </div>
-      </UPageAside>
-    </template>
+      </template>
+
+      <template #footer>
+        <UButton variant="ghost" @click="closeInviteModal">
+          {{ t('common.cancel') }}
+        </UButton>
+        <UButton color="primary" :loading="inviting" @click="submitInvite">
+          {{ t('server.users.sendInvite') }}
+        </UButton>
+      </template>
+    </UModal>
   </UPage>
 </template>

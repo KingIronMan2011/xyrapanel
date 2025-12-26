@@ -16,17 +16,6 @@ export default defineEventHandler(async (event) => {
   const { server } = await getServerWithAccess(serverId, session)
 
   return {
-    data: (await listServerSubusers(server.id)).map((entry) => ({
-      id: entry.id,
-      user: {
-        id: entry.userId,
-        username: entry.username,
-        email: entry.email,
-        image: entry.image,
-      },
-      permissions: entry.permissions,
-      created_at: entry.createdAt,
-      updated_at: entry.updatedAt,
-    })),
+    data: await listServerSubusers(server.id),
   }
 })

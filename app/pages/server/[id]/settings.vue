@@ -13,7 +13,7 @@ const serverId = computed(() => route.params.id as string)
 
 const { data: settingsData, pending, error } = await useAsyncData(
   `server-${serverId.value}-settings`,
-  () => $fetch<{ data: SettingsData }>(`/api/servers/${serverId.value}/settings`),
+  () => $fetch<{ data: SettingsData }>(`/api/client/servers/${serverId.value}/settings`),
   {
     watch: [serverId],
   },
@@ -46,8 +46,8 @@ async function renameServer() {
 
   renaming.value = true
   try {
-    await $fetch(`/api/servers/${serverId.value}/rename`, {
-      method: 'patch',
+    await $fetch(`/api/client/servers/${serverId.value}/settings/rename`, {
+      method: 'POST',
       body: { name: newName.value.trim() },
     })
 
@@ -76,7 +76,7 @@ async function renameServer() {
 async function reinstallServer() {
   reinstalling.value = true
   try {
-    await $fetch(`/api/servers/${serverId.value}/reinstall`, {
+    await $fetch(`/api/client/servers/${serverId.value}/settings/reinstall`, {
       method: 'POST',
     })
 

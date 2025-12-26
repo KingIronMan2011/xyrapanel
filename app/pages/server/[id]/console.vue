@@ -15,7 +15,7 @@ const { t } = useI18n()
 const serverId = computed(() => route.params.id as string)
 
 const { data: serverResponse } = await useFetch(
-  `/api/servers/${serverId.value}`,
+  `/api/client/servers/${serverId.value}`,
   {
     watch: [serverId],
     key: `server-${serverId.value}`,

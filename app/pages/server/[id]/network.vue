@@ -13,7 +13,7 @@ const serverId = computed(() => route.params.id as string)
 
 const { data: networkData, pending, error } = await useAsyncData(
   `server-${serverId.value}-network`,
-  () => $fetch<{ data: NetworkData }>(`/api/servers/${serverId.value}/network`),
+  () => $fetch<{ data: NetworkData }>(`/api/client/servers/${serverId.value}/network`),
   {
     watch: [serverId],
   },
