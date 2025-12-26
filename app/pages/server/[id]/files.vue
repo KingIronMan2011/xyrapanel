@@ -1133,7 +1133,9 @@ function handleEntryClick(entry: ServerFileListItem) {
     return
   }
 
-  selectedFile.value = entry
+  if (entry.type === 'file') {
+    selectedFile.value = entry
+  }
 }
 
 function resetEditor() {
@@ -1399,8 +1401,8 @@ const isEditorDirty = computed(() => {
             </div>
           </template>
 
-          <div class="flex flex-col gap-6 lg:flex-row">
-            <div class="flex w-full flex-col gap-3 lg:w-72">
+          <div class="flex flex-col gap-6">
+            <div v-if="!selectedFile || selectedFile.type !== 'file'" class="flex w-full flex-col gap-3">
               <header class="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p class="text-xs uppercase text-muted-foreground">Directory</p>
@@ -1435,9 +1437,9 @@ const isEditorDirty = computed(() => {
                     :aria-label="t('server.files.selectAllEntries')"
                     @update:model-value="toggleSelectAllEntries($event as boolean)"
                   />
-                  <span class="flex-1">{{ t('common.name') }}</span>
-                  <span class="w-24">{{ t('server.files.file') }}</span>
-                  <span class="w-32 text-right">{{ t('server.files.modified') }}</span>
+                  <span class="flex-[2] truncate">{{ t('common.name') }}</span>
+                  <span class="flex-1">{{ t('server.files.file') }}</span>
+                  <span class="w-40 text-right">{{ t('server.files.modified') }}</span>
                   <span class="w-8 text-right">{{ t('common.actions') }}</span>
                 </div>
                 <div class="max-h-112 overflow-y-auto">
@@ -1463,17 +1465,17 @@ const isEditorDirty = computed(() => {
                       @update:model-value="toggleEntrySelection(entry, $event as boolean)"
                     />
                     <button
-                      class="flex flex-1 items-center gap-2 text-left"
+                      class="flex flex-[2] items-center gap-2 truncate text-left"
                       type="button"
                       @click="handleEntryClick(entry)"
                     >
                       <UIcon :name="entry.type === 'directory' ? 'i-lucide-folder' : 'i-lucide-file-text'" class="size-4 text-primary" />
                       <span class="truncate">{{ entry.name }}</span>
                     </button>
-                    <span class="w-24 text-xs uppercase" :class="entry.type === 'directory' ? 'text-primary' : 'text-muted-foreground'">
+                    <span class="flex-1 text-xs uppercase" :class="entry.type === 'directory' ? 'text-primary' : 'text-muted-foreground'">
                       {{ entry.type }}
                     </span>
-                    <span class="w-32 text-right text-xs text-muted-foreground">{{ entry.modified }}</span>
+                    <span class="w-40 truncate text-right text-xs text-muted-foreground">{{ entry.modified }}</span>
                     <UDropdownMenu
                       v-if="entry.type === 'file'"
                       :items="availableFileActions(entry).map(action => ({ label: action.label, icon: action.icon, click: action.onClick }))"
@@ -1559,22 +1561,22 @@ const isEditorDirty = computed(() => {
               </Transition>
             </div>
 
-            <div class="flex min-h-112 flex-1 flex-col gap-4">
-              <header class="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p class="text-xs uppercase text-muted-foreground">Editing</p>
-                  <h3 class="text-base font-semibold">
-                    {{ selectedFile?.type === 'file' ? selectedFile.name : 'Select a file to view' }}
-                  </h3>
-                </div>
-                <UBadge v-if="selectedFile?.type === 'file'" color="neutral">{{ editorLanguageLabel }}</UBadge>
-              </header>
+            <UCard v-else>
+              <template #header>
+                <nav class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <button class="flex items-center gap-2 hover:text-foreground" type="button" @click="selectedFile = null">
+                    <UIcon name="i-lucide-arrow-left" class="size-3" />
+                    {{ t('server.files.backToFiles') }}
+                  </button>
+                  <div class="flex items-center gap-2">
+                    <span class="uppercase">{{ t('server.files.editing') }}</span>
+                    <span class="font-semibold text-foreground">{{ selectedFile.name }}</span>
+                    <UBadge color="neutral">{{ editorLanguageLabel }}</UBadge>
+                  </div>
+                </nav>
+              </template>
 
-              <div v-if="selectedFile?.type !== 'file'" class="flex flex-1 items-center justify-center rounded-md border border-dashed border-default p-6 text-center text-sm text-muted-foreground">
-                Choose a file from the list to preview its contents.
-              </div>
-
-              <div v-else class="flex flex-1 flex-col gap-4">
+              <div class="flex flex-col gap-4">
                 <UAlert
                   v-if="fileError"
                   color="error"
@@ -1584,9 +1586,9 @@ const isEditorDirty = computed(() => {
                   {{ fileError?.message || fileError?.toString() || t('server.files.failedToLoadFileContents') }}
                 </UAlert>
 
-                <div class="relative flex-1 overflow-hidden rounded-md border border-default/80">
+                <div class="relative min-h-[60vh] overflow-hidden rounded-md border border-default/80">
                   <div v-if="filePending" class="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
-                    <span class="text-sm text-muted-foreground">Loading file…</span>
+                    <span class="text-sm text-muted-foreground">{{ t('server.files.loadingFile') }}</span>
                   </div>
                   <ClientOnly>
                     <template #default>
@@ -1605,7 +1607,8 @@ const isEditorDirty = computed(() => {
                           wordWrap: 'on',
                           tabSize: 2,
                         }"
-                        class="h-full"
+                        class="w-full"
+                        :style="{ minHeight: '60vh', height: '60vh' }"
                       />
                     </template>
                     <template #fallback>
@@ -1618,7 +1621,7 @@ const isEditorDirty = computed(() => {
 
                 <div class="flex flex-wrap items-center justify-end gap-2">
                   <UButton icon="i-lucide-rotate-ccw" variant="ghost" color="neutral" :disabled="!isEditorDirty || fileSaving" @click="resetEditor">
-                    Reset changes
+                    {{ t('server.files.resetChanges') }}
                   </UButton>
                   <UButton 
                     type="button"
@@ -1627,20 +1630,17 @@ const isEditorDirty = computed(() => {
                     :disabled="!isEditorDirty || fileSaving" 
                     @click="saveEditor"
                   >
-                    Save changes
+                    {{ t('server.files.saveChanges') }}
                   </UButton>
                 </div>
               </div>
-            </div>
+            </UCard>
           </div>
         </UCard>
         </section>
       </UContainer>
     </UPageBody>
 
-    <template #right>
-      <UPageAside />
-    </template>
   </UPage>
 
   <UModal v-model:open="renameModal.open" :title="t('server.files.rename')" :ui="{ footer: 'justify-end gap-2' }">

@@ -30,11 +30,12 @@ export interface WingsFileObject {
   mode: string
   mode_bits: string
   size: number
-  is_file: boolean
-  is_symlink: boolean
+  file?: boolean
+  directory?: boolean
+  symlink?: boolean
   mimetype: string
-  created_at: string
-  modified_at: string
+  created: string
+  modified: string
 }
 
 export interface WingsBackup {

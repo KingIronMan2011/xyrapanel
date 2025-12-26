@@ -571,7 +571,14 @@
       "selectAllEntries": "Select all entries",
       "selectEntry": "Select entry",
       "moveSelectedItems": "Move selected items",
-      "deleteSelectedItems": "Delete selected items"
+      "deleteSelectedItems": "Delete selected items",
+      "selectFileToEdit": "Select a file to edit",
+      "editing": "Editing",
+      "resetChanges": "Reset changes",
+      "saveChanges": "Save changes",
+      "loadingFile": "Loading file…",
+      "selectFileToEditPlaceholder": "Open a file to preview and edit its contents.",
+      "backToFiles": "Back to files"
     },
     "databases": {
       "title": "Databases",

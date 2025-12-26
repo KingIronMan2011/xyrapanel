@@ -44,19 +44,19 @@ export default defineEventHandler(async (event) => {
     const { client } = await getWingsClientForServer(server.uuid as string)
     const files = await client.listFiles(server.uuid as string, directory)
 
-    const entries = files.map(file => ({
-      name: file.name,
-      path: joinPath(directory, file.name),
-      size: file.size,
-      mode: file.mode,
-      modeBits: file.mode_bits,
-      mime: file.mimetype,
-      created: file.created_at,
-      modified: file.modified_at,
-      isDirectory: !file.is_file,
-      isFile: file.is_file,
-      isSymlink: file.is_symlink,
-    }))
+    const entries = files.map((file) => ({
+        name: file.name,
+        path: joinPath(directory, file.name),
+        size: file.size,
+        mode: file.mode,
+        modeBits: file.mode_bits,
+        mime: file.mimetype,
+        created: file.created,
+        modified: file.modified,
+        isDirectory: Boolean(file.directory),
+        isFile: Boolean(file.file),
+        isSymlink: Boolean(file.symlink),
+      }))
 
     return {
       data: {
