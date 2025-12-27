@@ -30,25 +30,25 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@nuxt/scripts": "0.13.1",
+    "@nuxt/scripts": "0.13.2",
     "@nuxt/ui": "4.3.0",
     "@nuxtjs/i18n": "^10.2.1",
     "@nuxtjs/robots": "5.6.7",
     "@nuxtjs/turnstile": "^1.1.1",
-    "@pinia/colada": "^0.19.1",
-    "@pinia/colada-nuxt": "0.2.6",
+    "@pinia/colada": "^0.20.0",
+    "@pinia/colada-nuxt": "0.3.0",
     "@pinia/nuxt": "^0.11.3",
-    "@xterm/addon-fit": "^0.10.0",
-    "@xterm/addon-search": "^0.15.0",
-    "@xterm/addon-web-links": "^0.11.0",
-    "@xterm/xterm": "^5.5.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-search": "^0.16.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
     "bcryptjs": "^3.0.3",
-    "better-auth": "^1.4.7",
+    "better-auth": "^1.4.9",
     "better-sqlite3": "^12.5.0",
     "drizzle-orm": "^0.45.1",
     "jose": "^6.1.3",
     "monaco-editor": "^0.55.1",
-    "nodemailer": "^7.0.11",
+    "nodemailer": "^7.0.12",
     "nuxt": "^4.2.2",
     "nuxt-charts": "2.0.0",
     "nuxt-monaco-editor": "^1.4.0",
@@ -58,9 +58,9 @@
     "vue": "^3.5.26"
   },
   "devDependencies": {
-    "@iconify-json/lucide": "^1.2.81",
+    "@iconify-json/lucide": "^1.2.82",
     "@nuxt/eslint": "1.12.1",
-    "@nuxt/hints": "1.0.0-alpha.4",
+    "@nuxt/hints": "1.0.0-alpha.5",
     "@nuxt/test-utils": "3.21.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.0.3",
@@ -72,7 +72,7 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16",
-    "vue-tsc": "^3.1.8"
+    "vue-tsc": "^3.2.1"
   },
   "packageManager": "pnpm@10.26.0+sha512.3b3f6c725ebe712506c0ab1ad4133cf86b1f4b687effce62a9b38b4d72e3954242e643190fc51fa1642949c735f403debd44f5cb0edd657abe63a8b6a7e1e402"
 }
