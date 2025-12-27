@@ -127,13 +127,6 @@ function formatIo(io: number | null): string {
     <UPageBody>
       <UContainer>
         <section class="space-y-6">
-        <header class="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p class="text-xs text-muted-foreground">{{ t('server.settings.title') }}</p>
-            <h1 class="text-xl font-semibold">{{ t('server.settings.title') }}</h1>
-          </div>
-        </header>
-
         <div v-if="error" class="rounded-lg border border-error/20 bg-error/5 p-4 text-sm text-error">
           <div class="flex items-start gap-2">
             <UIcon name="i-lucide-alert-circle" class="mt-0.5 size-4" />
@@ -151,16 +144,28 @@ function formatIo(io: number | null): string {
         <template v-else>
           <UCard>
             <template #header>
-              <div class="flex items-center justify-between">
+              <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 class="text-lg font-semibold">{{ t('server.settings.title') }}</h2>
-                <UButton
-                  icon="i-lucide-pencil"
-                  size="sm"
-                  variant="ghost"
-                  @click="openRenameModal"
-                >
-                  {{ t('server.files.rename') }}
-                </UButton>
+                <div class="flex flex-wrap items-center gap-2">
+                  <UButton
+                    icon="i-lucide-pencil"
+                    size="sm"
+                    variant="ghost"
+                    @click="openRenameModal"
+                  >
+                    {{ t('server.files.rename') }}
+                  </UButton>
+                  <UButton
+                    icon="i-lucide-refresh-cw"
+                    color="error"
+                    variant="subtle"
+                    size="sm"
+                    :disabled="server?.suspended"
+                    @click="showReinstallModal = true"
+                  >
+                    {{ t('server.settings.reinstallServer') }}
+                  </UButton>
+                </div>
               </div>
             </template>
 
@@ -231,35 +236,6 @@ function formatIo(io: number | null): string {
             </div>
           </UCard>
 
-          <UCard>
-            <template #header>
-              <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold">{{ t('server.settings.title') }}</h2>
-              </div>
-            </template>
-
-            <div class="space-y-4">
-              <UAlert color="error" icon="i-lucide-alert-triangle" variant="subtle">
-                <template #title>{{ t('common.warning') }}</template>
-                <template #description>
-                  {{ t('server.settings.reinstallWarningDescription') }}
-                </template>
-              </UAlert>
-
-              <div class="flex justify-end">
-                <UButton
-                  icon="i-lucide-refresh-cw"
-                  color="error"
-                  variant="soft"
-                  :disabled="server?.suspended"
-                  @click="showReinstallModal = true"
-                >
-                  {{ t('server.settings.reinstallServer') }}
-                </UButton>
-              </div>
-            </div>
-          </UCard>
-
           <UCard v-if="server?.suspended">
             <template #header>
               <div class="flex items-center justify-between">
@@ -286,13 +262,12 @@ function formatIo(io: number | null): string {
     >
       <template #body>
         <div class="space-y-4">
-          <UAlert color="error" icon="i-lucide-alert-triangle">
+          <UAlert color="error" icon="i-lucide-alert-triangle" variant="subtle">
             <template #title>{{ t('common.warning') }}</template>
             <template #description>
               {{ t('server.settings.reinstallWarningDescription') }}
             </template>
           </UAlert>
-
           <p class="text-sm text-muted-foreground">
             {{ t('server.settings.confirmReinstall', { name: server?.name }) }}
           </p>
@@ -310,6 +285,7 @@ function formatIo(io: number | null): string {
         <UButton
           icon="i-lucide-refresh-cw"
           color="error"
+          variant="subtle"
           :loading="reinstalling"
           :disabled="reinstalling"
           @click="reinstallServer"

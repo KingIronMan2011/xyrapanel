@@ -412,22 +412,6 @@ function getStatusLabel(enabled: boolean) {
     <UPageBody>
       <UContainer>
         <section class="space-y-6">
-        <header class="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p class="text-xs text-muted-foreground">{{ t('server.schedules.serverSchedules', { id: serverId }) }}</p>
-            <h1 class="text-xl font-semibold">{{ t('server.schedules.automatedTasks') }}</h1>
-          </div>
-          <div class="flex gap-2">
-            <UButton
-              icon="i-lucide-plus"
-              color="primary"
-              variant="soft"
-              @click="openCreateModal"
-            >
-              {{ t('server.schedules.newSchedule') }}
-            </UButton>
-          </div>
-        </header>
 
         <UModal
           v-model:open="showCreateModal"
@@ -504,9 +488,15 @@ function getStatusLabel(enabled: boolean) {
                 <p class="text-xs uppercase tracking-wide text-muted-foreground">{{ t('server.schedules.scheduleInsights') }}</p>
                 <h2 class="text-lg font-semibold">{{ t('server.schedules.configuredSchedules') }}</h2>
               </div>
-              <UBadge color="neutral" variant="soft">
-                {{ t('server.schedules.taskSummary', { count: schedules.length }) }}
-              </UBadge>
+              <UButton
+                icon="i-lucide-plus"
+                color="primary"
+                variant="soft"
+                class="ml-auto"
+                @click="openCreateModal"
+              >
+                {{ t('server.schedules.newSchedule') }}
+              </UButton>
             </div>
           </template>
 

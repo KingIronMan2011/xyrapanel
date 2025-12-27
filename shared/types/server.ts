@@ -1,4 +1,4 @@
-import type { BaseActivityEvent } from './audit'
+import type { Pagination, ActorType, TargetType } from './audit'
 import type { SessionUser } from './auth'
 import type { StoredWingsNode } from './wings'
 
@@ -661,20 +661,22 @@ export interface RenameServerResponse {
 }
 
 
-export interface ServerActivityEvent extends BaseActivityEvent {
-  actorType: string
-  targetType: string
+export interface ServerActivityEvent {
+  id: string
+  occurredAt: string
+  actor: string
+  actorType: ActorType
+  action: string
+  targetType: TargetType
   targetId: string | null
+  metadata: Record<string, unknown> | null
+  actorDisplay?: string
+  actorEmail?: string
 }
 
 export interface PaginatedServerActivityResponse {
   data: ServerActivityEvent[]
-  pagination: {
-    page: number
-    perPage: number
-    total: number
-    totalPages: number
-  }
+  pagination: Pagination
   generatedAt: string
 }
 

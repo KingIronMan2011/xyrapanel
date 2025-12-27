@@ -9,13 +9,40 @@ const copied = ref(false)
 const toast = useToast()
 
 async function copyToClipboard() {
-  try {
+  const attemptNativeCopy = async () => {
+    if (!navigator?.clipboard?.writeText) {
+      throw new Error('Clipboard API unavailable')
+    }
     await navigator.clipboard.writeText(props.text)
+  }
+
+  const attemptLegacyCopy = () => {
+    const textarea = document.createElement('textarea')
+    textarea.value = props.text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const success = document.execCommand('copy')
+    textarea.remove()
+    if (!success) {
+      throw new Error('execCommand copy failed')
+    }
+  }
+
+  try {
+    try {
+      await attemptNativeCopy()
+    }
+    catch {
+      attemptLegacyCopy()
+    }
+
     copied.value = true
 
     toast.add({
       title: t('common.copied'),
-      description: props.label ? t('common.copiedToClipboard') : t('common.copiedToClipboard'),
+      description: t('common.copiedToClipboard'),
       color: 'success',
     })
 

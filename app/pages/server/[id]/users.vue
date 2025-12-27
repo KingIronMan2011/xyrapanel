@@ -160,27 +160,19 @@ async function submitInvite() {
     <UPageBody>
       <UContainer>
         <section class="space-y-6">
-        <header class="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p class="text-xs text-muted-foreground">{{ t('server.users.serverUsers', { id: serverId }) }}</p>
-            <h1 class="text-xl font-semibold">{{ t('server.users.collaborators') }}</h1>
-          </div>
-          <div class="flex gap-2">
-            <UButton
-              icon="i-lucide-user-plus"
-              color="primary"
-              variant="soft"
-              @click="openInviteModal"
-            >
-              {{ t('server.users.inviteUser') }}
-            </UButton>
-          </div>
-        </header>
-
         <UCard>
           <template #header>
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-lg font-semibold">{{ t('server.users.invitedUsers') }}</h2>
+              <UButton
+                icon="i-lucide-user-plus"
+                color="primary"
+                variant="soft"
+                class="ml-auto"
+                @click="openInviteModal"
+              >
+                {{ t('server.users.inviteUser') }}
+              </UButton>
             </div>
           </template>
 

@@ -6,7 +6,6 @@ const route = useRoute()
 
 const serverId = computed(() => route.params.id as string)
 
-// @ts-expect-error - Nuxt typed routes cause deep type inference
 const { data: serverResponse } = await useFetch(
   `/api/client/servers/${serverId.value}`,
   {
@@ -104,6 +103,11 @@ const navItems = computed(() => {
     },
   ]
 })
+
+const currentPageTitle = computed(() => {
+  const activeItem = navItems.value.find(item => item.active)
+  return activeItem?.label || ''
+})
 </script>
 
 <template>
@@ -134,10 +138,13 @@ const navItems = computed(() => {
 
     <UDashboardPanel :ui="{ body: 'flex flex-1 flex-col p-0' }">
       <template #body>
-        <UDashboardNavbar :ui="{ root: 'justify-start gap-0 px-6 py-0', left: 'flex flex-col gap-1 text-left' }">
+        <UDashboardNavbar :ui="{ left: 'flex flex-col gap-1 text-left', root: 'justify-start' }">
           <template #left>
             <div>
-              <h1 class="text-xl font-semibold text-foreground">{{ serverName }}</h1>
+              <h1 class="text-xl font-semibold text-foreground">
+                {{ serverName }}
+                <span v-if="currentPageTitle" class="text-sm font-normal text-muted-foreground">· {{ currentPageTitle }}</span>
+              </h1>
               <p class="text-xs text-muted-foreground">{{ serverIdentifier }}</p>
             </div>
           </template>

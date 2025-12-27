@@ -191,13 +191,6 @@ async function updateDockerImage() {
     <UPageBody>
       <UContainer>
         <section class="space-y-6">
-          <header class="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p class="text-xs text-muted-foreground">{{ t('server.startup.serverStartup', { id: serverId }) }}</p>
-              <h1 class="text-xl font-semibold">{{ t('server.startup.startupConfiguration') }}</h1>
-            </div>
-          </header>
-
           <div v-if="error" class="rounded-lg border border-error/20 bg-error/5 p-4 text-sm text-error">
             <div class="flex items-start gap-2">
               <UIcon name="i-lucide-alert-circle" class="mt-0.5 size-4" />

@@ -189,26 +189,20 @@ async function deleteDatabase() {
     <UPageBody>
       <UContainer>
         <section class="space-y-6">
-          <header class="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p class="text-xs text-muted-foreground">{{ t('server.databases.serverDatabases', { id: serverId }) }}</p>
-              <h1 class="text-xl font-semibold">{{ t('server.databases.linkedDatabases') }}</h1>
-            </div>
-            <div class="flex gap-2">
-              <UButton
-                icon="i-lucide-plus"
-                color="primary"
-                @click="showCreateModal = true"
-              >
-                {{ t('server.databases.createDatabase') }}
-              </UButton>
-            </div>
-          </header>
 
           <UCard>
             <template #header>
-              <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold">{{ t('server.databases.linkedDatabases') }}</h2>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 class="text-lg font-semibold">{{ t('server.databases.title') }}</h2>
+                <UButton
+                  icon="i-lucide-plus"
+                  color="primary"
+                  variant="soft"
+                  class="ml-auto"
+                  @click="showCreateModal = true"
+                >
+                  {{ t('server.databases.createDatabase') }}
+                </UButton>
               </div>
             </template>
 
@@ -231,11 +225,7 @@ async function deleteDatabase() {
               icon="i-lucide-database"
               :title="t('server.databases.noDatabases')"
               :description="t('server.databases.noDatabasesDescription')"
-            >
-              <UButton icon="i-lucide-plus" @click="showCreateModal = true">
-                {{ t('server.databases.createDatabase') }}
-              </UButton>
-            </ServerEmptyState>
+            />
 
             <div v-else class="overflow-hidden rounded-lg border border-default">
               <div class="grid grid-cols-12 bg-muted/50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

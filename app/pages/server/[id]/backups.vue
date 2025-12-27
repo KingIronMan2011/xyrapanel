@@ -217,28 +217,21 @@ async function deleteBackup(backupUuid: string) {
     <UPageBody>
       <UContainer>
         <section class="space-y-6">
-          <header class="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p class="text-xs text-muted-foreground">{{ t('server.backups.serverBackups', { id: serverId }) }}</p>
-              <h1 class="text-xl font-semibold">{{ t('server.backups.backupHistory') }}</h1>
-            </div>
-            <div class="flex gap-2">
-              <UButton
-                icon="i-lucide-archive"
-                color="primary"
-                variant="subtle"
-                :loading="creating"
-                @click="createBackup"
-              >
-                {{ t('server.backups.createBackup') }}
-              </UButton>
-            </div>
-          </header>
 
           <UCard>
             <template #header>
-              <div class="flex items-center justify-between">
+              <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 class="text-lg font-semibold">{{ t('server.backups.recentBackups') }}</h2>
+                <UButton
+                  icon="i-lucide-archive"
+                  color="primary"
+                  variant="subtle"
+                  :loading="creating"
+                  class="ml-auto"
+                  @click="createBackup"
+                >
+                  {{ t('server.backups.createBackup') }}
+                </UButton>
               </div>
             </template>
 

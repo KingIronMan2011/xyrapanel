@@ -35,7 +35,7 @@ const defaultResponse = (): PaginatedServerActivityResponse => ({
   data: [],
   pagination: {
     page: 1,
-    perPage: itemsPerPage.value,
+    limit: itemsPerPage.value,
     total: 0,
     totalPages: 0,
   },
@@ -149,14 +149,6 @@ function getActionColor(action: string): 'primary' | 'error' | 'warning' | 'neut
 
 <template>
   <UPage>
-    <UContainer>
-      <UPageHeader :title="t('server.activity.auditTrail')">
-        <template #description>
-          {{ t('server.activity.serverActivity', { id: serverId }) }}
-        </template>
-      </UPageHeader>
-    </UContainer>
-
     <UPageBody>
       <UContainer>
         <UCard :ui="{ body: 'space-y-3' }">
@@ -259,15 +251,15 @@ function getActionColor(action: string): 'primary' | 'error' | 'warning' | 'neut
             >
               <p class="text-sm text-muted-foreground">
                 {{ t('activity.showingEvents', {
-                  start: ((pagination.page - 1) * pagination.perPage) + 1,
-                  end: Math.min(pagination.page * pagination.perPage, pagination.total),
+                  start: ((pagination.page - 1) * pagination.limit) + 1,
+                  end: Math.min(pagination.page * pagination.limit, pagination.total),
                   total: pagination.total,
                 }) }}
               </p>
               <UPagination
                 v-model:page="currentPage"
                 :total="pagination.total"
-                :items-per-page="pagination.perPage"
+                :items-per-page="pagination.limit"
                 size="sm"
               />
             </div>
