@@ -525,11 +525,13 @@ const dashboardSearchGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]
     />
     <UDashboardPanel :ui="{ body: 'flex flex-1 flex-col p-0' }">
       <template #body>
-        <UDashboardNavbar>
-          <div class="flex flex-col gap-1">
-            <h1 class="text-xl font-semibold text-foreground">{{ adminTitle }}</h1>
-            <p class="text-xs text-muted-foreground">{{ adminSubtitle }}</p>
-          </div>
+        <UDashboardNavbar :ui="{ left: 'flex flex-col gap-0.5 text-left py-3', root: 'justify-between py-3' }">
+          <template #left>
+            <div class="flex flex-col gap-0.5">
+              <h1 class="text-lg font-semibold text-foreground">{{ adminTitle }}</h1>
+              <p class="text-xs text-muted-foreground">{{ adminSubtitle }}</p>
+            </div>
+          </template>
           <template #right>
             <div class="flex flex-wrap items-center gap-3">
               <ClientOnly>
@@ -574,7 +576,7 @@ const dashboardSearchGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]
         <USeparator />
 
         <main class="flex-1 overflow-y-auto">
-          <div class="mx-auto w-full px-6 py-10 space-y-6">
+          <div class="mx-auto w-full px-6 py-6 space-y-6">
             <UAlert v-if="showTwoFactorPrompt" color="warning" variant="soft" icon="i-lucide-shield-check">
               <template #title>{{ t('layout.enableTwoFactorAuthentication') }}</template>
               <template #description>
