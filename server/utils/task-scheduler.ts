@@ -20,19 +20,58 @@ export class TaskScheduler {
 
   private parseNextRun(cronExpression: string, lastRun?: Date): Date {
     const now = lastRun ? new Date(lastRun.getTime() + 60000) : new Date()
-    const tokens = cronExpression.split(' ')
-    const minuteToken = tokens.at(0)
-
-    const parsedMinute = minuteToken ? Number.parseInt(minuteToken, 10) : NaN
-    const minute = Number.isNaN(parsedMinute) ? 0 : parsedMinute
-
+    const [minute, hour, day, month, weekday] = cronExpression.split(' ')
+    
     const nextRun = new Date(now)
-    nextRun.setMinutes(minute)
     nextRun.setSeconds(0)
     nextRun.setMilliseconds(0)
     
-    if (nextRun <= now) {
-      nextRun.setDate(nextRun.getDate() + 1)
+    const targetMinute = minute === '*' ? null : parseInt(minute)
+    const targetHour = hour === '*' ? null : parseInt(hour)
+    const targetDay = day === '*' ? null : parseInt(day)
+    const targetMonth = month === '*' ? null : parseInt(month)
+    const targetWeekday = weekday === '*' ? null : parseInt(weekday)
+    
+    let found = false
+    let attempts = 0
+    const maxAttempts = 366
+    
+    while (!found && attempts < maxAttempts) {
+      attempts++
+      
+      if (targetMinute !== null) {
+        nextRun.setMinutes(targetMinute)
+      } else {
+        nextRun.setMinutes(nextRun.getMinutes() + 1)
+      }
+      
+      if (targetHour !== null) {
+        nextRun.setHours(targetHour)
+      }
+      
+      if (targetDay !== null) {
+        nextRun.setDate(targetDay)
+      }
+      
+      if (targetMonth !== null) {
+        nextRun.setMonth(targetMonth - 1)
+      }
+      
+      if (nextRun > now) {
+        const matchesMinute = targetMinute === null || nextRun.getMinutes() === targetMinute
+        const matchesHour = targetHour === null || nextRun.getHours() === targetHour
+        const matchesDay = targetDay === null || nextRun.getDate() === targetDay
+        const matchesMonth = targetMonth === null || nextRun.getMonth() === targetMonth - 1
+        const matchesWeekday = targetWeekday === null || nextRun.getDay() === targetWeekday
+        
+        if (matchesMinute && matchesHour && matchesDay && matchesMonth && matchesWeekday) {
+          found = true
+        } else {
+          nextRun.setMinutes(nextRun.getMinutes() + 1)
+        }
+      } else {
+        nextRun.setMinutes(nextRun.getMinutes() + 1)
+      }
     }
     
     return nextRun
@@ -159,7 +198,7 @@ export class TaskScheduler {
     }
   }
 
-  async executeSchedule(scheduleId: string): Promise<ScheduleExecutionResult> {
+  async executeSchedule(scheduleId: string, force: boolean = false): Promise<ScheduleExecutionResult> {
     if (this.runningTasks.has(scheduleId)) {
       throw new Error('Schedule is already running')
     }
@@ -180,7 +219,7 @@ export class TaskScheduler {
         throw new Error('Schedule not found')
       }
 
-      if (!schedule.enabled) {
+      if (!schedule.enabled && !force) {
         throw new Error('Schedule is disabled')
       }
 

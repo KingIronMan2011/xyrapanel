@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { eq } from 'drizzle-orm'
 import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
@@ -15,6 +16,65 @@ interface CreateSchedulePayload {
     day_of_week: string
   }
   is_active?: boolean
+}
+
+function calculateNextRun(cronExpression: string): Date {
+  const now = new Date()
+  const [minute, hour, day, month, weekday] = cronExpression.split(' ')
+  
+  const nextRun = new Date(now)
+  nextRun.setSeconds(0)
+  nextRun.setMilliseconds(0)
+  
+  const targetMinute = minute === '*' ? null : parseInt(minute)
+  const targetHour = hour === '*' ? null : parseInt(hour)
+  const targetDay = day === '*' ? null : parseInt(day)
+  const targetMonth = month === '*' ? null : parseInt(month)
+  const targetWeekday = weekday === '*' ? null : parseInt(weekday)
+  
+  let found = false
+  let attempts = 0
+  const maxAttempts = 366
+  
+  while (!found && attempts < maxAttempts) {
+    attempts++
+    
+    if (targetMinute !== null) {
+      nextRun.setMinutes(targetMinute)
+    } else {
+      nextRun.setMinutes(nextRun.getMinutes() + 1)
+    }
+    
+    if (targetHour !== null) {
+      nextRun.setHours(targetHour)
+    }
+    
+    if (targetDay !== null) {
+      nextRun.setDate(targetDay)
+    }
+    
+    if (targetMonth !== null) {
+      nextRun.setMonth(targetMonth - 1)
+    }
+    
+    if (nextRun > now) {
+      const matchesMinute = targetMinute === null || nextRun.getMinutes() === targetMinute
+      const matchesHour = targetHour === null || nextRun.getHours() === targetHour
+      const matchesDay = targetDay === null || nextRun.getDate() === targetDay
+      const matchesMonth = targetMonth === null || nextRun.getMonth() === targetMonth - 1
+      const matchesWeekday = targetWeekday === null || nextRun.getDay() === targetWeekday
+      
+      if (matchesMinute && matchesHour && matchesDay && matchesMonth && matchesWeekday) {
+        found = true
+      } else {
+        nextRun.setMinutes(nextRun.getMinutes() + 1)
+      }
+    } else {
+      nextRun.setMinutes(nextRun.getMinutes() + 1)
+    }
+  }
+  
+  return nextRun
 }
 
 export default defineEventHandler(async (event) => {
@@ -43,7 +103,9 @@ export default defineEventHandler(async (event) => {
   const scheduleId = randomUUID()
   const now = new Date()
 
-  db.insert(tables.serverSchedules)
+  const nextRunAt = calculateNextRun(cronString)
+
+  await db.insert(tables.serverSchedules)
     .values({
       id: scheduleId,
       serverId: server.id,
@@ -51,14 +113,14 @@ export default defineEventHandler(async (event) => {
       cron: cronString,
       action: 'none',
       enabled: body.is_active ?? true,
-      nextRunAt: null,
+      nextRunAt,
       lastRunAt: null,
       createdAt: now,
       updatedAt: now,
     })
     .run()
 
-  const schedule = db
+  const schedule = await db
     .select()
     .from(tables.serverSchedules)
     .where(eq(tables.serverSchedules.id, scheduleId))

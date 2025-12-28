@@ -4,6 +4,65 @@ import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { invalidateScheduleCaches } from '~~/server/utils/serversStore'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
+function calculateNextRun(cronExpression: string): Date {
+  const now = new Date()
+  const [minute, hour, day, month, weekday] = cronExpression.split(' ')
+  
+  const nextRun = new Date(now)
+  nextRun.setSeconds(0)
+  nextRun.setMilliseconds(0)
+  
+  const targetMinute = minute === '*' ? null : parseInt(minute)
+  const targetHour = hour === '*' ? null : parseInt(hour)
+  const targetDay = day === '*' ? null : parseInt(day)
+  const targetMonth = month === '*' ? null : parseInt(month)
+  const targetWeekday = weekday === '*' ? null : parseInt(weekday)
+  
+  let found = false
+  let attempts = 0
+  const maxAttempts = 366
+  
+  while (!found && attempts < maxAttempts) {
+    attempts++
+    
+    if (targetMinute !== null) {
+      nextRun.setMinutes(targetMinute)
+    } else {
+      nextRun.setMinutes(nextRun.getMinutes() + 1)
+    }
+    
+    if (targetHour !== null) {
+      nextRun.setHours(targetHour)
+    }
+    
+    if (targetDay !== null) {
+      nextRun.setDate(targetDay)
+    }
+    
+    if (targetMonth !== null) {
+      nextRun.setMonth(targetMonth - 1)
+    }
+    
+    if (nextRun > now) {
+      const matchesMinute = targetMinute === null || nextRun.getMinutes() === targetMinute
+      const matchesHour = targetHour === null || nextRun.getHours() === targetHour
+      const matchesDay = targetDay === null || nextRun.getDate() === targetDay
+      const matchesMonth = targetMonth === null || nextRun.getMonth() === targetMonth - 1
+      const matchesWeekday = targetWeekday === null || nextRun.getDay() === targetWeekday
+      
+      if (matchesMinute && matchesHour && matchesDay && matchesMonth && matchesWeekday) {
+        found = true
+      } else {
+        nextRun.setMinutes(nextRun.getMinutes() + 1)
+      }
+    } else {
+      nextRun.setMinutes(nextRun.getMinutes() + 1)
+    }
+  }
+  
+  return nextRun
+}
+
 type ServerScheduleUpdate = typeof tables.serverSchedules.$inferInsert
 
 interface UpdateSchedulePayload {
@@ -67,19 +126,21 @@ export default defineEventHandler(async (event) => {
   }
 
   if (body.cron) {
-    updates.cron = `${body.cron.minute} ${body.cron.hour} ${body.cron.day_of_month} ${body.cron.month} ${body.cron.day_of_week}`
+    const cronString = `${body.cron.minute} ${body.cron.hour} ${body.cron.day_of_month} ${body.cron.month} ${body.cron.day_of_week}`
+    updates.cron = cronString
+    updates.nextRunAt = calculateNextRun(cronString)
   }
 
   if (body.is_active !== undefined) {
     updates.enabled = body.is_active
   }
 
-  db.update(tables.serverSchedules)
+  await db.update(tables.serverSchedules)
     .set(updates)
     .where(eq(tables.serverSchedules.id, scheduleId))
     .run()
 
-  const updated = db
+  const updated = await db
     .select()
     .from(tables.serverSchedules)
     .where(eq(tables.serverSchedules.id, scheduleId))
@@ -87,7 +148,7 @@ export default defineEventHandler(async (event) => {
 
   await invalidateScheduleCaches({ serverId: server.id, scheduleId })
 
-  const tasks = db
+  const tasks = await db
     .select()
     .from(tables.serverScheduleTasks)
     .where(eq(tables.serverScheduleTasks.scheduleId, scheduleId))

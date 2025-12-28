@@ -99,6 +99,10 @@ const selectedSchedule = ref<ScheduleListItem | null>(null)
 const showDeleteModal = ref(false)
 const schedulePendingDelete = ref<ScheduleListItem | null>(null)
 const deletingSchedule = ref(false)
+const showEditModal = ref(false)
+const editingSchedule = ref(false)
+const scheduleToEdit = ref<ScheduleListItem | null>(null)
+const runningScheduleId = ref<string | null>(null)
 
 const createForm = reactive({
   name: '',
@@ -174,6 +178,19 @@ function openTaskModal(schedule: ScheduleListItem) {
   taskForm.scheduleId = schedule.id
   resetTaskForm()
   showTaskModal.value = true
+}
+
+function openEditModal(schedule: ScheduleListItem) {
+  scheduleToEdit.value = schedule
+  createForm.name = schedule.name
+  const parts = schedule.cron.split(' ')
+  createForm.minute = parts[0] || '*'
+  createForm.hour = parts[1] || '*'
+  createForm.dayOfMonth = parts[2] || '*'
+  createForm.month = parts[3] || '*'
+  createForm.dayOfWeek = parts[4] || '*'
+  createForm.isActive = schedule.enabled
+  showEditModal.value = true
 }
 
 function requestDeleteSchedule(schedule: ScheduleListItem) {
@@ -307,6 +324,78 @@ async function handleCreateSchedule() {
     })
   } finally {
     creatingSchedule.value = false
+  }
+}
+
+async function handleEditSchedule() {
+  if (!scheduleToEdit.value || !createForm.name.trim()) {
+    toast.add({
+      title: t('validation.fillInAllRequiredFields'),
+      color: 'error',
+    })
+    return
+  }
+
+  editingSchedule.value = true
+  try {
+    await $fetch(`/api/client/servers/${serverId.value}/schedules/${scheduleToEdit.value.id}`, {
+      method: 'POST',
+      body: {
+        name: createForm.name.trim(),
+        cron: {
+          minute: createForm.minute,
+          hour: createForm.hour,
+          day_of_month: createForm.dayOfMonth,
+          month: createForm.month,
+          day_of_week: createForm.dayOfWeek,
+        },
+        is_active: createForm.isActive,
+      },
+    })
+
+    toast.add({
+      title: t('server.schedules.scheduleUpdated'),
+      description: t('server.schedules.changesSavedSuccessfully'),
+      color: 'success',
+    })
+
+    showEditModal.value = false
+    await refreshSchedules()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : t('server.schedules.failedToSaveSchedule')
+    toast.add({
+      title: t('common.error'),
+      description: message,
+      color: 'error',
+    })
+  } finally {
+    editingSchedule.value = false
+  }
+}
+
+async function handleForceRunSchedule(scheduleId: string) {
+  runningScheduleId.value = scheduleId
+  try {
+    await $fetch(`/api/client/servers/${serverId.value}/schedules/${scheduleId}/run`, {
+      method: 'POST',
+    })
+
+    toast.add({
+      title: t('server.schedules.scheduleExecuted'),
+      description: t('server.schedules.scheduleExecutedDescription'),
+      color: 'success',
+    })
+
+    await refreshSchedules()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : t('server.schedules.failedToExecuteSchedule')
+    toast.add({
+      title: t('common.error'),
+      description: message,
+      color: 'error',
+    })
+  } finally {
+    runningScheduleId.value = null
   }
 }
 
@@ -550,6 +639,25 @@ function getStatusLabel(enabled: boolean) {
                     size="sm"
                     variant="solid"
                     color="primary"
+                    icon="i-lucide-play"
+                    :loading="runningScheduleId === item.id"
+                    @click="handleForceRunSchedule(item.id)"
+                  >
+                    {{ t('server.schedules.forceRun') }}
+                  </UButton>
+                  <UButton
+                    size="sm"
+                    variant="solid"
+                    color="primary"
+                    icon="i-lucide-pencil"
+                    @click="openEditModal(item)"
+                  >
+                    {{ t('common.edit') }}
+                  </UButton>
+                  <UButton
+                    size="sm"
+                    variant="solid"
+                    color="primary"
                     icon="i-lucide-list"
                     @click="openTaskModal(item)"
                   >
@@ -632,6 +740,74 @@ function getStatusLabel(enabled: boolean) {
         </section>
       </UContainer>
     </UPageBody>
+
+    <UModal
+      v-model:open="showEditModal"
+      :ui="{ footer: 'justify-end gap-2' }"
+      :title="t('server.schedules.editSchedule')"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UFormField :label="t('server.schedules.scheduleName')" required>
+            <UInput
+              v-model="createForm.name"
+              :placeholder="t('server.schedules.scheduleNamePlaceholder')"
+            />
+          </UFormField>
+
+          <UFormField :label="t('server.schedules.scheduleTiming')" required>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <UFormField :label="t('server.schedules.cronMinute')" class="space-y-1 text-xs font-medium text-muted-foreground">
+                <UInput v-model="createForm.minute" />
+              </UFormField>
+              <UFormField :label="t('server.schedules.cronHour')" class="space-y-1 text-xs font-medium text-muted-foreground">
+                <UInput v-model="createForm.hour" />
+              </UFormField>
+              <UFormField :label="t('server.schedules.cronDayOfMonth')" class="space-y-1 text-xs font-medium text-muted-foreground">
+                <UInput v-model="createForm.dayOfMonth" />
+              </UFormField>
+              <UFormField :label="t('server.schedules.cronMonth')" class="space-y-1 text-xs font-medium text-muted-foreground">
+                <UInput v-model="createForm.month" />
+              </UFormField>
+              <UFormField :label="t('server.schedules.cronDayOfWeek')" class="space-y-1 text-xs font-medium text-muted-foreground">
+                <UInput v-model="createForm.dayOfWeek" />
+              </UFormField>
+            </div>
+            <p class="mt-2 font-mono text-xs text-muted-foreground">{{ cronExpression }}</p>
+          </UFormField>
+
+          <div class="space-y-2">
+            <p class="text-xs font-medium text-muted-foreground">{{ t('server.schedules.quickPresets') }}</p>
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                v-for="preset in cronPresets"
+                :key="preset.label"
+                size="xs"
+                variant="ghost"
+                @click="applyCronPreset(preset.value)"
+              >
+                {{ preset.label }}
+              </UButton>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <USwitch v-model="createForm.isActive" />
+            <span class="text-sm text-muted-foreground">{{ t('server.schedules.enableThisSchedule') }}</span>
+          </div>
+        </div>
+      </template>
+
+      <template #footer>
+        <UButton variant="ghost" @click="showEditModal = false">
+          {{ t('common.cancel') }}
+        </UButton>
+        <UButton color="primary" :loading="editingSchedule" @click="handleEditSchedule">
+          {{ t('common.save') }}
+        </UButton>
+      </template>
+    </UModal>
+
     <UModal
       v-model:open="showTaskModal"
       :title="selectedSchedule ? t('server.schedules.manageTasksFor', { name: selectedSchedule.name }) : t('server.schedules.manageTasks')"
