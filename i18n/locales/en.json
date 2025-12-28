@@ -357,6 +357,7 @@
       "failedToRevokeSessions": "Failed to revoke sessions",
       "unableToRevokeSessions": "Unable to revoke sessions.",
       "revokedSessionsSingular": "Revoked {count} session.",
+      "neverUsed": "Never used",
       "revokedSessionsPlural": "Revoked {count} sessions.",
       "noSessionsRevoked": "No sessions were revoked."
     },
@@ -403,7 +404,9 @@
       "noActivityDescription": "Your account activity will appear here",
       "auditLogEntry": "Audit Log Entry",
       "copyJSON": "Copy JSON",
-      "failedToLoad": "Failed to load account activity."
+      "failedToLoad": "Failed to load account activity.",
+      "showingEvents": "Showing {count} events",
+      "total": "Total"
     }
   },
   "server": {

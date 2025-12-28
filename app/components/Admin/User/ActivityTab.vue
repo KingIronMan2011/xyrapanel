@@ -89,7 +89,7 @@ async function copyActivityJson(entry: typeof activity.value[0]) {
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">{{ t('account.activity.recentActivity') }}</h2>
         <UBadge color="neutral" variant="soft" size="xs">
-          {{ activityPagination?.total ?? 0 }} {{ t('activity.total') }}
+          {{ activityPagination?.total ?? 0 }} {{ t('account.activity.total') }}
         </UBadge>
       </div>
     </template>
@@ -152,10 +152,8 @@ async function copyActivityJson(entry: typeof activity.value[0]) {
       </div>
       <div v-if="activityPagination && activityPagination.totalPages > 1" class="flex items-center justify-between border-t border-default pt-4">
         <div class="text-sm text-muted-foreground">
-          {{ t('activity.showingEvents', {
-            start: ((activityPagination.page - 1) * activityPagination.perPage) + 1,
-            end: Math.min(activityPagination.page * activityPagination.perPage, activityPagination.total),
-            total: activityPagination.total,
+          {{ t('account.activity.showingEvents', {
+            count: activityPagination.total
           }) }}
         </div>
         <UPagination

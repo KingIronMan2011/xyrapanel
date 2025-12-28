@@ -116,7 +116,7 @@ async function copyJson(entry: typeof entries.value[0]) {
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold">{{ t('account.activity.recentActivity') }}</h2>
               <UBadge v-if="pagination" color="neutral" variant="soft" size="xs">
-                {{ pagination.total }} {{ t('activity.total') }}
+                {{ pagination.total }} {{ t('account.activity.total') }}
               </UBadge>
             </div>
           </template>
@@ -207,10 +207,8 @@ async function copyJson(entry: typeof entries.value[0]) {
               class="flex items-center justify-between border-t border-default pt-4"
             >
               <div class="text-sm text-muted-foreground">
-                {{ t('activity.showingEvents', { 
-                    start: ((pagination.page - 1) * pagination.perPage) + 1,
-                    end: Math.min(pagination.page * pagination.perPage, pagination.total),
-                    total: pagination.total
+                {{ t('account.activity.showingEvents', { 
+                    count: pagination.total
                 }) }}
               </div>
 
