@@ -1,6 +1,7 @@
 import { defineEventHandler } from 'h3'
 import { desc } from 'drizzle-orm'
 
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { listWingsNodes } from '~~/server/utils/wings/nodesStore'
 import { remotePaginateServers } from '~~/server/utils/wings/registry'
@@ -50,6 +51,8 @@ async function fetchNitroTasks(event: Parameters<Parameters<typeof defineEventHa
 }
 
 export default defineEventHandler(async (event): Promise<DashboardResponse> => {
+  await requireAdmin(event)
+  
   const db = useDrizzle()
   const nodes = listWingsNodes()
 

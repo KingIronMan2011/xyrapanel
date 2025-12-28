@@ -2,6 +2,8 @@ import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { invalidateServerSubusersCache } from '~~/server/utils/subusers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 interface UpdateSubuserPayload {
   permissions: string[]
@@ -20,6 +22,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.users.update'],
+  })
 
   const body = await readBody<UpdateSubuserPayload>(event)
 
@@ -42,13 +49,27 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const now = new Date()
   db.update(tables.serverSubusers)
     .set({
       permissions: JSON.stringify(body.permissions),
-      updatedAt: new Date(),
+      updatedAt: now,
     })
     .where(eq(tables.serverSubusers.id, subuserId))
     .run()
+
+  await recordAuditEventFromRequest(event, {
+    actor: session?.user?.email || session?.user?.id || 'unknown',
+    actorType: 'user',
+    action: 'server.user.updated',
+    targetType: 'user',
+    targetId: subuser.userId,
+    metadata: {
+      serverId: server.id,
+      subuserId,
+      permissions: body.permissions,
+    },
+  })
 
   const result = db
     .select({

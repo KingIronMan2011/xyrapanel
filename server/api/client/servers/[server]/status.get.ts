@@ -1,5 +1,7 @@
 import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { getServerStatus } from '~~/server/utils/server-status'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -13,6 +15,13 @@ export default defineEventHandler(async (event) => {
   if (!serverIdentifier) {
     throw createError({ statusCode: 400, statusMessage: 'Server identifier required' })
   }
+
+  const { server } = await getServerWithAccess(serverIdentifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.view'],
+  })
 
   try {
     const status = await getServerStatus(serverIdentifier)

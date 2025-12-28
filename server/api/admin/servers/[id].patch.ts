@@ -1,6 +1,8 @@
 import { createError, assertMethod, getRequestIP, getRequestHost, readRawBody, type H3Event } from 'h3'
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import type { UpdateAdminServerPayload } from '#shared/types/admin'
 import { requireRouteParam } from '~~/server/utils/http/params'
 
@@ -80,11 +82,9 @@ export default defineEventHandler(async (event) => {
   
   assertMethod(event, 'PATCH')
 
-  const session = await getServerSession(event)
+  const session = await requireAdmin(event)
 
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, message: 'Forbidden' })
-  }
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const serverId = await requireRouteParam(event, 'id', 'Server ID required')
 

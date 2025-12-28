@@ -1,23 +1,14 @@
-import { getServerSession, isAdmin, getSessionUser  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-
-  if (!isAdmin(session)) {
-    throw createError({
-      statusCode: 403,
-      message: 'Unauthorized: Admin access required',
-    })
-  }
-
-  const user = getSessionUser(session)
+  const session = await requireAdmin(event)
 
   try {
     const { sendEmail } = await import('~~/server/utils/email')
 
     const appName = useRuntimeConfig().public.appName || 'XyraPanel'
     await sendEmail({
-      to: user?.email || 'admin@example.com',
+      to: session.user.email || 'admin@example.com',
       subject: `${appName} - Test Email`,
       html: `
         <h2>Test Email</h2>

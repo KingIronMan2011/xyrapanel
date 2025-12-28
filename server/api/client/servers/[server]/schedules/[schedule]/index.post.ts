@@ -2,6 +2,7 @@ import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { invalidateScheduleCaches } from '~~/server/utils/serversStore'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 type ServerScheduleUpdate = typeof tables.serverSchedules.$inferInsert
 
@@ -30,6 +31,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.schedule.update'],
+  })
 
   const body = await readBody<UpdateSchedulePayload>(event)
 

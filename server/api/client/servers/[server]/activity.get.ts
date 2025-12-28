@@ -3,6 +3,7 @@ import type { PaginatedServerActivityResponse, ServerActivityEvent } from '#shar
 import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 function parseMetadata(raw: string | null): Record<string, unknown> | null {
   if (!raw) {
@@ -34,6 +35,11 @@ export default defineEventHandler(async (event): Promise<PaginatedServerActivity
   }
 
   const { server } = await getServerWithAccess(serverIdentifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.view'],
+  })
 
   const query = getQuery(event)
   const page = Math.max(Number.parseInt((query.page as string) ?? '1', 10) || 1, 1)

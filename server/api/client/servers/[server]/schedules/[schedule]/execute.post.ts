@@ -1,7 +1,11 @@
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { requirePermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { getServerSession } from '~~/server/utils/session'
+import { randomUUID } from 'crypto'
 
 export default defineEventHandler(async (event) => {
+  const session = await getServerSession(event)
   const serverId = getRouterParam(event, 'server')
   const scheduleId = getRouterParam(event, 'schedule')
 
@@ -32,6 +36,30 @@ export default defineEventHandler(async (event) => {
       message: 'Schedule not found',
     })
   }
+
+  const scheduleTaskId = randomUUID()
+  const now = new Date()
+
+  db.insert(tables.serverScheduleTasks)
+    .values({
+      id: scheduleTaskId,
+      scheduleId,
+      executedAt: now,
+      sequenceId: schedule.sequenceId,
+    })
+    .run()
+
+  await recordAuditEventFromRequest(event, {
+    actor: session?.user?.email || session?.user?.id || 'unknown',
+    actorType: 'user',
+    action: 'server.schedule.executed',
+    targetType: 'settings',
+    targetId: scheduleId,
+    metadata: {
+      serverId,
+      scheduleName: schedule?.name,
+    },
+  })
 
   try {
     const { executeScheduledTask } = await import('~~/server/utils/task-scheduler')

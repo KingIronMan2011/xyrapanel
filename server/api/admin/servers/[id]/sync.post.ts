@@ -1,13 +1,12 @@
+import { requireAdmin } from '~~/server/utils/security'
+import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 
 export default defineEventHandler(async (event) => {
-  const { getServerSession } = await import('~~/server/utils/session')
-  const session = await getServerSession(event)
-  if (!session?.user) {
-    throw createError({
-      statusCode: 401,
-      message: 'Unauthorized',
-    })
-  }
+  await requireAdmin(event)
+  
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const id = getRouterParam(event, 'id')
 
@@ -18,7 +17,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { useDrizzle, tables, eq } = await import('~~/server/utils/drizzle')
   const db = useDrizzle()
 
   const server = db
@@ -33,9 +31,6 @@ export default defineEventHandler(async (event) => {
       message: 'Server not found',
     })
   }
-
-  const { requireAdmin } = await import('~~/server/utils/security')
-  await requireAdmin(event)
 
   const { getWingsClientForServer } = await import('~~/server/utils/wings-client')
   const { client } = await getWingsClientForServer(server.uuid)

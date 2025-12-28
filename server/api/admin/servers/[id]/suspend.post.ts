@@ -1,16 +1,14 @@
 import { createError } from 'h3'
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  if (!isAdmin(session)) {
-    throw createError({
-      statusCode: 403,
-      message: 'Admin access required',
-    })
-  }
+  await requireAdmin(event)
+  
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const serverId = getRouterParam(event, 'id')
   if (!serverId) {

@@ -1,7 +1,14 @@
 import { createError } from 'h3'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 
 export default defineEventHandler(async (event) => {
+  await requireAdmin(event)
+
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.EGGS, ADMIN_ACL_PERMISSIONS.READ)
+
   const eggId = event.context.params?.id
 
   if (!eggId) {

@@ -1,21 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { getServerSession, isAdmin, getSessionUser } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { generateIdentifier, generateApiToken, formatApiKey } from '~~/server/utils/apiKeys'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import type { CreateApiKeyPayload, CreateApiKeyResponse } from '#shared/types/admin'
 
 export default defineEventHandler(async (event): Promise<CreateApiKeyResponse> => {
-  const session = await getServerSession(event)
+  const session = await requireAdmin(event)
 
-  if (!isAdmin(session)) {
-    throw createError({
-      statusCode: 403,
-      message: 'Unauthorized: Admin access required',
-    })
-  }
-
-  const user = getSessionUser(session)
+  const user = session.user
 
   if (!user || !user.id) {
     throw createError({

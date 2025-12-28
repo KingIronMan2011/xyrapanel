@@ -1,12 +1,8 @@
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, message: 'Admin access required' })
-  }
+  await requireAdmin(event)
 
   const db = useDrizzle()
   const settings = await db.select().from(tables.settings).all()

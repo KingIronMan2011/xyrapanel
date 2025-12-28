@@ -1,5 +1,8 @@
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import type { CreateServerPayload } from '#shared/types/admin'
 import { randomUUID } from 'crypto'
 import { and, eq, isNull } from 'drizzle-orm'
@@ -7,11 +10,9 @@ import { provisionServerOnWings } from '~~/server/utils/server-provisioning'
 import { sendServerCreatedEmail } from '~~/server/utils/email'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const session = await requireAdmin(event)
 
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const body = await readBody<CreateServerPayload>(event)
 
@@ -208,6 +209,20 @@ export default defineEventHandler(async (event) => {
         console.error('[Server Creation] Failed to update server status:', dbError)
       }
     }
+  })
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.server.created',
+    targetType: 'server',
+    targetId: serverId,
+    metadata: {
+      name: body.name,
+      nodeId: body.nodeId,
+      ownerId: body.ownerId,
+      eggId: body.eggId,
+    },
   })
 
   return {

@@ -1,16 +1,15 @@
-import { getServerSession, isAdmin, getSessionUser  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { serverManager } from '~~/server/utils/server-manager'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
 import type { ServerActionPayload, ServerActionResponse } from '#shared/types/admin'
 
 export default defineEventHandler(async (event): Promise<ServerActionResponse> => {
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
+  await requireAdmin(event)
 
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const serverId = getRouterParam(event, 'id')
   if (!serverId) {
@@ -35,7 +34,7 @@ export default defineEventHandler(async (event): Promise<ServerActionResponse> =
   }
 
   try {
-    const options = { userId: user?.id }
+    const options = { userId: serverId }
 
     switch (body.action) {
       case 'suspend':

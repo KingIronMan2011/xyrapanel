@@ -2,6 +2,8 @@ import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { invalidateServerCaches } from '~~/server/utils/serversStore'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -16,6 +18,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.database.delete'],
+  })
 
   const db = useDrizzle()
   const [database] = db.select()
@@ -39,6 +46,18 @@ export default defineEventHandler(async (event) => {
   db.delete(tables.serverDatabases)
     .where(eq(tables.serverDatabases.id, databaseId))
     .run()
+
+  await recordAuditEventFromRequest(event, {
+    actor: session?.user?.email || session?.user?.id || 'unknown',
+    actorType: 'user',
+    action: 'server.database.deleted',
+    targetType: 'database',
+    targetId: databaseId,
+    metadata: {
+      serverId: server.id,
+      databaseName: database?.name,
+    },
+  })
 
   await invalidateServerCaches({ id: server.id, uuid: server.uuid, identifier: server.identifier })
 

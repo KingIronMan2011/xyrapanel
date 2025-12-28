@@ -1,8 +1,10 @@
 import { createError, defineEventHandler, getQuery } from 'h3'
 
+import { requireAdmin } from '~~/server/utils/security'
 import { remoteGetSystemInformation } from '~~/server/utils/wings/registry'
 
 export default defineEventHandler(async (event) => {
+  await requireAdmin(event)
   const { id } = event.context.params ?? {}
   if (!id || typeof id !== 'string') {
     throw createError({ statusCode: 400, statusMessage: 'Missing node id' })

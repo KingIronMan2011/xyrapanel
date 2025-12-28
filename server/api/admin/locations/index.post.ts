@@ -1,14 +1,15 @@
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import type { CreateLocationPayload } from '#shared/types/admin'
 import { randomUUID } from 'crypto'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const session = await requireAdmin(event)
 
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.LOCATIONS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const body = await readBody<CreateLocationPayload>(event)
 
@@ -28,6 +29,18 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.insert(tables.locations).values(newLocation)
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.location.created',
+    targetType: 'settings',
+    targetId: newLocation.id,
+    metadata: {
+      short: body.short,
+      long: body.long || null,
+    },
+  })
 
   return {
     data: {

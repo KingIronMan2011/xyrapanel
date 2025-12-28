@@ -1,18 +1,10 @@
 import { createError, defineEventHandler } from 'h3'
-import { getServerSession, isAdmin } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { getWingsNodeConfigurationById, findWingsNode } from '~~/server/utils/wings/nodesStore'
 import { useRuntimeConfig, getRequestURL } from '#imports'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  
-  if (!isAdmin(session)) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Forbidden',
-      message: 'Admin access required',
-    })
-  }
+  await requireAdmin(event)
 
   const { id } = event.context.params ?? {}
   if (!id || typeof id !== 'string') {

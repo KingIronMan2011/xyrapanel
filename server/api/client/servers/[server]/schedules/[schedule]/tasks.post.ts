@@ -5,6 +5,7 @@ import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { createTaskSchema } from '#shared/schema/server/operations'
 import { invalidateScheduleCaches } from '~~/server/utils/serversStore'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -19,6 +20,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.schedule.update'],
+  })
 
   const db = useDrizzle()
   const schedule = db

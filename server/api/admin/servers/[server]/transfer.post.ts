@@ -1,7 +1,8 @@
 import { createError } from 'h3'
-import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAdmin } from '~~/server/utils/security'
 import { initiateServerTransfer } from '~~/server/utils/transfers/initiate'
-import { requireAdminPermission } from '~~/server/utils/permission-middleware'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { serverTransferSchema } from '~~/shared/schema/admin/server'
 
 export default defineEventHandler(async (event) => {
@@ -13,7 +14,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await requireAdminPermission(event)
+  await requireAdmin(event)
+  
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const body = await readValidatedBodyWithLimit(
     event,

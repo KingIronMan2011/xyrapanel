@@ -3,6 +3,7 @@ import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { invalidateScheduleCaches } from '~~/server/utils/serversStore'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 interface CreateSchedulePayload {
   name: string
@@ -28,6 +29,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.schedule.create'],
+  })
 
   const body = await readBody<CreateSchedulePayload>(event)
 

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { join, extname } from 'pathe'
 import { readMultipartFormData, createError } from 'h3'
 
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { SETTINGS_KEYS, getSetting, setSetting } from '~~/server/utils/settings'
 import { getUploadsPath } from '~~/server/utils/storage'
 
@@ -33,11 +33,7 @@ function toPublicPath(filepath: string) {
 }
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden', message: 'Admin access required' })
-  }
+  await requireAdmin(event)
 
   const formData = await readMultipartFormData(event)
   if (!formData) {

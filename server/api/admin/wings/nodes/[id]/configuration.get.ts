@@ -1,9 +1,11 @@
 import { createError, defineEventHandler } from 'h3'
 
+import { requireAdmin } from '~~/server/utils/security'
 import { getWingsNodeConfigurationById } from '~~/server/utils/wings/nodesStore'
 import { useRuntimeConfig } from '#imports'
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
+  await requireAdmin(event)
   const { id } = event.context.params ?? {}
   if (!id || typeof id !== 'string') {
     throw createError({ statusCode: 400, statusMessage: 'Missing node id' })

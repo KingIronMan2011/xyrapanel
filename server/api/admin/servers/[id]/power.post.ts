@@ -1,7 +1,9 @@
 import { defineEventHandler, readBody, createError } from 'h3'
 import { eq } from 'drizzle-orm'
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 
 export default defineEventHandler(async (event) => {
   const { id: serverId } = event.context.params ?? {}
@@ -9,10 +11,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Missing server id' })
   }
 
-  const session = await getServerSession(event)
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Admin access required' })
-  }
+  await requireAdmin(event)
+  
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const body = await readBody(event)
   const action = body.action as string

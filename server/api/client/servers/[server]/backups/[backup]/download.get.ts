@@ -4,6 +4,7 @@ import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -18,6 +19,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.backup.download'],
+  })
 
   const db = useDrizzle()
   const backup = db.select()

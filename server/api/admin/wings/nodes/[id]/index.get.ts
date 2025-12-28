@@ -3,11 +3,11 @@ import { desc, sql } from 'drizzle-orm'
 
 import type { AdminWingsNodeDetail, AdminWingsNodeAllocationSummary, AdminWingsNodeServerSummary } from '#shared/types/admin'
 
+import { requireAdmin } from '~~/server/utils/security'
 import { getWingsNode } from '~~/server/utils/wings/nodesStore'
 import { remoteGetSystemInformation } from '~~/server/utils/wings/registry'
 import { isH3Error } from '~~/server/utils/wings/http'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
 
 function toIsoTimestamp(value: unknown): string {
   if (value instanceof Date) {
@@ -43,12 +43,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Missing node id' })
   }
 
-  const contextAuth = (event.context as { auth?: { session?: Awaited<ReturnType<typeof getServerSession>> } }).auth
-  const session = contextAuth?.session ?? await getServerSession(event)
-
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdmin(event)
 
   const db = useDrizzle()
   const node = getWingsNode(id)

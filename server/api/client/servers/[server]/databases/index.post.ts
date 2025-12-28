@@ -3,6 +3,8 @@ import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { randomBytes } from 'crypto'
 import { invalidateServerCaches } from '~~/server/utils/serversStore'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -15,6 +17,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.database.create'],
+  })
+
   const body = await readBody(event)
   const { database, remote } = body
 
@@ -24,8 +33,6 @@ export default defineEventHandler(async (event) => {
       message: 'Database name is required',
     })
   }
-
-  const { server } = await getServerWithAccess(serverId, session)
 
   const db = useDrizzle()
   const existingDatabases = db.select()

@@ -1,14 +1,15 @@
 import { eq } from 'drizzle-orm'
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import type { UpdateLocationPayload } from '#shared/types/admin'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const session = await requireAdmin(event)
 
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.LOCATIONS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const locationId = getRouterParam(event, 'id')
   if (!locationId) {
@@ -45,6 +46,17 @@ export default defineEventHandler(async (event) => {
     .from(tables.locations)
     .where(eq(tables.locations.id, locationId))
     .get()
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.location.updated',
+    targetType: 'settings',
+    targetId: locationId,
+    metadata: {
+      fields: Object.keys(body),
+    },
+  })
 
   return {
     data: {

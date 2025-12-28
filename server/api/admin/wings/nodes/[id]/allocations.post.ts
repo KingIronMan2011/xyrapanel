@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody, createError } from 'h3'
 import { eq, and } from 'drizzle-orm'
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { randomUUID } from 'node:crypto'
 import { parseCidr, parsePorts, CidrOutOfRangeError, InvalidIpAddressError } from '~~/server/utils/ip-utils'
@@ -11,10 +11,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Missing node id' })
   }
 
-  const session = await getServerSession(event)
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Admin access required' })
-  }
+  await requireAdmin(event)
 
   const db = useDrizzle()
 

@@ -1,5 +1,8 @@
 import type { H3Event } from 'h3'
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { assertMethod, createError, readRawBody } from 'h3'
+import { requireAdmin } from '~~/server/utils/security'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { updateWingsNode } from '~~/server/utils/wings/nodesStore'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import type { UpdateWingsNodePayload, UpdateWingsNodeResponse } from '#shared/types/admin'
@@ -61,11 +64,9 @@ async function readUpdatePayload(event: H3Event): Promise<UpdateWingsNodePayload
 export default defineEventHandler(async (event): Promise<UpdateWingsNodeResponse> => {
   assertMethod(event, 'PATCH')
 
-  const session = await getServerSession(event)
+  const session = await requireAdmin(event)
 
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.NODES, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const { id } = event.context.params ?? {}
   if (!id || typeof id !== 'string') {

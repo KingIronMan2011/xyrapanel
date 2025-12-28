@@ -2,6 +2,7 @@ import type { NetworkData, ServerAllocation } from '#shared/types/server'
 import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { listServerAllocations } from '~~/server/utils/serversStore'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -15,6 +16,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverIdentifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['allocation.read'],
+  })
 
   const allocations = await listServerAllocations(server.id)
 

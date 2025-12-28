@@ -6,6 +6,7 @@ import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { permissionManager } from '~~/server/utils/permission-manager'
 import { getServerLimits, listServerAllocations } from '~~/server/utils/serversStore'
 import { getServerStatus } from '~~/server/utils/server-status'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
   const serverIdentifier = getRouterParam(event, 'server')
@@ -15,6 +16,11 @@ export default defineEventHandler(async (event) => {
 
   const session = await getServerSession(event)
   const { server, user } = await getServerWithAccess(serverIdentifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.view'],
+  })
 
   const db = useDrizzle()
 

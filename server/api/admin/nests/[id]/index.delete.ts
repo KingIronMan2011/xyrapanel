@@ -1,13 +1,14 @@
 import { eq } from 'drizzle-orm'
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const session = await requireAdmin(event)
 
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.NESTS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const nestId = getRouterParam(event, 'id')
   if (!nestId) {
@@ -41,6 +42,18 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.delete(tables.nests).where(eq(tables.nests.id, nestId))
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.nest.deleted',
+    targetType: 'settings',
+    targetId: nestId,
+    metadata: {
+      name: existing.name,
+      author: existing.author,
+    },
+  })
 
   return { success: true }
 })

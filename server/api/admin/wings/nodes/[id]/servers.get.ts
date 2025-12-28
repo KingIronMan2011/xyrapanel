@@ -3,8 +3,8 @@ import { and, desc, like, or, sql } from 'drizzle-orm'
 
 import type { AdminPaginatedMeta, AdminWingsNodeServerSummary, AdminWingsNodeServersPayload } from '#shared/types/admin'
 
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
 
 function toIsoTimestamp(value: unknown): string {
   if (value instanceof Date) {
@@ -40,11 +40,7 @@ export default defineEventHandler(async (event): Promise<AdminWingsNodeServersPa
     throw createError({ statusCode: 400, statusMessage: 'Missing node id' })
   }
 
-  const session = await getServerSession(event)
-
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdmin(event)
 
   const query = getQuery(event)
   const pageParam = typeof query.page === 'string' ? Number.parseInt(query.page, 10) : 1

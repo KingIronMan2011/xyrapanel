@@ -1,15 +1,8 @@
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { SETTINGS_KEYS, getSettingWithDefault } from '~~/server/utils/settings'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-
-  if (!isAdmin(session)) {
-    throw createError({
-      statusCode: 403,
-      message: 'Unauthorized: Admin access required',
-    })
-  }
+  await requireAdmin(event)
 
   return {
     driver: getSettingWithDefault(SETTINGS_KEYS.MAIL_DRIVER, 'smtp'),

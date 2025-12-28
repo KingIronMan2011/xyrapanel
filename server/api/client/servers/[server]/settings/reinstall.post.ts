@@ -2,6 +2,8 @@ import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess, getNodeForServer } from '~~/server/utils/server-helpers'
 import { createWingsClient } from '~~/server/utils/wings/client'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -15,6 +17,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.update'],
+  })
 
   if (server.suspended) {
     throw createError({
@@ -32,6 +39,17 @@ export default defineEventHandler(async (event) => {
     })
     .where(eq(tables.servers.id, server.id))
     .run()
+
+  await recordAuditEventFromRequest(event, {
+    actor: session?.user?.email || session?.user?.id || 'unknown',
+    actorType: 'user',
+    action: 'server.reinstalled',
+    targetType: 'server',
+    targetId: server.id,
+    metadata: {
+      serverId: server.id,
+    },
+  })
 
   const node = await getNodeForServer(server.nodeId)
 

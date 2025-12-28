@@ -1,16 +1,9 @@
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { SETTINGS_KEYS, deleteSetting, setSettings } from '~~/server/utils/settings'
 import type { GeneralSettings } from '#shared/types/admin'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-
-  if (!isAdmin(session)) {
-    throw createError({
-      statusCode: 403,
-      message: 'Unauthorized: Admin access required',
-    })
-  }
+  await requireAdmin(event)
 
   const body = await readBody<Partial<GeneralSettings>>(event)
   const updates: Record<string, string> = {}

@@ -2,6 +2,7 @@ import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import type { ServerStartupVariable } from '#shared/types/server'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -15,6 +16,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.read'],
+  })
 
   const db = useDrizzle()
 

@@ -1,5 +1,5 @@
 import { createError, defineEventHandler, type H3Event } from 'h3'
-import { getServerSession, isAdmin } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { findWingsNode, ensureNodeHasToken, requireNodeRow } from '~~/server/utils/wings/nodesStore'
 import { decryptToken } from '~~/server/utils/wings/encryption'
 
@@ -8,15 +8,7 @@ function formatCombinedToken(identifier: string, secret: string): string {
 }
 
 export default defineEventHandler(async (event: H3Event) => {
-  const session = await getServerSession(event)
-  
-  if (!isAdmin(session)) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Forbidden',
-      message: 'Admin access required',
-    })
-  }
+  await requireAdmin(event)
 
   const { id } = event.context.params ?? {}
   if (!id || typeof id !== 'string') {

@@ -1,14 +1,10 @@
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import type { CreateDatabaseHostPayload } from '#shared/types/admin'
 import { randomUUID } from 'crypto'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdmin(event)
 
   const body = await readBody<CreateDatabaseHostPayload>(event)
 

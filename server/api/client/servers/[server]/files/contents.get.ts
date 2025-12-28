@@ -1,5 +1,7 @@
 import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { getWingsClientForServer, WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024
 const BINARY_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', '.pdf', '.zip', '.tar', '.gz', '.exe', '.bin']
@@ -22,6 +24,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const serverId = getRouterParam(event, 'server')
+  const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.read'],
+  })
+
   const query = getQuery(event)
   const file = sanitizeFilePath(query.file as string)
 

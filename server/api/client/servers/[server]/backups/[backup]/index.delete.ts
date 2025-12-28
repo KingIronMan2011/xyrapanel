@@ -3,6 +3,8 @@ import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { getWingsClientForServer, WingsConnectionError } from '~~/server/utils/wings-client'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { invalidateServerBackupsCache } from '~~/server/utils/backups'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -17,6 +19,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.backup.delete'],
+  })
 
   const db = useDrizzle()
   const backup = db.select()
@@ -53,9 +60,24 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    db.delete(tables.serverBackups)
-      .where(eq(tables.serverBackups.id, backup.id))
+    const now = new Date()
+    db.update(tables.serverBackups)
+      .set({ completedAt: now })
+      .where(eq(tables.serverBackups.uuid, backupUuid))
       .run()
+
+    await recordAuditEventFromRequest(event, {
+      actor: session?.user?.email || session?.user?.id || 'unknown',
+      actorType: 'user',
+      action: 'server.backup.deleted',
+      targetType: 'backup',
+      targetId: backupUuid,
+      metadata: {
+        serverId: server.id,
+        backupName: backup?.name,
+      },
+    })
+
     await invalidateServerBackupsCache(server.id as string)
 
     return {

@@ -1,18 +1,16 @@
 import { createError, assertMethod } from 'h3'
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { updateServerStartupSchema } from '~~/shared/schema/admin/server'
 
 export default defineEventHandler(async (event) => {
   assertMethod(event, 'PATCH')
 
-  const session = await getServerSession(event)
-  if (!isAdmin(session)) {
-    throw createError({
-      statusCode: 403,
-      message: 'Admin access required',
-    })
-  }
+  await requireAdmin(event)
+  
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const identifier = getRouterParam(event, 'id')
   if (!identifier) {

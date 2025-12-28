@@ -1,17 +1,8 @@
-import { getServerSession, isAdmin, getSessionUser  } from '~~/server/utils/session'
-import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireAdmin } from '~~/server/utils/security'
+import { useDrizzle, tables } from '~~/server/utils/drizzle'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-
-  if (!isAdmin(session)) {
-    throw createError({
-      statusCode: 403,
-      message: 'Unauthorized: Admin access required',
-    })
-  }
-
-  const user = getSessionUser(session)
+  await requireAdmin(event)
   const db = useDrizzle()
 
   const keys = db
@@ -24,7 +15,6 @@ export default defineEventHandler(async (event) => {
       createdAt: tables.apiKeys.createdAt,
     })
     .from(tables.apiKeys)
-    .where(eq(tables.apiKeys.userId, user!.id))
     .orderBy(tables.apiKeys.createdAt)
     .all()
 

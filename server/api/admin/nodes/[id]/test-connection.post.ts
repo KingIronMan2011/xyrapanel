@@ -1,14 +1,14 @@
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { getWingsClient, WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
 import type { WingsNode } from '#shared/types/wings-client'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  await requireAdmin(event)
 
-  if (!isAdmin(session)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.NODES, ADMIN_ACL_PERMISSIONS.READ)
 
   const nodeId = getRouterParam(event, 'id')
   if (!nodeId) {

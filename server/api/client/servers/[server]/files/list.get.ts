@@ -2,6 +2,7 @@ import { getQuery } from 'h3'
 import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 function sanitizeDirectoryPath(value?: string): string {
   if (!value)
@@ -37,6 +38,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.read'],
+  })
+
   const query = getQuery(event)
   const directory = sanitizeDirectoryPath(typeof query.directory === 'string' ? query.directory : '/')
 

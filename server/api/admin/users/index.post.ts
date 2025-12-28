@@ -1,5 +1,4 @@
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
+import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
@@ -7,12 +6,7 @@ import type { AdminCreateUserPayload } from '#shared/types/user'
 import { sendAdminUserCreatedEmail } from '~~/server/utils/email'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
-
-  if (!user || user.role !== 'admin') {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireAdmin(event)
 
   const body = await readBody<AdminCreateUserPayload>(event)
 

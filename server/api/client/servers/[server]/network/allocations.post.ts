@@ -2,6 +2,8 @@ import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and, isNull } from '~~/server/utils/drizzle'
 import { invalidateServerCaches } from '~~/server/utils/serversStore'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -15,6 +17,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['allocation.create'],
+  })
 
   const db = useDrizzle()
   const currentAllocations = db
@@ -69,6 +76,19 @@ export default defineEventHandler(async (event) => {
     .from(tables.serverAllocations)
     .where(eq(tables.serverAllocations.id, availableAllocation.id))
     .get()
+
+  await recordAuditEventFromRequest(event, {
+    actor: session?.user?.email || session?.user?.id || 'unknown',
+    actorType: 'user',
+    action: 'server.allocation.created',
+    targetType: 'server',
+    targetId: server.id,
+    metadata: {
+      allocationId: updated!.id,
+      ip: updated!.ip,
+      port: updated!.port,
+    },
+  })
 
   await invalidateServerCaches({ id: server.id, uuid: server.uuid, identifier: server.identifier })
 

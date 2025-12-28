@@ -1,6 +1,7 @@
 import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess, getNodeForServer } from '~~/server/utils/server-helpers'
 import { createWingsClient } from '~~/server/utils/wings/client'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -14,6 +15,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.upload'],
+  })
 
   const node = await getNodeForServer(server.nodeId)
 

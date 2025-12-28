@@ -5,6 +5,7 @@ import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { createSubuserSchema } from '#shared/schema/server/subusers'
 import { invalidateServerSubusersCache } from '~~/server/utils/subusers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -19,6 +20,12 @@ export default defineEventHandler(async (event) => {
 
   const { server } = await getServerWithAccess(serverId, session)
 
+  // Verify user has permission to manage server users
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.users.create'],
+  })
+
   const body = await readValidatedBodyWithLimit(
     event,
     createSubuserSchema,
@@ -26,13 +33,13 @@ export default defineEventHandler(async (event) => {
   )
 
   const db = useDrizzle()
-  const user = db
+  const targetUser = db
     .select()
     .from(tables.users)
     .where(eq(tables.users.email, body.email))
     .get()
 
-  if (!user) {
+  if (!targetUser) {
     throw createError({
       statusCode: 404,
       message: 'User not found with that email address',
@@ -45,7 +52,7 @@ export default defineEventHandler(async (event) => {
     .where(
       and(
         eq(tables.serverSubusers.serverId, server.id),
-        eq(tables.serverSubusers.userId, user.id)
+        eq(tables.serverSubusers.userId, targetUser.id)
       )
     )
     .get()
@@ -64,7 +71,7 @@ export default defineEventHandler(async (event) => {
     .values({
       id: subuserId,
       serverId: server.id,
-      userId: user.id,
+      userId: targetUser.id,
       permissions: JSON.stringify(body.permissions),
       createdAt: now,
       updatedAt: now,
@@ -77,16 +84,16 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.serverSubusers.id, subuserId))
     .get()
 
-  await invalidateServerSubusersCache(server.id, [user.id])
+  await invalidateServerSubusersCache(server.id, [targetUser.id])
 
   return {
     data: {
       id: subuser!.id,
       user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        image: user.image,
+        id: targetUser.id,
+        username: targetUser.username,
+        email: targetUser.email,
+        image: targetUser.image,
       },
       permissions: JSON.parse(subuser!.permissions),
       created_at: subuser!.createdAt,

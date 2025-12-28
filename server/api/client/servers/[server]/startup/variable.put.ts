@@ -1,6 +1,8 @@
 import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -13,6 +15,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.update'],
+  })
+
   const body = await readBody(event)
   const { key, value } = body
 
@@ -22,8 +31,6 @@ export default defineEventHandler(async (event) => {
       message: 'Variable key is required',
     })
   }
-
-  const { server } = await getServerWithAccess(serverId, session)
 
   const db = useDrizzle()
   const [eggVariable] = db.select()
@@ -65,7 +72,6 @@ export default defineEventHandler(async (event) => {
   const now = new Date()
 
   if (existingVar) {
-
     db.update(tables.serverEnvironmentVariables)
       .set({
         value: value || '',
@@ -74,7 +80,6 @@ export default defineEventHandler(async (event) => {
       .where(eq(tables.serverEnvironmentVariables.id, existingVar.id))
       .run()
   } else {
-
     db.insert(tables.serverEnvironmentVariables)
       .values({
         id: `env_${Date.now()}`,
@@ -86,6 +91,18 @@ export default defineEventHandler(async (event) => {
       })
       .run()
   }
+
+  await recordAuditEventFromRequest(event, {
+    actor: session?.user?.email || session?.user?.id || 'unknown',
+    actorType: 'user',
+    action: 'server.startup_variable.updated',
+    targetType: 'settings',
+    targetId: server.id,
+    metadata: {
+      key,
+      value,
+    },
+  })
 
   return {
     object: 'egg_variable',

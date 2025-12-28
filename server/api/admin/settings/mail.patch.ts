@@ -1,17 +1,10 @@
-import { getServerSession, isAdmin  } from '~~/server/utils/session'
+import { requireAdmin } from '~~/server/utils/security'
 import { SETTINGS_KEYS, setSettings } from '~~/server/utils/settings'
 import { refreshEmailService } from '~~/server/utils/email'
 import type { MailSettings } from '#shared/types/admin'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-
-  if (!isAdmin(session)) {
-    throw createError({
-      statusCode: 403,
-      message: 'Unauthorized: Admin access required',
-    })
-  }
+  await requireAdmin(event)
 
   const body = await readBody<Partial<MailSettings>>(event)
   const updates: Record<string, string> = {}

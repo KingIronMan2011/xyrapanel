@@ -2,6 +2,8 @@ import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { invalidateServerBackupsCache } from '~~/server/utils/backups'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -16,6 +18,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.backup.download'],
+  })
 
   const db = useDrizzle()
   const backup = db.select()
@@ -35,12 +42,23 @@ export default defineEventHandler(async (event) => {
   const newLockStatus = !backup.isLocked
 
   db.update(tables.serverBackups)
-    .set({
-      isLocked: newLockStatus,
-      updatedAt: new Date(),
-    })
-    .where(eq(tables.serverBackups.id, backup.id))
+    .set({ isLocked: !backup.isLocked })
+    .where(eq(tables.serverBackups.uuid, backupUuid))
     .run()
+
+  await recordAuditEventFromRequest(event, {
+    actor: session?.user?.email || session?.user?.id || 'unknown',
+    actorType: 'user',
+    action: backup.isLocked ? 'server.backup.unlocked' : 'server.backup.locked',
+    targetType: 'backup',
+    targetId: backupUuid,
+    metadata: {
+      serverId: server.id,
+      backupName: backup?.name,
+      isLocked: !backup.isLocked,
+    },
+  })
+
   await invalidateServerBackupsCache(server.id as string)
 
   return {

@@ -3,6 +3,8 @@ import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { randomBytes } from 'crypto'
 import { invalidateServerCaches } from '~~/server/utils/serversStore'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -17,6 +19,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.database.update'],
+  })
 
   const db = useDrizzle()
   const [database] = db.select()
@@ -40,12 +47,21 @@ export default defineEventHandler(async (event) => {
   const newPassword = randomBytes(16).toString('hex')
 
   db.update(tables.serverDatabases)
-    .set({
-      password: newPassword,
-      updatedAt: new Date(),
-    })
+    .set({ password: newPassword })
     .where(eq(tables.serverDatabases.id, databaseId))
     .run()
+
+  await recordAuditEventFromRequest(event, {
+    actor: session?.user?.email || session?.user?.id || 'unknown',
+    actorType: 'user',
+    action: 'server.database.password_rotated',
+    targetType: 'database',
+    targetId: databaseId,
+    metadata: {
+      serverId: server.id,
+      databaseName: database?.name,
+    },
+  })
 
   await invalidateServerCaches({ id: server.id, uuid: server.uuid, identifier: server.identifier })
 
