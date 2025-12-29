@@ -5,8 +5,6 @@ const props = defineProps<{
   nodeId: string
 }>()
 
-const isRefreshing = ref(false)
-
 const rawFetch = $fetch as (input: string, init?: Record<string, unknown>) => Promise<unknown>
 
 async function fetchSystemInfo(nodeId: string): Promise<WingsSystemInformation | null> {
@@ -19,7 +17,6 @@ async function fetchSystemInfo(nodeId: string): Promise<WingsSystemInformation |
 const {
   data: systemData,
   pending: systemPending,
-  refresh,
   error,
 } = await useAsyncData<WingsSystemInformation | null>(
   `node-system-${props.nodeId}`,
@@ -31,12 +28,6 @@ const {
 )
 
 const systemInfo = computed(() => systemData.value)
-
-async function handleRefresh() {
-  isRefreshing.value = true
-  await refresh()
-  isRefreshing.value = false
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -116,9 +107,6 @@ const systemMetrics = computed(() => {
       <p class="text-sm text-muted-foreground">
         Real-time system information from the Wings daemon
       </p>
-      <UButton icon="i-lucide-refresh-cw" variant="soft" size="sm" :loading="isRefreshing" @click="handleRefresh">
-        Refresh
-      </UButton>
     </div>
 
     <div v-if="systemPending" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

@@ -165,10 +165,10 @@ function handleFileChange(event: Event) {
                 </div>
               </div>
               <div class="flex gap-2">
-                <UButton icon="i-lucide-upload" variant="outline" @click="openImportEggModal">
+                <UButton icon="i-lucide-upload" color="neutral" variant="outline" @click="openImportEggModal">
                   {{ t('admin.nests.createEgg.importEgg') }}
                 </UButton>
-                <UButton icon="i-lucide-plus" color="primary" @click="openCreateEggModal">
+                <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="openCreateEggModal">
                   {{ t('admin.nests.createEgg.createEgg') }}
                 </UButton>
               </div>
@@ -178,7 +178,7 @@ function handleFileChange(event: Event) {
               <template #header>
                 <div class="flex items-center justify-between">
                   <h2 class="text-lg font-semibold">{{ t('admin.nests.createEgg.eggs') }}</h2>
-                  <UBadge color="neutral">{{ eggs.length }} {{ t('common.all') }}</UBadge>
+                  <UBadge color="neutral" variant="outline" size="sm">{{ eggs.length }} {{ t('common.all') }}</UBadge>
                 </div>
               </template>
 

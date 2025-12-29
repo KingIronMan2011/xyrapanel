@@ -81,8 +81,8 @@ const resourceLinks = computed(() => {
       </div>
     </template>
 
-    <div v-if="pending" class="grid gap-4 md:grid-cols-3">
-      <USkeleton v-for="i in 3" :key="`panel-info-skeleton-${i}`" class="h-16 rounded-lg" />
+    <div v-if="pending" class="grid gap-4 md:grid-cols-2">
+      <USkeleton v-for="i in 2" :key="`panel-info-skeleton-${i}`" class="h-16 rounded-lg" />
     </div>
 
     <UAlert
@@ -95,7 +95,7 @@ const resourceLinks = computed(() => {
     </UAlert>
 
     <div v-else class="space-y-5">
-      <div class="grid gap-4 md:grid-cols-3">
+      <div class="grid gap-4 md:grid-cols-2">
         <div
           v-for="row in detailRows"
           :key="row.key"

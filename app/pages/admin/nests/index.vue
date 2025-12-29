@@ -131,7 +131,7 @@ function viewNest(nest: NestWithEggCount) {
                   <div class="flex items-center gap-2">
                     <UIcon name="i-lucide-box" class="size-5 text-primary" />
                     <span class="font-semibold">{{ nest.name }}</span>
-                    <UBadge size="xs" color="neutral">
+                    <UBadge size="sm" color="neutral" variant="outline">
                       {{ nest.eggCount }} {{ nest.eggCount !== 1 ? t('admin.nests.eggs') : t('admin.nests.egg') }}
                     </UBadge>
                   </div>

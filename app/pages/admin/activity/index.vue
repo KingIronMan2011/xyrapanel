@@ -195,8 +195,8 @@ function exportCsv() {
                   <UBadge v-if="pending" color="primary" variant="soft">Loading</UBadge>
                   <UButton
                     icon="i-lucide-download"
-                    color="primary"
-                    variant="subtle"
+                    color="neutral"
+                    variant="outline"
                     :disabled="pending || activities.length === 0"
                     @click="exportCsv"
                   >

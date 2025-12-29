@@ -234,7 +234,7 @@ async function handleExportEgg() {
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <UButton icon="i-lucide-download" size="sm" variant="outline" @click="handleExportEgg">
+                <UButton icon="i-lucide-download" size="sm" color="neutral" variant="outline" @click="handleExportEgg">
                   {{ t('admin.eggs.exportEgg') }}
                 </UButton>
               </div>
@@ -276,6 +276,7 @@ async function handleExportEgg() {
                 <div class="flex justify-end">
                   <UButton
                     color="primary"
+                    variant="subtle"
                     :loading="isSavingConfig"
                     :disabled="isSavingConfig"
                     @click="handleSaveConfig"
@@ -291,9 +292,9 @@ async function handleExportEgg() {
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <h2 class="text-lg font-semibold">{{ t('admin.eggs.environmentVariables') }}</h2>
-                    <UBadge color="neutral">{{ egg.variables.length }} {{ t('common.all') }}</UBadge>
+                    <UBadge color="neutral" variant="outline" size="sm">{{ egg.variables.length }} {{ t('common.all') }}</UBadge>
                   </div>
-                  <UButton icon="i-lucide-plus" size="xs" @click="openCreateVariableModal">
+                  <UButton icon="i-lucide-plus" size="xs" color="primary" variant="subtle" @click="openCreateVariableModal">
                     {{ t('admin.eggs.addVariable') }}
                   </UButton>
                 </div>

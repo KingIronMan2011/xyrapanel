@@ -259,7 +259,7 @@ const unassignedCount = computed(() => allocations.value.filter(a => a.serverId 
         </UButton>
       </div>
 
-      <UButton icon="i-lucide-plus" color="primary" @click="showCreateModal = true">
+      <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="showCreateModal = true">
         {{ t('admin.nodes.createAllocations') }}
       </UButton>
     </div>

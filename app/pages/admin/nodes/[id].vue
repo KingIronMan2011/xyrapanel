@@ -71,7 +71,6 @@ const { data: nodeResponse, pending, error, refresh: refreshNode } = await useAs
 const nodeDetail = computed(() => nodeResponse.value?.data)
 const node = computed(() => nodeDetail.value?.node)
 const stats = computed(() => nodeDetail.value?.stats)
-const recentServers = computed(() => nodeDetail.value?.recentServers ?? [])
 const systemInfo = computed(() => nodeDetail.value?.system ?? null)
 const systemError = computed(() => nodeDetail.value?.systemError ?? null)
 
@@ -97,10 +96,10 @@ const statusBadge = computed(() => {
   }
 
   if (node.value && !node.value.public) {
-    return { label: t('admin.nodes.private'), color: 'neutral' as const }
+    return { label: t('admin.nodes.offline'), color: 'error' as const }
   }
 
-  return { label: t('admin.nodes.online'), color: 'primary' as const }
+  return { label: t('admin.nodes.online'), color: 'success' as const }
 })
 
 function formatDateTime(value?: string | null) {
@@ -598,7 +597,7 @@ async function handleCreateAllocations() {
               </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <UBadge :color="statusBadge.color" size="xs">{{ statusBadge.label }}</UBadge>
+              <UBadge :color="statusBadge.color" variant="subtle" size="sm">{{ statusBadge.label }}</UBadge>
               <UButton
                 v-for="action in maintenanceActions"
                 :key="action.label"
@@ -623,7 +622,7 @@ async function handleCreateAllocations() {
             { label: t('admin.nodes.tabs.system'), value: 'system', icon: 'i-lucide-activity' },
           ]" class="w-full" />
 
-          <div v-if="tab === 'overview'" class="grid gap-4 lg:grid-cols-3">
+          <div v-if="tab === 'overview'" class="grid gap-4 lg:grid-cols-2">
             <UCard :ui="{ body: 'space-y-3' }">
               <template #header>
                 <h2 class="text-lg font-semibold">{{ t('common.status') }}</h2>
@@ -674,27 +673,6 @@ async function handleCreateAllocations() {
               </div>
             </UCard>
 
-            <UCard :ui="{ body: 'space-y-3' }">
-              <template #header>
-                <h2 class="text-lg font-semibold">{{ t('admin.nodes.recentServers') }}</h2>
-              </template>
-              <div v-if="recentServers.length === 0" class="text-sm text-muted-foreground">
-                {{ t('admin.nodes.noServersForNodeYet') }}
-              </div>
-              <ul v-else class="space-y-3">
-                <li v-for="server in recentServers" :key="server.id" class="rounded-md border border-default px-4 py-3">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <p class="text-sm font-semibold">{{ server.name }}</p>
-                      <p class="text-xs text-muted-foreground">{{ server.identifier }}</p>
-                    </div>
-                    <UBadge :color="server.primaryAllocation ? 'primary' : 'neutral'" size="xs">
-                      {{ server.primaryAllocation ? `${server.primaryAllocation.ip}:${server.primaryAllocation.port}` : t('server.network.noPrimaryAllocation') }}
-                    </UBadge>
-                  </div>
-                </li>
-              </ul>
-            </UCard>
           </div>
 
           <UCard v-else-if="tab === 'servers'" :ui="{ body: 'space-y-4' }">
@@ -796,7 +774,7 @@ async function handleCreateAllocations() {
                     { label: t('common.perPage', { count: 50 }), value: 50 },
                     { label: t('common.perPage', { count: 100 }), value: 100 },
                   ]" size="sm" />
-                  <UButton icon="i-lucide-plus" color="primary" size="sm" @click="showCreateAllocationModal = true">
+                  <UButton icon="i-lucide-plus" color="primary" variant="subtle" size="sm" @click="showCreateAllocationModal = true">
                     {{ t('admin.nodes.createAllocations') }}
                   </UButton>
                 </div>
@@ -826,7 +804,7 @@ async function handleCreateAllocations() {
                     <td class="px-3 py-2 font-mono text-xs">{{ allocation.ip }}</td>
                     <td class="px-3 py-2 font-mono text-xs">{{ allocation.port }}</td>
                     <td class="px-3 py-2">
-                      <UBadge :color="allocation.isPrimary ? 'primary' : 'neutral'" size="xs">
+                      <UBadge :color="'neutral'" variant="outline" size="xs">
                         {{ allocation.isPrimary ? t('admin.nodes.primary') : t('admin.nodes.secondary') }}
                       </UBadge>
                     </td>

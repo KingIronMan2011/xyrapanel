@@ -299,7 +299,7 @@ watch(
                         <span>{{ t('admin.nodes.updated') }} {{ formatUpdatedAt(node.updatedAt) }}</span>
                       </div>
                       <div class="col-span-2">
-                        <UBadge :color="node.hasToken ? 'primary' : 'warning'" size="xs">
+                        <UBadge :color="node.hasToken ? 'neutral' : 'warning'" :variant="node.hasToken ? 'outline' : 'soft'" size="sm">
                           {{ node.hasToken ? t('admin.nodes.configured') : t('admin.nodes.missingToken') }}
                         </UBadge>
                       </div>
