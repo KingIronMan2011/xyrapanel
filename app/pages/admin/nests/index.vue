@@ -4,6 +4,8 @@ import type { NestWithEggCount, CreateNestPayload } from '#shared/types/admin'
 definePageMeta({
   auth: true,
   layout: 'admin',
+  adminTitle: 'Nests',
+  adminSubtitle: 'Manage server nests and eggs.',
 })
 
 const { t } = useI18n()
@@ -99,8 +101,7 @@ function viewNest(nest: NestWithEggCount) {
         <section class="space-y-6">
           <UCard>
             <template #header>
-              <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold">{{ t('admin.nests.allNests') }}</h2>
+              <div class="flex justify-end">
                 <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="openCreateModal">
                   {{ t('admin.nests.createNest') }}
                 </UButton>

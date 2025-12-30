@@ -245,8 +245,7 @@ const table = useTemplateRef('table')
           <section class="space-y-6">
             <UCard :ui="{ body: 'space-y-3' }">
               <template #header>
-                <div class="flex items-center justify-between">
-                  <h2 class="text-lg font-semibold">{{ t('admin.servers.serverInventory') }}</h2>
+                <div class="flex justify-end">
                   <UButton icon="i-lucide-plus" color="primary" variant="subtle" to="/admin/servers/create">
                     {{ t('admin.servers.createServer') }}
                   </UButton>

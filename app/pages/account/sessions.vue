@@ -281,12 +281,6 @@ async function handleSignOutAll(includeCurrent = false) {
 
     <div>
         <UCard :ui="{ body: 'space-y-3' }">
-          <template #header>
-            <div>
-              <h2 class="text-lg font-semibold">{{ t('account.sessions.activeSessionsTitle') }}</h2>
-              <p class="text-sm text-muted-foreground">{{ t('account.sessions.browserTokensDescription') }}</p>
-            </div>
-          </template>
 
           <div v-if="sessionsPending" class="space-y-3">
             <USkeleton v-for="i in 3" :key="`session-skeleton-${i}`" class="h-16 w-full rounded-lg" />

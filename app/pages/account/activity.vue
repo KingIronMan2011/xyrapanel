@@ -112,14 +112,11 @@ async function copyJson(entry: typeof entries.value[0]) {
 <template>
   <div>
         <UCard :ui="{ body: 'space-y-3' }">
-          <template #header>
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold">{{ t('account.activity.recentActivity') }}</h2>
-              <UBadge v-if="pagination" color="neutral" variant="soft" size="xs">
-                {{ pagination.total }} {{ t('account.activity.total') }}
-              </UBadge>
-            </div>
-          </template>
+          <div v-if="pagination" class="flex justify-end">
+            <UBadge color="neutral" variant="soft" size="xs">
+              {{ pagination.total }} {{ t('account.activity.total') }}
+            </UBadge>
+          </div>
 
           <template v-if="pending">
             <div class="space-y-2">

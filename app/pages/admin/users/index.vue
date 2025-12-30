@@ -7,6 +7,8 @@ const { t } = useI18n()
 definePageMeta({
   auth: true,
   layout: 'admin',
+  adminTitle: 'Users',
+  adminSubtitle: 'Audit panel accounts and Wings permissions',
 })
 const toast = useToast()
 const router = useRouter()
@@ -244,21 +246,18 @@ function formatDate(value: string) {
         <section class="space-y-6">
           <UCard :ui="{ body: 'space-y-3' }">
             <template #header>
-              <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold">{{ t('admin.users.title') }}</h2>
-                <div class="flex items-center gap-2">
-                  <UButton
-                    icon="i-lucide-search"
-                    color="neutral"
-                    variant="subtle"
-                    @click="openSearchModal"
-                  >
-                    {{ t('common.search') }}
-                  </UButton>
-                  <UButton icon="i-lucide-user-plus" color="primary" variant="subtle" @click="openCreateModal">
-                    {{ t('admin.users.title') }}
-                  </UButton>
-                </div>
+              <div class="flex justify-end gap-2">
+                <UButton
+                  icon="i-lucide-search"
+                  color="neutral"
+                  variant="subtle"
+                  @click="openSearchModal"
+                >
+                  {{ t('common.search') }}
+                </UButton>
+                <UButton icon="i-lucide-user-plus" color="primary" variant="subtle" @click="openCreateModal">
+                  {{ t('admin.users.createUser') }}
+                </UButton>
               </div>
             </template>
 

@@ -286,14 +286,12 @@ async function disableTotp() {
     <div>
         <div class="space-y-6">
           <UCard :ui="{ body: 'space-y-4' }">
-            <template #header>
-              <div>
-                <h2 class="text-lg font-semibold">{{ t('account.security.password.title') }}</h2>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('account.security.password.description') }}
-                </p>
-              </div>
-            </template>
+            <div class="space-y-1 pb-2">
+              <p class="text-sm font-semibold">{{ t('account.security.password.title') }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ t('account.security.password.description') }}
+              </p>
+            </div>
 
             <UAlert v-if="passwordErrorMessage" icon="i-lucide-alert-triangle" color="error" :title="passwordErrorMessage" />
             
@@ -353,19 +351,17 @@ async function disableTotp() {
           </UCard>
 
           <UCard :ui="{ body: 'space-y-4' }">
-            <template #header>
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="text-lg font-semibold">{{ t('account.security.twoFactor.title') }}</h2>
-                  <p class="text-xs text-muted-foreground">
-                    {{ t('account.security.twoFactor.description') }}
-                  </p>
-                </div>
-                <UBadge :color="totpEnabled ? 'success' : 'warning'" variant="subtle">
-                  {{ totpEnabled ? t('account.security.twoFactor.enabled') : t('account.security.twoFactor.disabled') }}
-                </UBadge>
+            <div class="flex flex-col gap-2 pb-2 md:flex-row md:items-center md:justify-between">
+              <div class="space-y-1">
+                <p class="text-sm font-semibold">{{ t('account.security.twoFactor.title') }}</p>
+                <p class="text-xs text-muted-foreground">
+                  {{ t('account.security.twoFactor.description') }}
+                </p>
               </div>
-            </template>
+              <UBadge :color="totpEnabled ? 'success' : 'warning'" variant="subtle">
+                {{ totpEnabled ? t('account.security.twoFactor.enabled') : t('account.security.twoFactor.disabled') }}
+              </UBadge>
+            </div>
 
             <UAlert v-if="twoFactorError" icon="i-lucide-alert-triangle" color="error">
               <template #description>{{ twoFactorError }}</template>

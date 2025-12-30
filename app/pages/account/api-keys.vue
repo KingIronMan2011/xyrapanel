@@ -464,11 +464,7 @@ async function copyToken() {
     <div>
         <UCard :ui="{ body: 'space-y-3' }">
           <template #header>
-            <div class="flex items-start justify-between">
-              <div class="space-y-1">
-                <h2 class="text-lg font-semibold">{{ t('account.apiKeys.activeAPIKeys') }}</h2>
-                <p class="text-sm text-muted-foreground">{{ t('account.apiKeys.manageExistingKeys') }}</p>
-              </div>
+            <div class="flex justify-end">
               <UButton variant="subtle" icon="i-lucide-plus" @click="showCreateModal = true">
                 {{ t('account.apiKeys.createKey') }}
               </UButton>

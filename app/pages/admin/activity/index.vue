@@ -184,15 +184,12 @@ function exportCsv() {
           <UCard :ui="{ body: 'space-y-3' }">
             <template #header>
               <div class="flex items-center justify-between">
-                <div class="space-y-1">
-                  <h2 class="text-lg font-semibold">Recent activity</h2>
-                  <p v-if="pagination" class="text-xs text-muted-foreground">
-                    Showing {{ activities.length }} of {{ pagination.total }} events
-                    <span v-if="hasMore">{{ t('admin.activity.loadMoreToSeeAdditional') }}</span>
-                  </p>
-                </div>
+                <p v-if="pagination" class="text-xs text-muted-foreground">
+                  {{ t('admin.activity.showingEvents', { count: activities.length, total: pagination.total }) }}
+                  <span v-if="hasMore">{{ t('admin.activity.loadMoreToSeeAdditional') }}</span>
+                </p>
                 <div class="flex items-center gap-2">
-                  <UBadge v-if="pending" color="primary" variant="soft">Loading</UBadge>
+                  <UBadge v-if="pending" color="primary" variant="soft">{{ t('common.loading') }}</UBadge>
                   <UButton
                     icon="i-lucide-download"
                     color="neutral"
@@ -200,7 +197,7 @@ function exportCsv() {
                     :disabled="pending || activities.length === 0"
                     @click="exportCsv"
                   >
-                    Export CSV
+                    {{ t('admin.activity.exportCsv') }}
                   </UButton>
                 </div>
               </div>

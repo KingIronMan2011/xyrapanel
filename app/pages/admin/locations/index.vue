@@ -4,6 +4,8 @@ import type { LocationWithNodeCount, CreateLocationPayload } from '#shared/types
 definePageMeta({
   auth: true,
   layout: 'admin',
+  adminTitle: 'Locations',
+  adminSubtitle: 'Manage server locations.',
 })
 
 const { t } = useI18n()
@@ -114,8 +116,7 @@ async function handleDelete(location: LocationWithNodeCount) {
         <section class="space-y-6">
           <UCard>
             <template #header>
-              <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold">{{ t('admin.locations.allLocations') }}</h2>
+              <div class="flex justify-end">
                 <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="openCreateModal">
                   {{ t('admin.locations.createLocation') }}
                 </UButton>

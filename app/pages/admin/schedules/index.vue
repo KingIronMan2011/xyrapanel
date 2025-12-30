@@ -120,13 +120,12 @@ async function copyJson(schedule: AdminScheduleResponse) {
           <UCard :ui="{ body: 'space-y-3' }">
             <template #header>
               <div class="flex items-center justify-between">
-                <div class="space-y-1">
-                  <h2 class="text-lg font-semibold">{{ t('admin.schedules.title') }}</h2>
-                  <p class="text-xs text-muted-foreground">
-                    {{ t('admin.schedules.showingSchedules', { count: schedules.length }) }}
-                  </p>
-                </div>
-                <UBadge v-if="schedulesPending" color="primary" variant="soft">{{ t('common.loading') }}</UBadge>
+                <p class="text-xs text-muted-foreground">
+                  {{ t('admin.schedules.showingSchedules', { count: schedules.length }) }}
+                </p>
+                <UBadge v-if="schedulesPending" color="primary" variant="soft">
+                  {{ t('common.loading') }}
+                </UBadge>
               </div>
             </template>
 

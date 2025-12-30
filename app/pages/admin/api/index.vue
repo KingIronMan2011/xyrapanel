@@ -153,11 +153,7 @@ function copyToClipboard(text: string) {
         <section class="space-y-6">
           <UCard>
             <template #header>
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="text-lg font-semibold">{{ t('admin.api.activeKeys') }}</h2>
-                  <p class="text-xs text-muted-foreground">{{ t('admin.api.activeKeysDescription') }}</p>
-                </div>
+              <div class="flex justify-end">
                 <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="showCreateModal = true">
                   {{ t('admin.api.createApiKey') }}
                 </UButton>

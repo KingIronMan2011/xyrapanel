@@ -4,6 +4,8 @@ import type { DatabaseHostWithStats, CreateDatabaseHostPayload } from '#shared/t
 definePageMeta({
   auth: true,
   layout: 'admin',
+  adminTitle: 'Database Hosts',
+  adminSubtitle: 'Manage database hosts.',
 })
 
 const { t } = useI18n()
@@ -102,8 +104,7 @@ async function handleDelete(host: DatabaseHostWithStats) {
         <section class="space-y-6">
           <UCard>
             <template #header>
-              <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold">{{ t('admin.databaseHosts.allDatabaseHosts') }}</h2>
+              <div class="flex justify-end">
                 <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="openCreateModal">
                   {{ t('admin.databaseHosts.addDatabaseHost') }}
                 </UButton>

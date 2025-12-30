@@ -254,11 +254,7 @@ async function confirmDelete() {
     <div>
         <UCard :ui="{ body: 'space-y-3' }">
           <template #header>
-            <div class="flex items-start justify-between">
-              <div class="space-y-1">
-                <h2 class="text-lg font-semibold">{{ t('account.sshKeys.configuredSSHKeys') }}</h2>
-                <p class="text-sm text-muted-foreground">{{ t('account.sshKeys.configuredSSHKeysDescription') }}</p>
-              </div>
+            <div class="flex justify-end">
               <UButton variant="subtle" icon="i-lucide-plus" @click="showCreateModal = true">
                 {{ t('account.sshKeys.addSSHKey') }}
               </UButton>

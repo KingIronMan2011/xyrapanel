@@ -5,6 +5,8 @@ import type { MountWithRelations, CreateMountPayload } from '#shared/types/admin
 definePageMeta({
   auth: true,
   layout: 'admin',
+  adminTitle: 'Mounts',
+  adminSubtitle: 'Manage server mounts.',
 })
 
 const { t } = useI18n()
@@ -122,8 +124,7 @@ async function handleDelete(mount: MountWithRelations) {
         <section class="space-y-6">
           <UCard>
             <template #header>
-              <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold">{{ t('admin.mounts.allMounts') }}</h2>
+              <div class="flex justify-end">
                 <UButton icon="i-lucide-plus" color="primary" variant="subtle" @click="openCreateModal">
                   {{ t('admin.mounts.createMount') }}
                 </UButton>

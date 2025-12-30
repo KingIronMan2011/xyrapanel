@@ -155,14 +155,9 @@ const scopeToggleText = computed(() => {
 
     <div>
         <UCard :ui="{ body: 'space-y-4' }">
-          <template #header>
-            <div>
-              <h2 class="text-lg font-semibold">{{ t('server.list.registeredServers') }}</h2>
-              <p class="text-sm text-muted-foreground">
-                {{ showAll && isAdmin ? t('server.list.allServersInPanel') : t('server.list.serversAssignedToAccount') }}
-              </p>
-            </div>
-          </template>
+          <div class="pb-2 text-sm text-muted-foreground">
+            {{ showAll && isAdmin ? t('server.list.allServersInPanel') : t('server.list.serversAssignedToAccount') }}
+          </div>
 
           <div class="space-y-3">
             <div v-if="loading" class="space-y-2">
