@@ -14,6 +14,11 @@ const {
 
 const info = computed(() => (data.value as PanelInformation | null) ?? null)
 
+const releaseNotesOpen = ref(false)
+const releaseNotesLoading = ref(false)
+const releaseVersions = ref<Array<{ title: string; description: string; date?: string }>>([])
+const releaseNotesError = ref(false)
+
 const detailRows = computed(() => {
   const panelInfo = info.value
   return [
@@ -71,6 +76,54 @@ const resourceLinks = computed(() => {
     },
   ].filter(Boolean) as { key: string; label: string; icon: string; url: string }[]
 })
+
+async function openReleaseNotes(url: string) {
+  releaseNotesOpen.value = true
+  releaseNotesLoading.value = true
+  releaseVersions.value = []
+  releaseNotesError.value = false
+  try {
+    type ReleaseData = { name?: string; tag_name?: string; body?: string; description?: string; markdown?: string; tag?: string; publishedAt?: string; createdAt?: string }
+    let data: ReleaseData | ReleaseData[] | string | null = null
+    try {
+      data = await $fetch(url)
+    }
+    catch (err) {
+      if (url.includes('/releases') && !url.includes('/latest')) {
+        const latestUrl = url.endsWith('/') ? `${url}latest` : `${url}/latest`
+        data = await $fetch(latestUrl)
+      } else {
+        throw err
+      }
+    }
+    
+    if (Array.isArray(data) && data.length > 0) {
+      releaseVersions.value = data.map((release: ReleaseData) => ({
+        title: release.name || release.tag_name || release.tag || 'Release',
+        description: release.markdown || release.body || release.description || '',
+        date: release.publishedAt || release.createdAt,
+      }))
+    } else if (data && typeof data === 'object' && !Array.isArray(data) && ('name' in data || 'tag_name' in data || 'tag' in data)) {
+      const release = data as ReleaseData
+      releaseVersions.value = [{
+        title: release.name || release.tag_name || release.tag || 'Release',
+        description: release.markdown || release.body || release.description || '',
+        date: release.publishedAt || release.createdAt,
+      }]
+    } else if (typeof data === 'string') {
+      releaseNotesError.value = true
+    } else {
+      releaseNotesError.value = true
+    }
+  }
+  catch (err) {
+    console.error('Failed to load release notes:', err)
+    releaseNotesError.value = true
+  }
+  finally {
+    releaseNotesLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -120,11 +173,30 @@ const resourceLinks = computed(() => {
           color="neutral"
           :icon="link.icon"
           :label="link.label"
-          :to="link.url"
-          target="_blank"
-          rel="noopener"
+          :to="link.key === 'releaseNotes' ? undefined : link.url"
+          :target="link.key === 'releaseNotes' ? undefined : '_blank'"
+          :rel="link.key === 'releaseNotes' ? undefined : 'noopener'"
+          :loading="link.key === 'releaseNotes' && releaseNotesLoading"
+          @click="link.key === 'releaseNotes' ? openReleaseNotes(link.url) : undefined"
         />
       </div>
+
+      <UModal v-model:open="releaseNotesOpen" :title="t('admin.settings.panelInfo.releaseNotes')" scrollable>
+        <template #body>
+          <div class="p-4">
+            <div v-if="releaseNotesLoading" class="text-muted-foreground text-center py-8">
+              {{ t('common.loading') }}
+            </div>
+            <div v-else-if="releaseNotesError" class="text-muted-foreground text-center py-8">
+              {{ t('admin.settings.panelInfo.releaseNotesUnavailable') }}
+            </div>
+            <UChangelogVersions v-else-if="releaseVersions.length" :versions="releaseVersions" />
+            <div v-else class="text-muted-foreground text-center py-8">
+              {{ t('admin.settings.panelInfo.releaseNotesUnavailable') }}
+            </div>
+          </div>
+        </template>
+      </UModal>
 
       <div class="text-xs text-muted-foreground flex items-center gap-1">
         <span>{{ t('admin.settings.panelInfo.lastChecked') }}</span>
