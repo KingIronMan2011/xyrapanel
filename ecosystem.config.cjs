@@ -3,6 +3,8 @@ const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: process.env.PORT || process.env.NITRO_PORT || 3000,
   HOST: process.env.HOST || process.env.NITRO_HOST || '0.0.0.0',
+  DB_DIALECT: process.env.DB_DIALECT || 'sqlite',
+  DRIZZLE_DATABASE_URL: process.env.DRIZZLE_DATABASE_URL || 'file:./data/XyraPanel.sqlite',
 }
 
 const env_production = {
@@ -22,6 +24,8 @@ const env_production = {
   NUXT_MAX_REQUEST_SIZE_MB: process.env.NUXT_MAX_REQUEST_SIZE_MB,
   NUXT_MAX_UPLOAD_SIZE_MB: process.env.NUXT_MAX_UPLOAD_SIZE_MB,
   BETTER_AUTH_TRUSTED_ORIGINS: process.env.BETTER_AUTH_TRUSTED_ORIGINS,
+  DB_DIALECT: process.env.DB_DIALECT || 'postgresql',
+  DRIZZLE_DATABASE_URL: process.env.DRIZZLE_DATABASE_URL,
 }
 
 module.exports = {

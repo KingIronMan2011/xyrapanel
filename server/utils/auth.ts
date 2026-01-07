@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin, bearer, multiSession, customSession, captcha, username, twoFactor, apiKey } from "better-auth/plugins"
 import type { AuthContext } from '@better-auth/core'
-import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { useDrizzle, tables, eq, isPostgresDialect } from '~~/server/utils/drizzle'
 import type { Role } from '#shared/types/auth'
 import bcrypt from 'bcryptjs'
 
@@ -166,7 +166,7 @@ function createAuth() {
 
   return betterAuth({
     database: drizzleAdapter(db, {
-      provider: 'sqlite',
+      provider: isPostgresDialect ? 'pg' : 'sqlite',
       schema: adapterSchema,
     }),
     account: {
