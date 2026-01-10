@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useClipboard } from '@vueuse/core'
 import type { PowerAction, PanelServerDetails } from '#shared/types/server'
 import { useAuthStore } from '~/stores/auth'
 
@@ -34,6 +35,12 @@ const authStore = useAuthStore()
 const { user: sessionUser, isAdmin } = storeToRefs(authStore)
 const currentUserId = computed(() => sessionUser.value?.id ?? null)
 const serverPermissions = computed(() => server.value?.permissions ?? [])
+
+const { copy, copied } = useClipboard()
+const serverAddress = computed(() => {
+  if (!primaryAllocation.value) return ''
+  return `${primaryAllocation.value.ip}:${primaryAllocation.value.port}`
+})
 
 watch(server, (newServer) => {
   if (import.meta.client && newServer) {
@@ -448,14 +455,31 @@ function handleSearch() {
                     <span class="ml-1 capitalize">{{ serverState }}</span>
                   </UBadge>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between gap-2">
                   <span class="text-muted-foreground">{{ t('server.console.ipPort') }}</span>
-                  <span v-if="primaryAllocation" class="font-mono">{{ primaryAllocation.ip }}:{{ primaryAllocation.port }}</span>
+                  <div v-if="primaryAllocation" class="flex items-center gap-1">
+                    <span class="font-mono text-xs">{{ serverAddress }}</span>
+                    <UTooltip :text="copied ? t('common.copied') : t('common.copy')">
+                      <UButton
+                        :color="copied ? 'success' : 'neutral'"
+                        variant="link"
+                        size="xs"
+                        :icon="copied ? 'i-lucide-copy-check' : 'i-lucide-copy'"
+                        :aria-label="t('common.copy')"
+                        @click="copy(serverAddress)"
+                      />
+                    </UTooltip>
+                  </div>
                   <span v-else class="text-muted-foreground">{{ t('common.notAssigned') }}</span>
                 </div>
                 <div v-if="stats && stats.uptime" class="flex items-center justify-between">
                   <span class="text-muted-foreground">{{ t('server.console.uptime') }}</span>
                   <span class="font-mono">{{ formattedUptime }}</span>
+                </div>
+                <div v-if="stats && stats.cpuAbsolute !== undefined" class="flex items-center justify-between">
+                  <span class="text-muted-foreground">{{ t('server.console.cpu') }}</span>
+                  <span v-if="serverLimits?.cpu">{{ stats.cpuAbsolute.toFixed(2) }}% / {{ serverLimits.cpu }}%</span>
+                  <span v-else>{{ stats.cpuAbsolute.toFixed(2) }}%</span>
                 </div>
                 <div v-if="stats && stats.memoryLimitBytes" class="flex items-center justify-between">
                   <span class="text-muted-foreground">{{ t('server.console.memory') }}</span>
@@ -497,14 +521,31 @@ function handleSearch() {
                 <span class="ml-1 capitalize">{{ serverState }}</span>
               </UBadge>
             </div>
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-2">
               <span class="text-muted-foreground">{{ t('server.console.ipPort') }}</span>
-              <span v-if="primaryAllocation" class="font-mono">{{ primaryAllocation.ip }}:{{ primaryAllocation.port }}</span>
+              <div v-if="primaryAllocation" class="flex items-center gap-1">
+                <span class="font-mono text-xs">{{ serverAddress }}</span>
+                <UTooltip :text="copied ? t('common.copied') : t('common.copy')">
+                  <UButton
+                    :color="copied ? 'success' : 'neutral'"
+                    variant="link"
+                    size="xs"
+                    :icon="copied ? 'i-lucide-copy-check' : 'i-lucide-copy'"
+                    :aria-label="t('common.copy')"
+                    @click="copy(serverAddress)"
+                  />
+                </UTooltip>
+              </div>
               <span v-else class="text-muted-foreground">{{ t('common.notAssigned') }}</span>
             </div>
             <div v-if="stats && stats.uptime" class="flex items-center justify-between">
               <span class="text-muted-foreground">{{ t('server.console.uptime') }}</span>
               <span class="font-mono">{{ formattedUptime }}</span>
+            </div>
+            <div v-if="stats && stats.cpuAbsolute !== undefined" class="flex items-center justify-between">
+              <span class="text-muted-foreground">{{ t('server.console.cpu') }}</span>
+              <span v-if="serverLimits?.cpu">{{ stats.cpuAbsolute.toFixed(2) }}% / {{ serverLimits.cpu }}%</span>
+              <span v-else>{{ stats.cpuAbsolute.toFixed(2) }}%</span>
             </div>
             <div v-if="stats && stats.memoryLimitBytes" class="flex items-center justify-between">
               <span class="text-muted-foreground">{{ t('server.console.memory') }}</span>
