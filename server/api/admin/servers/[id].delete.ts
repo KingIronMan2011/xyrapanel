@@ -67,7 +67,8 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.serverLimits.serverId, serverId))
     .run()
 
-  db.delete(tables.serverAllocations)
+  db.update(tables.serverAllocations)
+    .set({ serverId: null, isPrimary: false })
     .where(eq(tables.serverAllocations.serverId, serverId))
     .run()
 
