@@ -4,7 +4,26 @@
     "source.fixAll.eslint": "explicit",
   },
   "conventionalCommits.scopes": [
-    "deps",
-    "auth"
+    "auth",
+    "server",
+    "files",
+    "admin",
+    "api",
+    "allocations",
+    "console",
+    "permissions",
+    "settings",
+    "activity",
+    "ui",
+    "i18n",
+    "db",
+    "middleware",
+    "composable",
+    "store",
+    "config",
+    "types",
+    "utils",
+    "test",
+    "deps"
   ],
 }
