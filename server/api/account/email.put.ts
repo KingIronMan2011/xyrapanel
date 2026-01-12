@@ -59,6 +59,7 @@ export default defineEventHandler(async (event): Promise<UpdateEmailResponse> =>
   db.update(tables.users)
     .set({
       email: body.email,
+      emailVerified: null,
       updatedAt: new Date(),
     })
     .where(eq(tables.users.id, user.id))

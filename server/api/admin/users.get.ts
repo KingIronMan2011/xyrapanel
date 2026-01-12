@@ -4,10 +4,11 @@ import { count, desc, inArray } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import type { AdminUsersPayload } from '#shared/types/admin'
 
 export default defineEventHandler(async (event): Promise<AdminUsersPayload> => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
   
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.USERS, ADMIN_ACL_PERMISSIONS.READ)
   
@@ -96,6 +97,19 @@ export default defineEventHandler(async (event): Promise<AdminUsersPayload> => {
       serversOwned: counts.owned,
       serversAccess: counts.accessible,
     }
+  })
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.users.listed',
+    targetType: 'user',
+    metadata: {
+      page,
+      limit,
+      total,
+      returned: users.length,
+    },
   })
 
   return {

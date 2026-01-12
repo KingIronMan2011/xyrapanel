@@ -5,9 +5,12 @@ import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { resetPasswordActionSchema } from '#shared/schema/admin/actions'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 
 export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.USERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const userId = getRouterParam(event, 'id')
   if (!userId) {
@@ -77,7 +80,7 @@ export default defineEventHandler(async (event) => {
     const temporaryPassword = body.password?.trim() || randomBytes(9).toString('base64url')
     
     const bcrypt = await import('bcryptjs')
-    const hashedPassword = await bcrypt.default.hash(temporaryPassword, 10)
+    const hashedPassword = await bcrypt.default.hash(temporaryPassword, 12)
     await db.update(tables.users)
       .set({
         password: hashedPassword,

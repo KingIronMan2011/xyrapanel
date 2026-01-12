@@ -2,6 +2,7 @@ import { createError } from 'h3'
 import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -27,6 +28,14 @@ export default defineEventHandler(async (event) => {
   if (!user) {
     throw createError({ statusCode: 404, statusMessage: 'User not found' })
   }
+
+  await recordAuditEventFromRequest(event, {
+    actor: resolvedUser.id,
+    actorType: 'user',
+    action: 'account.profile.viewed',
+    targetType: 'user',
+    targetId: resolvedUser.id,
+  })
 
   return { data: user }
 })

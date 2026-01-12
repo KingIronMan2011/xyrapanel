@@ -4,9 +4,13 @@ import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import type { AdminCreateUserPayload } from '#shared/types/user'
 import { sendAdminUserCreatedEmail } from '~~/server/utils/email'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.USERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const body = await readBody<AdminCreateUserPayload>(event)
 
@@ -50,6 +54,19 @@ export default defineEventHandler(async (event) => {
   catch (error) {
     console.error('Failed to send admin user created email', error)
   }
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.user.created',
+    targetType: 'user',
+    targetId: newUser.id,
+    metadata: {
+      email: newUser.email,
+      username: newUser.username,
+      role: newUser.rootAdmin ? 'admin' : 'user',
+    },
+  })
 
   return {
     data: {

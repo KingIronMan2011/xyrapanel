@@ -1,5 +1,6 @@
 import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -16,13 +17,22 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.sshKeys.userId, user.id))
     .all()
 
-  return {
-    data: keys.map(key => ({
-      id: key.id,
-      name: key.name,
-      fingerprint: key.fingerprint,
-      public_key: key.publicKey,
-      created_at: key.createdAt,
-    })),
-  }
+  const data = keys.map(key => ({
+    id: key.id,
+    name: key.name,
+    fingerprint: key.fingerprint,
+    public_key: key.publicKey,
+    created_at: key.createdAt,
+  }))
+
+  await recordAuditEventFromRequest(event, {
+    actor: user.id,
+    actorType: 'user',
+    action: 'account.ssh_keys.listed',
+    targetType: 'user',
+    targetId: user.id,
+    metadata: { count: keys.length },
+  })
+
+  return { data }
 })

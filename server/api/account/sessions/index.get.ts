@@ -2,6 +2,7 @@ import { createError, parseCookies } from 'h3'
 import type { UserSessionSummary, AccountSessionsResponse, AuthContext } from '#shared/types/auth'
 import { requireAuth } from '~~/server/utils/security'
 import { parseUserAgent } from '~~/server/utils/user-agent'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event): Promise<AccountSessionsResponse> => {
   const middlewareAuth = (event.context as { auth?: AuthContext }).auth
@@ -194,6 +195,15 @@ export default defineEventHandler(async (event): Promise<AccountSessionsResponse
       })
     ))
   }
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.id,
+    actorType: 'user',
+    action: 'account.sessions.listed',
+    targetType: 'user',
+    targetId: session.user.id,
+    metadata: { count: data.length },
+  })
 
   const response: AccountSessionsResponse = {
     data,

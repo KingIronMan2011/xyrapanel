@@ -2,6 +2,7 @@ import { createError, getQuery } from 'h3'
 import { desc, eq, or, sql } from 'drizzle-orm'
 import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -59,15 +60,26 @@ export default defineEventHandler(async (event) => {
     .offset(offset)
     .all()
 
+  const data = rows.map((row) => ({
+    id: row.id,
+    occurredAt: row.occurredAt.toISOString(),
+    action: row.action,
+    target: row.targetId ? `${row.targetType}#${row.targetId}` : row.targetType,
+    actor: row.actor,
+    metadata: row.metadata ? JSON.parse(row.metadata) : null,
+  }))
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.id,
+    actorType: 'user',
+    action: 'account.activity.viewed',
+    targetType: 'user',
+    targetId: session.user.id,
+    metadata: { page, limit, total },
+  })
+
   return {
-    data: rows.map((row) => ({
-      id: row.id,
-      occurredAt: row.occurredAt.toISOString(),
-      action: row.action,
-      target: row.targetId ? `${row.targetType}#${row.targetId}` : row.targetType,
-      actor: row.actor,
-      metadata: row.metadata ? JSON.parse(row.metadata) : null,
-    })),
+    data,
     pagination: {
       page,
       perPage: limit,

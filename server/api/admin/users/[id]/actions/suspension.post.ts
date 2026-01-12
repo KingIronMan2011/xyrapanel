@@ -3,9 +3,12 @@ import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { suspensionActionSchema } from '#shared/schema/admin/actions'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 
 export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.USERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const userId = getRouterParam(event, 'id')
   if (!userId) {

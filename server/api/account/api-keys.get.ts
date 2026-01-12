@@ -1,6 +1,7 @@
 import { createError } from 'h3'
 import { getServerSession, getSessionUser } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -40,31 +41,40 @@ export default defineEventHandler(async (event) => {
 
   const permsByKeyId = new Map(keyPermissions.map(p => [p.apiKeyId, p]))
 
-  return {
-    data: keys.map(key => {
-      const perms = permsByKeyId.get(key.id)
+  const data = keys.map(key => {
+    const perms = permsByKeyId.get(key.id)
 
-      let allowedIps: string[] = []
-      if (perms?.allowedIps) {
-        if (typeof perms.allowedIps === 'string') {
-          try {
-            const parsed = JSON.parse(perms.allowedIps)
-            allowedIps = Array.isArray(parsed) ? parsed : []
-          } catch {
-            allowedIps = perms.allowedIps.split(',').map((ip: string) => ip.trim()).filter(Boolean)
-          }
-        } else if (Array.isArray(perms.allowedIps)) {
-          allowedIps = perms.allowedIps
+    let allowedIps: string[] = []
+    if (perms?.allowedIps) {
+      if (typeof perms.allowedIps === 'string') {
+        try {
+          const parsed = JSON.parse(perms.allowedIps)
+          allowedIps = Array.isArray(parsed) ? parsed : []
+        } catch {
+          allowedIps = perms.allowedIps.split(',').map((ip: string) => ip.trim()).filter(Boolean)
         }
+      } else if (Array.isArray(perms.allowedIps)) {
+        allowedIps = perms.allowedIps
       }
+    }
 
-      return {
-        identifier: key.id,
-        description: perms?.memo || key.name || null,
-        allowed_ips: allowedIps,
-        last_used_at: perms?.lastUsedAt?.toISOString() || null,
-        created_at: key.createdAt.toISOString(),
-      }
-    }),
-  }
+    return {
+      identifier: key.id,
+      description: perms?.memo || key.name || null,
+      allowed_ips: allowedIps,
+      last_used_at: perms?.lastUsedAt?.toISOString() || null,
+      created_at: key.createdAt.toISOString(),
+    }
+  })
+
+  await recordAuditEventFromRequest(event, {
+    actor: user.id,
+    actorType: 'user',
+    action: 'account.api_keys.listed',
+    targetType: 'user',
+    targetId: user.id,
+    metadata: { count: keys.length },
+  })
+
+  return { data }
 })
