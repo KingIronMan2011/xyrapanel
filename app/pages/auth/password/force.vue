@@ -11,6 +11,15 @@ const authStore = useAuthStore()
 const { status, requiresPasswordReset, isAuthenticated } = storeToRefs(authStore)
 const route = useRoute()
 const toast = useToast()
+const runtimeConfig = useRuntimeConfig()
+const appName = computed(() => runtimeConfig.public.appName || 'XyraPanel')
+const { data: brandingSettings } = await useFetch('/api/branding', {
+  key: 'auth-password-force-branding',
+  default: () => ({
+    showBrandLogo: false,
+    brandLogoUrl: null,
+  } as { showBrandLogo: boolean; brandLogoUrl: string | null }),
+})
 
 definePageMeta({
   layout: 'auth',
@@ -127,12 +136,30 @@ async function onSubmit(event: FormSubmitEvent<PasswordForceBody>) {
   <UAuthForm
     :schema="schema"
     :fields="fields"
-    :title="t('auth.passwordResetRequired')"
-    :description="t('auth.chooseNewPasswordToContinue')"
-    icon="i-lucide-key-round"
     :submit="submitProps"
     @submit="onSubmit as any"
   >
+    <template #title>
+      <div class="flex flex-col items-center gap-3 text-center">
+        <img
+          v-if="brandingSettings?.showBrandLogo && brandingSettings?.brandLogoUrl"
+          :src="brandingSettings.brandLogoUrl"
+          :alt="appName"
+          class="h-16 w-auto"
+        >
+        <h1 v-else class="text-3xl font-semibold text-white">
+          {{ appName }}
+        </h1>
+        <div class="space-y-1">
+          <h2 class="text-2xl font-semibold text-white">
+            {{ t('auth.passwordResetRequired') }}
+          </h2>
+          <p class="text-sm text-white/80">
+            {{ t('auth.chooseNewPasswordToContinue') }}
+          </p>
+        </div>
+      </div>
+    </template>
     <template #validation>
       <UAlert
         v-if="errorMessage"

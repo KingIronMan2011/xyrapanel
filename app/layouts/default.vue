@@ -43,10 +43,13 @@ const { data: securitySettings } = await useFetch('/api/admin/settings/security'
 const { data: brandingSettings } = await useFetch('/api/branding', {
   key: 'default-layout-branding-settings',
   default: () => ({
-    showBrandLogo: false,
-    brandLogoUrl: null,
+    showBrandLogo: true,
+    brandLogoUrl: '/logo.png',
   } as { showBrandLogo: boolean; brandLogoUrl: string | null }),
 })
+
+const showBrandLogo = computed(() => brandingSettings.value?.showBrandLogo !== false)
+const brandLogoUrl = computed(() => brandingSettings.value?.brandLogoUrl || '/logo.png')
 
 const isMaintenanceMode = computed(() => {
   if (!securitySettings.value?.maintenanceMode) return false
@@ -171,9 +174,15 @@ async function handleLocaleChange(newLocale: string | undefined) {
       :ui="{ footer: 'border-t border-default' }"
     >
       <template #header="{ collapsed }">
-        <NuxtLink v-if="!collapsed" :to="localePath('index')" class="group inline-flex items-center gap-2">
-          <img v-if="brandingSettings?.showBrandLogo && brandingSettings?.brandLogoUrl" :src="brandingSettings.brandLogoUrl" :alt="appName" class="h-12 w-auto" >
-          <h1 v-else class="text-lg font-semibold text-muted-foreground group-hover:text-foreground transition">
+        <NuxtLink v-if="!collapsed" :to="localePath('index')" class="group inline-flex items-center gap-3">
+          <img
+            v-if="showBrandLogo"
+            :src="brandLogoUrl"
+            :alt="appName"
+            class="h-12 w-auto"
+          >
+          <UIcon v-else name="i-simple-icons-nuxtdotjs" class="size-5 text-primary" />
+          <h1 class="text-lg font-semibold text-muted-foreground group-hover:text-foreground transition">
             {{ appName }}
           </h1>
         </NuxtLink>

@@ -13,6 +13,15 @@ const { t } = useI18n()
 const toast = useToast()
 const router = useRouter()
 const route = useRoute()
+const runtimeConfig = useRuntimeConfig()
+const appName = computed(() => runtimeConfig.public.appName || 'XyraPanel')
+const { data: brandingSettings } = await useFetch('/api/branding', {
+  key: 'auth-password-reset-branding',
+  default: () => ({
+    showBrandLogo: false,
+    brandLogoUrl: null,
+  } as { showBrandLogo: boolean; brandLogoUrl: string | null }),
+})
 
 const fields: AuthFormField[] = [
   {
@@ -117,11 +126,30 @@ async function onSubmit(payload: FormSubmitEvent<PasswordResetInput>) {
   <UAuthForm
     :schema="schema"
     :fields="fields"
-    :title="t('auth.setNewPassword')"
-    :description="t('auth.enterResetTokenAndPassword')"
     :submit="submitProps"
     @submit="onSubmit as any"
   >
+    <template #title>
+      <div class="flex flex-col items-center gap-3 text-center">
+        <img
+          v-if="brandingSettings?.showBrandLogo && brandingSettings?.brandLogoUrl"
+          :src="brandingSettings.brandLogoUrl"
+          :alt="appName"
+          class="h-16 w-auto"
+        >
+        <h1 v-else class="text-3xl font-semibold text-white">
+          {{ appName }}
+        </h1>
+        <div class="space-y-1">
+          <h2 class="text-2xl font-semibold text-white">
+            {{ t('auth.setNewPassword') }}
+          </h2>
+          <p class="text-sm text-white/80">
+            {{ t('auth.enterResetTokenAndPassword') }}
+          </p>
+        </div>
+      </div>
+    </template>
     <template #footer>
       <NuxtLink to="/auth/login" class="text-primary font-medium">
         {{ t('auth.backToSignIn') }}

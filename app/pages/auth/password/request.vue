@@ -12,6 +12,14 @@ const { t } = useI18n()
 const toast = useToast()
 const router = useRouter()
 const runtimeConfig = useRuntimeConfig()
+const appName = computed(() => runtimeConfig.public.appName || 'XyraPanel')
+const { data: brandingSettings } = await useFetch('/api/branding', {
+  key: 'auth-password-request-branding',
+  default: () => ({
+    showBrandLogo: false,
+    brandLogoUrl: null,
+  } as { showBrandLogo: boolean; brandLogoUrl: string | null }),
+})
 
 const turnstileSiteKey = computed(() => runtimeConfig.public.turnstile?.siteKey || '')
 const hasTurnstile = computed(() => !!turnstileSiteKey.value && turnstileSiteKey.value.length > 0)
@@ -107,12 +115,23 @@ async function onSubmit(payload: FormSubmitEvent<PasswordRequestBody>) {
   <UAuthForm
     :schema="schema"
     :fields="fields"
-    :title="t('auth.resetYourPassword')"
-    :description="t('auth.enterEmailOrUsername')"
-    icon="i-lucide-key-round"
     :submit="submitProps"
     @submit="onSubmit as any"
   >
+    <template #title>
+      <div class="flex flex-col items-center gap-3 text-center">
+        <img
+          v-if="brandingSettings?.showBrandLogo && brandingSettings?.brandLogoUrl"
+          :src="brandingSettings.brandLogoUrl"
+          :alt="appName"
+          class="h-16 w-auto"
+        >
+        <h1 class="text-2xl font-semibold text-white">
+          {{ t('auth.resetYourPassword') }}
+        </h1>
+        <p class="text-sm text-white/80">{{ t('auth.enterEmailOrUsername') }}</p>
+      </div>
+    </template>
     <template #footer>
       <div class="space-y-4">
         <div v-if="hasTurnstile" class="flex flex-col items-center gap-2">

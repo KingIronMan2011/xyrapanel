@@ -189,7 +189,7 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
     <div class="space-y-6">
       <UAuthForm :schema="schema" :fields="fields" :submit="submitProps" @submit="onSubmit as any">
         <template #title>
-          <div class="flex flex-col items-center gap-3">
+          <div class="flex flex-col items-center gap-3 text-center">
             <img
               v-if="brandingSettings?.showBrandLogo && brandingSettings?.brandLogoUrl"
               :src="brandingSettings.brandLogoUrl"
@@ -199,6 +199,14 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
             <h1 v-else class="text-3xl font-semibold text-white">
               {{ appName }}
             </h1>
+            <div class="space-y-1">
+              <h2 class="text-2xl font-semibold text-white">
+                {{ t('auth.signIn') }}
+              </h2>
+              <p class="text-sm text-white/80">
+                {{ t('auth.signInToContinue') }}
+              </p>
+            </div>
           </div>
         </template>
         <template #password-hint>

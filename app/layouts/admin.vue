@@ -446,7 +446,16 @@ const dashboardSearchGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]
             :label="t('common.search')"
           />
           <div v-if="!collapsed" class="text-[10px] uppercase tracking-wide text-muted-foreground/70 px-2 py-2">
-            <p>{{ t('layout.copyright', { year: new Date().getFullYear() }) }} <ULink href="https://xyrapanel.com" target="_blank">XyraPanel</ULink></p>
+            <p class="flex items-center gap-1">
+              <img
+                src="/logo.png"
+                alt="XyraPanel logo"
+                class="h-4 w-auto"
+                loading="lazy"
+              >
+              {{ t('layout.copyright', { year: new Date().getFullYear() }) }}
+              <ULink href="https://xyrapanel.com" target="_blank">XyraPanel</ULink>
+            </p>
           </div>
           <ClientOnly>
             <UNavigationMenu
