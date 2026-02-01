@@ -5,7 +5,6 @@ import type { PasswordResetBody } from '#shared/types/account'
 import { authClient } from '~/utils/auth-client'
 
 definePageMeta({
-  layout: 'auth',
   auth: false,
 })
 

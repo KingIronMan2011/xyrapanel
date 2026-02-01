@@ -4,7 +4,6 @@ import { passwordRequestSchema } from '#shared/schema/account'
 import type { PasswordRequestBody } from '#shared/types/account'
 
 definePageMeta({
-  layout: 'auth',
   auth: false,
 })
 

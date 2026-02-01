@@ -4,7 +4,6 @@ import type { AdminScheduleResponse } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Schedules',
   adminSubtitle: 'Review panel automation (Wings tasks & Nitro tasks)',
 })

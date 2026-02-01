@@ -4,7 +4,6 @@ import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Servers',
   adminSubtitle: 'Global view of panel servers synchronized with Wings',
 })

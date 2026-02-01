@@ -6,7 +6,6 @@ const route = useRoute()
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Server details',
   adminSubtitle: 'Manage server configuration and resources',
 })

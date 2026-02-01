@@ -25,6 +25,7 @@
     "types",
     "utils",
     "test",
-    "deps"
+    "deps",
+    "pages"
   ],
 }

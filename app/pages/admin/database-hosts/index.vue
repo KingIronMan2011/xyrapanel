@@ -3,7 +3,6 @@ import type { DatabaseHostWithStats, CreateDatabaseHostPayload } from '#shared/t
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Database Hosts',
   adminSubtitle: 'Manage database hosts.',
 })

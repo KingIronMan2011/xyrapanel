@@ -4,7 +4,6 @@ import type { MountWithRelations, CreateMountPayload } from '#shared/types/admin
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Mounts',
   adminSubtitle: 'Manage server mounts.',
 })

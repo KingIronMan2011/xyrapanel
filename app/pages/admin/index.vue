@@ -3,7 +3,6 @@ import { ref } from 'vue'
 import type { DashboardResponse } from '#shared/types/admin'
 
 definePageMeta({
-  layout: 'admin',
   adminTitle: 'Dashboard',
   adminSubtitle: 'Infrastructure overview sourced from Wings metrics',
 })

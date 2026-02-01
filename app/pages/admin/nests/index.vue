@@ -3,7 +3,6 @@ import type { NestWithEggCount, CreateNestPayload } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Nests',
   adminSubtitle: 'Manage server nests and eggs.',
 })

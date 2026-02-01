@@ -9,7 +9,6 @@ const requestFetch = useRequestFetch() as typeof $fetch
 
 definePageMeta({
   auth: true,
-  layout: 'server',
 })
 
 const serverId = computed(() => route.params.id as string)

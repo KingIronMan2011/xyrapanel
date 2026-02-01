@@ -4,7 +4,6 @@ import { storeToRefs } from 'pinia'
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
 })
 
 const { t } = useI18n()

@@ -5,7 +5,6 @@ definePageMeta({
   auth: true,
   title: 'SSH Keys',
   subtitle: 'Manage SSH keys for secure server access',
-  layout: 'default',
 })
 
 const { t } = useI18n()

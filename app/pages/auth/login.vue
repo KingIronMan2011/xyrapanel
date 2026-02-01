@@ -25,7 +25,6 @@ const turnstileSiteKey = computed(() => runtimeConfig.public.turnstile?.siteKey 
 const hasTurnstile = computed(() => !!turnstileSiteKey.value && turnstileSiteKey.value.length > 0)
 
 definePageMeta({
-  layout: 'auth',
   auth: false,
 })
 

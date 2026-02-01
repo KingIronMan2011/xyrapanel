@@ -3,7 +3,6 @@ import type { LocationWithNodeCount, CreateLocationPayload } from '#shared/types
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Locations',
   adminSubtitle: 'Manage server locations.',
 })

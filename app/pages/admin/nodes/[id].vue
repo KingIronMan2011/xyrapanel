@@ -15,7 +15,6 @@ const route = useRoute()
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Node details',
   adminSubtitle: 'Inspect Wings node metrics and allocations',
 })

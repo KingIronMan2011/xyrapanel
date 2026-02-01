@@ -3,7 +3,6 @@ import type { WingsNodeConfiguration, WingsNodeSummary, WingsSystemInformation }
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Nodes',
   adminSubtitle: 'Manage Wings daemons and monitor node health',
 })

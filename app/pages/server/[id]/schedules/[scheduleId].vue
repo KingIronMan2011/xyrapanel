@@ -7,7 +7,6 @@ const router = useRouter()
 
 definePageMeta({
   auth: true,
-  layout: 'server',
 })
 
 const serverId = computed(() => route.params.id as string)

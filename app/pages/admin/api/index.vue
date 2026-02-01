@@ -3,7 +3,6 @@ import type { ApiKey, ApiKeyWithToken, CreateApiKeyPayload } from '#shared/types
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'API Keys',
   adminSubtitle: 'Manage existing keys or create new ones for API access.',
 })

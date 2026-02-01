@@ -9,7 +9,6 @@ const route = useRoute()
 
 definePageMeta({
   auth: true,
-  layout: 'server',
 })
 
 const { t } = useI18n()

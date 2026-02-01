@@ -4,7 +4,6 @@ import type { AdminUserProfilePayload } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'User profile',
   adminSubtitle: 'Inspect panel access, owned servers, and activity',
 })

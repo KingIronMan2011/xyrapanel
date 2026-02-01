@@ -4,7 +4,6 @@ import type { AdminActivityEntry, AuditEventsPayload } from '#shared/types/admin
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Audit log',
   adminSubtitle: 'Track panel-wide events mirrored from Wings',
 })

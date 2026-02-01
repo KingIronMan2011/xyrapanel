@@ -7,7 +7,6 @@ import type { NodeOption, UserOption } from '#shared/types/ui'
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
 })
 
 const { t } = useI18n()

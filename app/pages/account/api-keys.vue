@@ -8,7 +8,6 @@ import type { CreateApiKeyFormInput } from '#shared/schema/account'
 
 definePageMeta({
   auth: true,
-  layout: 'default',
   title: 'API Keys',
   subtitle: 'Manage existing keys or create new ones for API access',
 })

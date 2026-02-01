@@ -6,7 +6,6 @@ const { t } = useI18n()
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
   adminTitle: 'Users',
   adminSubtitle: 'Audit panel accounts and Wings permissions',
 })

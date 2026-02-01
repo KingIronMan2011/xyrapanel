@@ -22,7 +22,6 @@ const { data: brandingSettings } = await useFetch('/api/branding', {
 })
 
 definePageMeta({
-  layout: 'auth',
   auth: true,
 })
 

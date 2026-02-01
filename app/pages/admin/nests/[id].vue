@@ -4,7 +4,6 @@ import type { Nest, Egg } from '#shared/types/nest'
 
 definePageMeta({
   auth: true,
-  layout: 'admin',
 })
 
 const route = useRoute()

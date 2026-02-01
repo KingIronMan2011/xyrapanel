@@ -68,6 +68,21 @@ export default defineNuxtConfig({
     '@nuxtjs/i18n',
   ],
 
+  routeRules: {
+    '/admin/**': {
+      appLayout: 'admin',
+    },
+    '/auth/**': {
+      appLayout: 'auth',
+    },
+    '/server': {
+      appLayout: 'default',
+    },
+    '/server/**': {
+      appLayout: 'server',
+    },
+  },
+
   pwa: {
     strategies: 'generateSW',
     registerType: 'autoUpdate',
