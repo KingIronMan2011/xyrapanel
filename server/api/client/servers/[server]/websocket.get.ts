@@ -1,6 +1,11 @@
-import { createError, getRouterParam, setResponseHeader } from 'h3'
-import { resolveServerRequest } from '~~/server/utils/http/serverAccess'
 import { generateWingsJWT } from '~~/server/utils/wings/jwt'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { getNodeForServer } from '~~/server/utils/server-helpers'
+import { resolveNodeConnection } from '~~/server/utils/wings/nodesStore'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import type { Permission } from '#shared/types/server'
 
 interface WebSocketToken {
   token: string
@@ -17,20 +22,28 @@ export default defineEventHandler(async (event): Promise<WebSocketToken> => {
     })
   }
 
-  const context = await resolveServerRequest(event, {
-    identifier: id,
-    requiredPermissions: ['websocket.connect'],
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(id, accountContext.session)
+
+  const websocketPermissions: Permission[] = ['websocket.connect']
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: websocketPermissions,
+    allowOwner: true,
+    allowAdmin: true,
   })
 
-  if (!context.node || !context.nodeConnection) {
+  const node = await getNodeForServer(server.nodeId)
+  const { connection: nodeConnection } = resolveNodeConnection(node.id)
+
+  if (!nodeConnection) {
     throw createError({
       statusCode: 500,
       statusMessage: 'Node not available',
       message: 'Server has no resolved Wings node',
     })
   }
-
-  const { node, nodeConnection, user, server, permissions } = context
 
   const baseUrl = `${node.scheme}://${node.fqdn}:${node.daemonListen}`
   
@@ -42,7 +55,7 @@ export default defineEventHandler(async (event): Promise<WebSocketToken> => {
     {
       server: { uuid: server.uuid },
       user: user.id ? { id: user.id, uuid: user.id } : undefined,
-      permissions,
+      permissions: ['*'],
       identifiedBy: `${user.id ?? 'anonymous'}:${server.uuid}`,
       expiresIn: 900,
     },
@@ -50,6 +63,13 @@ export default defineEventHandler(async (event): Promise<WebSocketToken> => {
 
   const protocol = node.scheme === 'https' ? 'wss' : 'ws'
   const socketUrl = `${protocol}://${node.fqdn}:${node.daemonListen}/api/servers/${server.uuid}/ws`
+
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.websocket.token_issued',
+    server: { id: server.id, uuid: server.uuid },
+  })
 
   const response: WebSocketToken = {
     token,

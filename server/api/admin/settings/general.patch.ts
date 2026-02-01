@@ -1,11 +1,12 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { SETTINGS_KEYS, deleteSetting, setSettings } from '~~/server/utils/settings'
-import type { GeneralSettings } from '#shared/types/admin'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { generalSettingsSchema } from '#shared/schema/admin/settings'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
-  const body = await readBody<Partial<GeneralSettings>>(event)
+  const body = await readValidatedBodyWithLimit(event, generalSettingsSchema, BODY_SIZE_LIMITS.SMALL)
   const updates: Record<string, string> = {}
   const deletions: string[] = []
 
@@ -31,14 +32,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (body.paginationLimit !== undefined) {
-    const value = body.paginationLimit
-    if (!Number.isInteger(value) || value < 10 || value > 100) {
-      throw createError({
-        statusCode: 422,
-        message: 'Pagination limit must be an integer between 10 and 100',
-      })
-    }
-    updates[SETTINGS_KEYS.PAGINATION_LIMIT] = String(value)
+    updates[SETTINGS_KEYS.PAGINATION_LIMIT] = String(body.paginationLimit)
   }
 
   if (body.telemetryEnabled !== undefined) {
@@ -58,5 +52,22 @@ export default defineEventHandler(async (event) => {
     deleteSetting(key as typeof SETTINGS_KEYS[keyof typeof SETTINGS_KEYS])
   }
 
-  return { success: true }
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.settings.general.updated',
+    targetType: 'settings',
+    metadata: {
+      updatedKeys: Object.keys(updates),
+      deletedKeys: deletions,
+    },
+  })
+
+  return {
+    data: {
+      success: true,
+      updatedKeys: Object.keys(updates),
+      deletedKeys: deletions,
+    },
+  }
 })

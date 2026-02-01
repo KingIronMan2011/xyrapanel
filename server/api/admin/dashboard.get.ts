@@ -1,12 +1,11 @@
-import { defineEventHandler } from 'h3'
 import { desc } from 'drizzle-orm'
-
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { listWingsNodes } from '~~/server/utils/wings/nodesStore'
 import { remotePaginateServers } from '~~/server/utils/wings/registry'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 import type {
   DashboardResponse,
@@ -44,7 +43,10 @@ async function fetchNitroTasks(event: Parameters<Parameters<typeof defineEventHa
       return { tasks: {}, scheduledTasks: [] }
     }
 
-    return await response.json() as NitroTasksResponse
+    const payload = await response.json() as { data?: NitroTasksResponse } | NitroTasksResponse
+    return 'data' in payload && payload.data
+      ? payload.data
+      : (payload as NitroTasksResponse)
   }
   catch (error) {
     console.error('Failed to fetch Nitro tasks for dashboard:', error)
@@ -52,8 +54,8 @@ async function fetchNitroTasks(event: Parameters<Parameters<typeof defineEventHa
   }
 }
 
-export default defineEventHandler(async (event): Promise<DashboardResponse> => {
-  await requireAdmin(event)
+export default defineEventHandler(async (event): Promise<{ data: DashboardResponse }> => {
+  const session = await requireAdmin(event)
   
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.DASHBOARD, ADMIN_ACL_PERMISSIONS.READ)
   
@@ -106,7 +108,7 @@ export default defineEventHandler(async (event): Promise<DashboardResponse> => {
   }).from(tables.serverSchedules).all()
 
   const nitroTasks = await fetchNitroTasks(event)
-  const nitroScheduleCount = nitroTasks.scheduledTasks.reduce((sum, sched) => sum + sched.tasks.length, 0)
+  const nitroScheduleCount = (nitroTasks.scheduledTasks ?? []).reduce((sum, sched) => sum + sched.tasks.length, 0)
 
   const activeSchedules = scheduleRows.filter(s => s.enabled).length + nitroScheduleCount
   const soonThreshold = new Date(Date.now() + 30 * 60 * 1000)
@@ -180,11 +182,26 @@ export default defineEventHandler(async (event): Promise<DashboardResponse> => {
   if (dueSoonCount > 0) operations.push({ key: 'review-schedules', label: 'Review upcoming schedules', detail: `${dueSoonCount} schedule${dueSoonCount === 1 ? '' : 's'} scheduled within 30 minutes.` })
   if (operations.length === 0) operations.push({ key: 'all-clear', label: 'All systems nominal', detail: 'Wings nodes and panel services are responding as expected.' })
 
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.dashboard.viewed',
+    targetType: 'settings',
+    targetId: null,
+    metadata: {
+      nodeCount: nodes.length,
+      totalServers,
+      totalUsers,
+    },
+  })
+
   return {
-    metrics,
-    nodes: nodeResults,
-    incidents,
-    operations,
-    generatedAt: new Date().toISOString(),
+    data: {
+      metrics,
+      nodes: nodeResults,
+      incidents,
+      operations,
+      generatedAt: new Date().toISOString(),
+    },
   }
 })

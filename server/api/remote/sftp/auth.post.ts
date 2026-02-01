@@ -1,9 +1,12 @@
-import { createError, readBody, getRequestIP, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { eq } from 'drizzle-orm'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { listServerSubusers } from '~~/server/utils/subusers'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { recordAuditEvent } from '~~/server/utils/audit'
 import bcrypt from 'bcryptjs'
-import type { SftpAuthRequest, SftpAuthResponse } from '#shared/types/api'
+import type { SftpAuthResponse } from '#shared/types/api'
+import { remoteSftpAuthSchema } from '#shared/schema/wings'
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
 const MAX_ATTEMPTS = 5
@@ -28,7 +31,7 @@ function checkRateLimit(ip: string): boolean {
 
 export default defineEventHandler(async (event: H3Event) => {
   const db = useDrizzle()
-  const body = await readBody<SftpAuthRequest>(event)
+  const body = await readValidatedBodyWithLimit(event, remoteSftpAuthSchema, BODY_SIZE_LIMITS.SMALL)
   const clientIp = getRequestIP(event) || body.ip || 'unknown'
 
   if (!checkRateLimit(clientIp)) {
@@ -40,30 +43,6 @@ export default defineEventHandler(async (event: H3Event) => {
   }
 
   const { type, username, password: credential } = body
-
-  if (!username) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'Username is required',
-    })
-  }
-
-  if (type !== 'password' && type !== 'public_key') {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'Invalid authentication type',
-    })
-  }
-
-  if (!credential) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'Password or public key is required',
-    })
-  }
 
   const parts = username.split('.')
   if (parts.length < 2) {
@@ -210,5 +189,7 @@ export default defineEventHandler(async (event: H3Event) => {
     permissions,
   }
 
-  return response
+  return {
+    data: response,
+  }
 })

@@ -2,10 +2,10 @@ import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.READ)
 
@@ -72,6 +72,17 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.mountServer.serverId, server.id))
     .all()
 
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.server.viewed',
+    targetType: 'server',
+    targetId: server.id,
+    metadata: {
+      serverUuid: server.uuid,
+    },
+  })
+
   return {
     data: {
       id: server.id,
@@ -93,9 +104,9 @@ export default defineEventHandler(async (event) => {
       allocationLimit: server.allocationLimit ?? null,
       databaseLimit: server.databaseLimit ?? null,
       backupLimit: server.backupLimit ?? 3,
-      installedAt: server.installedAt,
-      createdAt: server.createdAt,
-      updatedAt: server.updatedAt,
+      installedAt: server.installedAt instanceof Date ? server.installedAt.toISOString() : server.installedAt,
+      createdAt: server.createdAt instanceof Date ? server.createdAt.toISOString() : server.createdAt,
+      updatedAt: server.updatedAt instanceof Date ? server.updatedAt.toISOString() : server.updatedAt,
       owner: owner ? {
         id: owner.id,
         username: owner.username,
@@ -126,7 +137,7 @@ export default defineEventHandler(async (event) => {
         id: a.id,
         ip: a.ip,
         port: a.port,
-        is_primary: a.isPrimary,
+        isPrimary: Boolean(a.isPrimary),
       })),
       limits: limits ? {
         cpu: limits.cpu,
@@ -137,7 +148,7 @@ export default defineEventHandler(async (event) => {
         threads: limits.threads,
         oomDisabled: limits.oomDisabled,
       } : null,
-      databases: databases,
+      databases,
       mounts: mounts.map(m => m.mounts),
     },
   }

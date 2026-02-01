@@ -1,8 +1,10 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { renderEmailTemplate } from '~~/server/utils/email-templates'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { emailTemplatePreviewSchema } from '#shared/schema/admin/settings'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   const id = getRouterParam(event, 'id')
   if (!id) {
@@ -12,13 +14,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody(event)
-  if (!body.data || typeof body.data !== 'object') {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Preview data is required',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(event, emailTemplatePreviewSchema, BODY_SIZE_LIMITS.MEDIUM)
 
   try {
     const isPlaceholderMode = Object.values(body.data).some(
@@ -31,7 +27,8 @@ export default defineEventHandler(async (event) => {
       const templateData = await getTemplate(id)
       templateHtml = templateData.html
     } else {
-      const template = await renderEmailTemplate(id, body.data)
+      const templateData = body.data as Record<string, string | number | boolean | null | undefined>
+      const template = await renderEmailTemplate(id, templateData)
       templateHtml = template.html
     }
     
@@ -116,10 +113,23 @@ export default defineEventHandler(async (event) => {
       </html>
     `
     
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.email_template.previewed',
+      targetType: 'settings',
+      metadata: {
+        templateId: id,
+        placeholderMode: isPlaceholderMode,
+      },
+    })
+
     return {
-      id,
-      subject: '',
-      html: styledHtml,
+      data: {
+        id,
+        subject: '',
+        html: styledHtml,
+      },
     }
   }
   catch (err) {

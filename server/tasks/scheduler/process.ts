@@ -7,7 +7,7 @@ import { debugLog, debugError } from '~~/server/utils/logger'
 
 function parseNextRun(cronExpression: string): Date {
   const now = new Date()
-  const [minute, hour, day, month, weekday] = cronExpression.split(' ')
+  const [minute = '*', hour = '*', day = '*', month = '*', weekday = '*'] = cronExpression.trim().split(/\s+/)
   
   const nextRun = new Date(now)
   nextRun.setSeconds(0)

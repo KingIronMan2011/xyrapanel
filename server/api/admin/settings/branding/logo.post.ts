@@ -1,11 +1,10 @@
 import { promises as fs, existsSync  } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join, extname } from 'pathe'
-import { readMultipartFormData, createError } from 'h3'
-
 import { requireAdmin } from '~~/server/utils/security'
 import { SETTINGS_KEYS, getSetting, setSetting } from '~~/server/utils/settings'
 import { getUploadsPath } from '~~/server/utils/storage'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 const ALLOWED_MIME_TYPES: Record<string, string> = {
@@ -33,7 +32,7 @@ function toPublicPath(filepath: string) {
 }
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   const formData = await readMultipartFormData(event)
   if (!formData) {
@@ -78,7 +77,21 @@ export default defineEventHandler(async (event) => {
   setSetting(SETTINGS_KEYS.BRAND_LOGO_PATH, publicPath)
   setSetting(SETTINGS_KEYS.BRAND_SHOW_LOGO, 'true')
 
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.branding.logo.uploaded',
+    targetType: 'settings',
+    metadata: {
+      fileName: file.filename ?? undefined,
+      mimeType: file.type ?? undefined,
+      size: file.data.length,
+    },
+  })
+
   return {
-    url: publicPath,
+    data: {
+      url: publicPath,
+    },
   }
 })

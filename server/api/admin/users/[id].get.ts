@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { useDrizzle, tables, eq, or } from '~~/server/utils/drizzle'
 import { desc } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'
@@ -177,148 +176,151 @@ export default defineEventHandler(async (event) => {
   })
 
   return {
-    user: {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      firstName: user.nameFirst ?? null,
-      lastName: user.nameLast ?? null,
-      name: user.nameFirst || user.nameLast ? `${user.nameFirst ?? ''} ${user.nameLast ?? ''}`.trim() || null : null,
-      language: user.language,
-      role: user.role,
-      rootAdmin: Boolean(user.rootAdmin),
-      twoFactorEnabled: Boolean(user.useTotp),
-      emailVerified: Boolean(user.emailVerified),
-      emailVerifiedAt: formatTimestamp(user.emailVerified),
-      suspended: Boolean(user.suspended),
-      suspendedAt: formatTimestamp(user.suspendedAt),
-      suspensionReason: user.suspensionReason ?? null,
-      passwordResetRequired: Boolean(user.passwordResetRequired),
-      createdAt: formatTimestamp(user.createdAt)!,
-      updatedAt: formatTimestamp(user.updatedAt)!,
-    },
-    stats: {
-      serverCount: servers.length,
-      apiKeyCount: apiKeys.length,
-    },
-    servers: servers.map(server => ({
-      id: server.id,
-      uuid: server.uuid,
-      identifier: server.identifier,
-      name: server.name,
-      status: server.status,
-      suspended: Boolean(server.suspended),
-      nodeName: server.nodeName ?? null,
-      createdAt: formatTimestamp(server.createdAt)!,
-    })),
-    apiKeys: apiKeys.map(key => ({
-      id: key.id,
-      identifier: key.identifier,
-      memo: key.memo,
-      createdAt: formatTimestamp(key.createdAt)!,
-      lastUsedAt: formatTimestamp(key.lastUsedAt),
-      expiresAt: formatTimestamp(key.expiresAt),
-    })),
-    activity: allActivityEvents.map(entry => ({
-      id: entry.id,
-      occurredAt: formatTimestamp(entry.occurredAt)!,
-      action: entry.action,
-      target: entry.targetId ? `${entry.targetType}#${entry.targetId}` : entry.targetType,
-      actor: entry.actor,
-      details: parseMetadata(entry.metadata ?? null),
-    })),
-    security: {
-      sessions: sessions.map(session => {
-        const ipAddress = session.metadataIpAddress || session.sessionIpAddress || null
-        
-        let expiresDate: Date | null = null
-        if (session.expiresAt) {
-          expiresDate = session.expiresAt instanceof Date 
-            ? session.expiresAt 
-            : new Date(session.expiresAt)
-        } else if (session.expires) {
-          const expires = session.expires instanceof Date 
-            ? session.expires 
-            : typeof session.expires === 'number'
-              ? (String(session.expires).length <= 10 
-                  ? new Date(session.expires * 1000) 
-                  : new Date(session.expires))
-              : null
-          expiresDate = expires
-        }
-        
-        return {
-          sessionToken: session.sessionToken,
-          expiresAt: formatTimestamp(expiresDate),
-          ipAddress,
-          lastSeenAt: formatTimestamp(session.lastSeenAt),
-          userAgent: session.userAgent ?? null,
-        }
-      }),
-      lastLogin: (() => {
-        const allSessions = sessions
-          .map(s => ({
-            lastSeenAt: s.lastSeenAt instanceof Date ? s.lastSeenAt : s.lastSeenAt ? new Date(s.lastSeenAt) : null,
-            firstSeenAt: s.firstSeenAt instanceof Date ? s.firstSeenAt : s.firstSeenAt ? new Date(s.firstSeenAt) : null,
-          }))
-          .filter(s => s.lastSeenAt || s.firstSeenAt)
-        
-        if (allSessions.length === 0) return null
-        
-        const mostRecent = allSessions.reduce((latest, current) => {
-          const currentTime = (current.lastSeenAt || current.firstSeenAt)?.getTime() || 0
-          const latestTime = (latest.lastSeenAt || latest.firstSeenAt)?.getTime() || 0
-          return currentTime > latestTime ? current : latest
-        })
-        
-        return formatTimestamp(mostRecent.lastSeenAt || mostRecent.firstSeenAt)
-      })(),
-      lastLoginIp: (() => {
-        const sessionsWithTime = sessions
-          .map(s => ({
-            ipAddress: s.metadataIpAddress || s.sessionIpAddress || null,
-            lastSeenAt: s.lastSeenAt instanceof Date ? s.lastSeenAt : s.lastSeenAt ? new Date(s.lastSeenAt) : null,
-            firstSeenAt: s.firstSeenAt instanceof Date ? s.firstSeenAt : s.firstSeenAt ? new Date(s.firstSeenAt) : null,
-          }))
-          .filter(s => s.ipAddress && (s.lastSeenAt || s.firstSeenAt))
-        
-        if (sessionsWithTime.length === 0) return null
-        
-        const mostRecent = sessionsWithTime.reduce((latest, current) => {
-          const currentTime = (current.lastSeenAt || current.firstSeenAt)?.getTime() || 0
-          const latestTime = (latest.lastSeenAt || latest.firstSeenAt)?.getTime() || 0
-          return currentTime > latestTime ? current : latest
-        })
-        
-        return mostRecent.ipAddress
-      })(),
-      uniqueIps: (() => {
-        const allIps = sessions
-          .map(s => s.metadataIpAddress || s.sessionIpAddress)
-          .filter(Boolean) as string[]
-        return [...new Set(allIps)]
-      })(),
-      activeSessions: sessions.filter(s => {
-        if (!s.expires && !s.expiresAt) return false
-        const expires = s.expiresAt instanceof Date 
-          ? s.expiresAt 
-          : s.expires instanceof Date
-            ? s.expires
-            : typeof s.expires === 'number'
-              ? (String(s.expires).length <= 10 
-                  ? new Date(s.expires * 1000) 
-                  : new Date(s.expires))
-              : s.expiresAt
-                ? new Date(s.expiresAt)
-                : null
-        return expires && expires > new Date()
-      }).length,
-      securityEvents: securityEvents.map(event => ({
-        id: event.id,
-        occurredAt: formatTimestamp(event.occurredAt)!,
-        action: event.action,
-        details: parseMetadata(event.metadata ?? null),
+    data: {
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: user.nameFirst ?? null,
+        lastName: user.nameLast ?? null,
+        name: user.nameFirst || user.nameLast ? `${user.nameFirst ?? ''} ${user.nameLast ?? ''}`.trim() || null : null,
+        language: user.language,
+        role: user.role,
+        rootAdmin: Boolean(user.rootAdmin),
+        twoFactorEnabled: Boolean(user.useTotp),
+        emailVerified: Boolean(user.emailVerified),
+        emailVerifiedAt: formatTimestamp(user.emailVerified),
+        suspended: Boolean(user.suspended),
+        suspendedAt: formatTimestamp(user.suspendedAt),
+        suspensionReason: user.suspensionReason ?? null,
+        passwordResetRequired: Boolean(user.passwordResetRequired),
+        createdAt: formatTimestamp(user.createdAt)!,
+        updatedAt: formatTimestamp(user.updatedAt)!,
+      },
+      stats: {
+        serverCount: servers.length,
+        apiKeyCount: apiKeys.length,
+      },
+      servers: servers.map(server => ({
+        id: server.id,
+        uuid: server.uuid,
+        identifier: server.identifier,
+        name: server.name,
+        status: server.status,
+        suspended: Boolean(server.suspended),
+        nodeName: server.nodeName ?? null,
+        createdAt: formatTimestamp(server.createdAt)!,
       })),
+      apiKeys: apiKeys.map(key => ({
+        id: key.id,
+        identifier: key.identifier,
+        memo: key.memo,
+        createdAt: formatTimestamp(key.createdAt)!,
+        lastUsedAt: formatTimestamp(key.lastUsedAt),
+        expiresAt: formatTimestamp(key.expiresAt),
+      })),
+      activity: allActivityEvents.map(entry => ({
+        id: entry.id,
+        occurredAt: formatTimestamp(entry.occurredAt)!,
+        action: entry.action,
+        target: entry.targetId ? `${entry.targetType}#${entry.targetId}` : entry.targetType,
+        actor: entry.actor,
+        details: parseMetadata(entry.metadata ?? null),
+      })),
+      security: {
+        sessions: sessions.map(session => {
+          const ipAddress = session.metadataIpAddress || session.sessionIpAddress || null
+
+          let expiresDate: Date | null = null
+          if (session.expiresAt) {
+            expiresDate = session.expiresAt instanceof Date
+              ? session.expiresAt
+              : new Date(session.expiresAt)
+          }
+          else if (session.expires) {
+            if (session.expires instanceof Date) {
+              expiresDate = session.expires
+            }
+            else if (typeof session.expires === 'number') {
+              expiresDate = String(session.expires).length <= 10
+                ? new Date(session.expires * 1000)
+                : new Date(session.expires)
+            }
+          }
+
+          return {
+            sessionToken: session.sessionToken,
+            expiresAt: formatTimestamp(expiresDate),
+            ipAddress,
+            lastSeenAt: formatTimestamp(session.lastSeenAt),
+            userAgent: session.userAgent ?? null,
+          }
+        }),
+        lastLogin: (() => {
+          const allSessions = sessions
+            .map(s => ({
+              lastSeenAt: s.lastSeenAt instanceof Date ? s.lastSeenAt : s.lastSeenAt ? new Date(s.lastSeenAt) : null,
+              firstSeenAt: s.firstSeenAt instanceof Date ? s.firstSeenAt : s.firstSeenAt ? new Date(s.firstSeenAt) : null,
+            }))
+            .filter(s => s.lastSeenAt || s.firstSeenAt)
+
+          if (allSessions.length === 0) return null
+
+          const mostRecent = allSessions.reduce((latest, current) => {
+            const currentTime = (current.lastSeenAt || current.firstSeenAt)?.getTime() || 0
+            const latestTime = (latest.lastSeenAt || latest.firstSeenAt)?.getTime() || 0
+            return currentTime > latestTime ? current : latest
+          })
+
+          return formatTimestamp(mostRecent.lastSeenAt || mostRecent.firstSeenAt)
+        })(),
+        lastLoginIp: (() => {
+          const sessionsWithTime = sessions
+            .map(s => ({
+              ipAddress: s.metadataIpAddress || s.sessionIpAddress || null,
+              lastSeenAt: s.lastSeenAt instanceof Date ? s.lastSeenAt : s.lastSeenAt ? new Date(s.lastSeenAt) : null,
+              firstSeenAt: s.firstSeenAt instanceof Date ? s.firstSeenAt : s.firstSeenAt ? new Date(s.firstSeenAt) : null,
+            }))
+            .filter(s => s.ipAddress && (s.lastSeenAt || s.firstSeenAt))
+
+          if (sessionsWithTime.length === 0) return null
+
+          const mostRecent = sessionsWithTime.reduce((latest, current) => {
+            const currentTime = (current.lastSeenAt || current.firstSeenAt)?.getTime() || 0
+            const latestTime = (latest.lastSeenAt || latest.firstSeenAt)?.getTime() || 0
+            return currentTime > latestTime ? current : latest
+          })
+
+          return mostRecent.ipAddress
+        })(),
+        uniqueIps: (() => {
+          const allIps = sessions
+            .map(s => s.metadataIpAddress || s.sessionIpAddress)
+            .filter(Boolean) as string[]
+          return [...new Set(allIps)]
+        })(),
+        activeSessions: sessions.filter(s => {
+          if (!s.expires && !s.expiresAt) return false
+          const expires = s.expiresAt instanceof Date
+            ? s.expiresAt
+            : s.expires instanceof Date
+              ? s.expires
+              : typeof s.expires === 'number'
+                ? (String(s.expires).length <= 10
+                    ? new Date(s.expires * 1000)
+                    : new Date(s.expires))
+                : s.expiresAt
+                  ? new Date(s.expiresAt)
+                  : null
+          return expires && expires > new Date()
+        }).length,
+        securityEvents: securityEvents.map(event => ({
+          id: event.id,
+          occurredAt: formatTimestamp(event.occurredAt)!,
+          action: event.action,
+          details: parseMetadata(event.metadata ?? null),
+        })),
+      },
     },
   }
 })

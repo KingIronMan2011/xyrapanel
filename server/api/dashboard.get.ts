@@ -1,6 +1,5 @@
-import { defineEventHandler } from 'h3'
-import { requireAuth } from '~~/server/utils/security'
-
+import { requireAccountUser } from '~~/server/utils/security'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { tables, useDrizzle } from '~~/server/utils/drizzle'
 import { listWingsNodes } from '~~/server/utils/wings/nodesStore'
 import { remoteListServers } from '~~/server/utils/wings/registry'
@@ -72,7 +71,8 @@ function parseMetadata(raw: string | null): string {
 }
 
 export default defineEventHandler(async (event): Promise<ClientDashboardResponse> => {
-  await requireAuth(event)
+  const accountContext = await requireAccountUser(event)
+  const user = accountContext.user
 
   const db = useDrizzle()
 
@@ -169,7 +169,7 @@ export default defineEventHandler(async (event): Promise<ClientDashboardResponse
     },
   ]
 
-  return {
+  const response: ClientDashboardResponse = {
     metrics,
     activity,
     quickLinks,
@@ -177,4 +177,14 @@ export default defineEventHandler(async (event): Promise<ClientDashboardResponse
     nodes: enrichedNodes,
     generatedAt: new Date().toISOString(),
   }
+
+  await recordAuditEventFromRequest(event, {
+    actor: user.id,
+    actorType: 'user',
+    action: 'account.dashboard.viewed',
+    targetType: 'user',
+    targetId: user.id,
+  })
+
+  return response
 })

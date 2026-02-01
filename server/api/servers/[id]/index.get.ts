@@ -1,53 +1,33 @@
-import { createError } from 'h3'
-import { eq, and, sql } from 'drizzle-orm'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-
+import { eq, sql } from 'drizzle-orm'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import { findServerByIdentifier, getServerLimits, listServerAllocations } from '~~/server/utils/serversStore'
+import { getServerLimits, listServerAllocations } from '~~/server/utils/serversStore'
 import { permissionManager } from '~~/server/utils/permission-manager'
 import { getServerStatus } from '~~/server/utils/server-status'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 import type { PanelServerDetails, ServerAllocationSummary } from '#shared/types/server'
 
 export default defineEventHandler(async (event) => {
-  const id = event.context.params?.id
-  if (!id || typeof id !== 'string') {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const server = await findServerByIdentifier(id)
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'Server not found' })
-  }
-
-  const isAdmin = user.role === 'admin'
-  const isOwner = server.ownerId === user.id
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.view'],
+    allowOwner: true,
+    allowAdmin: true,
+  })
 
   const db = useDrizzle()
   const userPermissions = await permissionManager.getUserPermissions(user.id)
   const serverPerms = userPermissions.serverPermissions.get(server.id) || []
-  
-  if (!isAdmin && !isOwner) {
-    const subuser = await db
-      .select()
-      .from(tables.serverSubusers)
-      .where(and(
-        eq(tables.serverSubusers.serverId, server.id),
-        eq(tables.serverSubusers.userId, user.id),
-      ))
-      .get()
-
-    if (!subuser) {
-      throw createError({ statusCode: 403, statusMessage: 'Forbidden', message: 'You do not have access to this server' })
-    }
-  }
 
   const nodeRow = server.nodeId
     ? await db
@@ -142,6 +122,16 @@ export default defineEventHandler(async (event) => {
     },
     permissions: serverPerms,
   }
+
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.details.viewed',
+    server: { id: server.id, uuid: server.uuid },
+    metadata: {
+      permissionsCount: serverPerms.length,
+    },
+  })
 
   return {
     data: response,

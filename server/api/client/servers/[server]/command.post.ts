@@ -1,6 +1,9 @@
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
-import { requirePermission } from '~~/server/utils/permission-middleware'
 import { recordServerActivity } from '~~/server/utils/server-activity'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { serverCommandSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
   const serverIdentifier = getRouterParam(event, 'server')
@@ -8,29 +11,35 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Server identifier required' })
   }
 
-  const { userId } = await requirePermission(event, 'server.command', serverIdentifier)
-  const body = await readBody<{ command: string }>(event)
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverIdentifier, accountContext.session)
 
-  if (!body.command || body.command.trim().length === 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Command is required' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.command'],
+    allowOwner: true,
+    allowAdmin: true,
+  })
+
+  const body = await readValidatedBodyWithLimit(event, serverCommandSchema, BODY_SIZE_LIMITS.SMALL)
 
   try {
-
-    const { client, server } = await getWingsClientForServer(serverIdentifier)
+    const { client } = await getWingsClientForServer(server.uuid as string)
     await client.sendCommand(server.uuid as string, body.command)
 
     await recordServerActivity({
       event,
-      actorId: userId,
-      action: 'server.command',
-      server: { id: server.id as string, uuid: server.uuid as string },
+      actorId: user.id,
+      action: 'server.command.executed',
+      server: { id: server.id, uuid: server.uuid },
       metadata: { command: body.command },
     })
 
     return {
-      success: true,
-      message: 'Command sent successfully',
+      data: {
+        success: true,
+        message: 'Command sent successfully',
+      },
     }
   } catch (error) {
     console.error('Wings command failed:', error)

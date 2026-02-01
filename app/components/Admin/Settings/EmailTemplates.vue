@@ -95,8 +95,8 @@ onMounted(async () => {
 async function fetchTemplates() {
   try {
     isLoading.value = true
-    const data = await $fetch('/api/admin/settings/email-templates')
-    templates.value = data
+    const response = await $fetch<{ data: Template[] }>('/api/admin/settings/email-templates')
+    templates.value = response.data
   }
   catch {
     toast.add({
@@ -113,8 +113,10 @@ async function fetchTemplates() {
 async function selectTemplate(template: Template) {
   try {
     selectedTemplate.value = template
-    const response = await $fetch(`/api/admin/settings/email-templates/${template.id}`)
-    templateContent.value = response.content
+    const response = await $fetch<{ data: { id: string; content: string; updatedAt: string } }>(
+      `/api/admin/settings/email-templates/${template.id}`,
+    )
+    templateContent.value = response.data.content
   }
   catch {
     toast.add({
@@ -173,7 +175,7 @@ async function previewTemplate() {
       }
     }
 
-    const response = await $fetch(
+    const response = await $fetch<{ data: { id: string; html: string; subject: string } }>(
       `/api/admin/settings/email-templates/${selectedTemplate.value.id}/preview`,
       {
         method: 'POST',
@@ -183,10 +185,10 @@ async function previewTemplate() {
             ...previewData.value.variables,
           },
         },
-      }
+      },
     )
 
-    previewHtml.value = response.html || ''
+    previewHtml.value = response.data.html || ''
     isPreviewMode.value = true
   }
   catch {
@@ -236,10 +238,10 @@ async function resetTemplate() {
       }
     )
 
-    const response = await $fetch(
-      `/api/admin/settings/email-templates/${selectedTemplate.value.id}`
+    const response = await $fetch<{ data: { id: string; content: string; updatedAt: string } }>(
+      `/api/admin/settings/email-templates/${selectedTemplate.value.id}`,
     )
-    templateContent.value = response.content
+    templateContent.value = response.data.content
 
     toast.add({
       title: 'Success',

@@ -1,20 +1,18 @@
-import { createError, readBody } from 'h3'
 import { randomUUID } from 'node:crypto'
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
-import type { EggImportData, EggImportResponse } from '#shared/types/admin'
+import type { EggImportResponse } from '#shared/types/admin'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { eggImportSchema } from '#shared/schema/admin/eggs'
 
 export default defineEventHandler(async (event): Promise<EggImportResponse> => {
   const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.EGGS, ADMIN_ACL_PERMISSIONS.WRITE)
 
-  const body = await readBody(event)
-
-  const { nestId, eggData } = body as { nestId: string; eggData: EggImportData }
+  const { nestId, eggData } = await readValidatedBodyWithLimit(event, eggImportSchema, BODY_SIZE_LIMITS.MEDIUM)
 
   if (!nestId || !eggData) {
     throw createError({ 
@@ -91,20 +89,22 @@ export default defineEventHandler(async (event): Promise<EggImportResponse> => {
   }).run()
 
   if (eggData.variables && eggData.variables.length > 0) {
-    for (const variable of eggData.variables) {
-      await db.insert(tables.eggVariables).values({
-        id: randomUUID(),
-        eggId,
-        name: variable.name,
-        description: variable.description || null,
-        envVariable: variable.env_variable,
-        defaultValue: variable.default_value || null,
-        userViewable: variable.user_viewable !== false,
-        userEditable: variable.user_editable !== false,
-        rules: variable.rules || 'required|string',
-        createdAt: now,
-        updatedAt: now,
-      }).run()
+    const variableValues = eggData.variables.map(variable => ({
+      id: randomUUID(),
+      eggId,
+      name: variable.name,
+      description: variable.description || null,
+      envVariable: variable.env_variable,
+      defaultValue: variable.default_value || null,
+      userViewable: variable.user_viewable !== false,
+      userEditable: variable.user_editable !== false,
+      rules: variable.rules || 'required|string',
+      createdAt: now,
+      updatedAt: now,
+    }))
+
+    if (variableValues.length > 0) {
+      await db.insert(tables.eggVariables).values(variableValues)
     }
   }
 

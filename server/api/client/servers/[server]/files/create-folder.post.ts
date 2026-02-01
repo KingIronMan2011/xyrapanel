@@ -1,45 +1,40 @@
-import { createError, readBody, type H3Event } from 'h3'
-import { requirePermission } from '~~/server/utils/permission-middleware'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { recordServerActivity } from '~~/server/utils/server-activity'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { createDirectorySchema } from '#shared/schema/server/operations'
 
-interface CreateDirectoryBody {
-  root?: string
-  name?: string
-}
+export default defineEventHandler(async (event) => {
+  const accountContext = await requireAccountUser(event)
+  const serverIdentifier = getRouterParam(event, 'server')
 
-export default defineEventHandler(async (event: H3Event) => {
-  const serverId = getRouterParam(event, 'server')
-
-  if (!serverId) {
+  if (!serverIdentifier) {
     throw createError({
       statusCode: 400,
       message: 'Server identifier is required',
     })
   }
 
-  const { userId } = await requirePermission(event, 'file.create', serverId)
+  const { server } = await getServerWithAccess(serverIdentifier, accountContext.session)
 
-  const body = await readBody<CreateDirectoryBody>(event)
-  const name = body.name?.trim()
-  const root = typeof body.root === 'string' && body.root.length > 0 ? body.root : '/'
+  const permissionContext = await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.write'],
+  })
 
-  if (!name) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'Unprocessable Entity',
-      message: 'Directory name is required',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(event, createDirectorySchema, BODY_SIZE_LIMITS.SMALL)
+  const name = body.name.trim()
+  const root = body.root && body.root.length > 0 ? body.root : '/'
 
   try {
-    const { client, server } = await getWingsClientForServer(serverId)
+    const { client } = await getWingsClientForServer(server.uuid)
 
     await client.createDirectory(server.uuid as string, root, name)
 
     await recordServerActivity({
       event,
-      actorId: userId,
+      actorId: permissionContext.userId,
       action: 'server.directory.create',
       server: { id: server.id as string, uuid: server.uuid as string },
       metadata: { directory: root, name },

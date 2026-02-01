@@ -1,11 +1,22 @@
-import { createError } from 'h3'
 import { APIError } from 'better-auth/api'
+import { z } from 'zod'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { auth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+
+const adminUpdateUserSchema = z.object({
+  username: z.string().min(1).max(255).optional(),
+  email: z.string().email().optional(),
+  password: z.string().min(8).optional(),
+  nameFirst: z.string().max(255).nullable().optional(),
+  nameLast: z.string().max(255).nullable().optional(),
+  language: z.string().max(10).optional(),
+  rootAdmin: z.union([z.boolean(), z.string()]).optional(),
+  role: z.enum(['admin', 'user']).optional(),
+})
 
 export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
@@ -20,45 +31,42 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody(event)
+  const body = await readValidatedBodyWithLimit(event, adminUpdateUserSchema, BODY_SIZE_LIMITS.SMALL)
   const { username, email, password, nameFirst, nameLast, language, rootAdmin, role } = body
 
   try {
-    const updateData: Record<string, string | undefined> = {}
-    
-    if (nameFirst !== undefined || nameLast !== undefined) {
-      const name = [nameFirst, nameLast].filter(Boolean).join(' ') || undefined
-      if (name) updateData.name = name
+    const db = useDrizzle()
+    const now = new Date()
+
+    let userRecord = db
+      .select({
+        id: tables.users.id,
+        email: tables.users.email,
+        username: tables.users.username,
+        role: tables.users.role,
+      })
+      .from(tables.users)
+      .where(eq(tables.users.id, id))
+      .get()
+
+    if (!userRecord) {
+      throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'User not found' })
     }
 
-    const db = useDrizzle()
-    
-    if (Object.keys(updateData).length > 0) {
-      await db.update(tables.users)
-        .set({
-          ...updateData,
-          updatedAt: new Date(),
-        })
-        .where(eq(tables.users.id, id))
-        .run()
-    }
+    const changedFields = new Set<string>()
 
     if (email !== undefined) {
-      const currentUser = db
-        .select({ email: tables.users.email })
-        .from(tables.users)
-        .where(eq(tables.users.id, id))
-        .get()
-      
-      if (currentUser && currentUser.email !== email) {
+      if (userRecord.email !== email) {
         await db.update(tables.users)
           .set({
             email,
             emailVerified: null,
-            updatedAt: new Date(),
+            updatedAt: now,
           })
           .where(eq(tables.users.id, id))
           .run()
+        userRecord = { ...userRecord, email }
+        changedFields.add('email')
       }
     }
 
@@ -68,7 +76,7 @@ export default defineEventHandler(async (event) => {
       setUserPassword: (options: { body: { userId: string; newPassword: string }; headers: Record<string, string> }) => Promise<unknown>
     }
 
-    if (role !== undefined) {
+    if (role !== undefined && userRecord.role !== role) {
       await adminAuthApi.setRole({
         body: { userId: id, role },
         headers,
@@ -77,10 +85,12 @@ export default defineEventHandler(async (event) => {
       await db.update(tables.users)
         .set({
           role,
-          updatedAt: new Date(),
+          updatedAt: now,
         })
         .where(eq(tables.users.id, id))
         .run()
+      userRecord = { ...userRecord, role }
+      changedFields.add('role')
     }
 
     if (password) {
@@ -92,20 +102,41 @@ export default defineEventHandler(async (event) => {
       await db.update(tables.users)
         .set({
           passwordResetRequired: false,
-          updatedAt: new Date(),
+          updatedAt: now,
         })
         .where(eq(tables.users.id, id))
         .run()
+      changedFields.add('password')
     }
+
     const updates: Partial<typeof tables.users.$inferInsert> = {
-      updatedAt: new Date(),
+      updatedAt: now,
     }
-    
-    if (username !== undefined) updates.username = username
-    if (language !== undefined) updates.language = language
-    if (rootAdmin !== undefined) updates.rootAdmin = rootAdmin === true || rootAdmin === 'true'
-    if (nameFirst !== undefined) updates.nameFirst = nameFirst || null
-    if (nameLast !== undefined) updates.nameLast = nameLast || null
+
+    if (username !== undefined) {
+      updates.username = username
+      changedFields.add('username')
+    }
+
+    if (language !== undefined) {
+      updates.language = language
+      changedFields.add('language')
+    }
+
+    if (rootAdmin !== undefined) {
+      updates.rootAdmin = rootAdmin === true || rootAdmin === 'true'
+      changedFields.add('rootAdmin')
+    }
+
+    if (nameFirst !== undefined) {
+      updates.nameFirst = nameFirst || null
+      changedFields.add('nameFirst')
+    }
+
+    if (nameLast !== undefined) {
+      updates.nameLast = nameLast || null
+      changedFields.add('nameLast')
+    }
 
     if (Object.keys(updates).length > 1) {
       await db.update(tables.users)
@@ -121,7 +152,7 @@ export default defineEventHandler(async (event) => {
       targetType: 'user',
       targetId: id,
       metadata: {
-        fields: Object.keys(body),
+        fields: Array.from(changedFields),
       },
     })
 
@@ -148,7 +179,9 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'User not found' })
     }
 
-    return { user }
+    return {
+      data: user,
+    }
   }
   catch (error) {
     if (error instanceof APIError) {

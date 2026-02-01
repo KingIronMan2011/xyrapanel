@@ -1,5 +1,6 @@
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 const defaultTemplates: Record<string, string> = {
   'password-reset': `<h1>Password Reset Request</h1><p>Hello,</p><p>You requested a password reset for your <strong>{{ appName }}</strong> account.</p><p>Click the button below to reset your password:</p><p><a href="{{ resetUrl }}" class="button">Reset Password</a></p><p>Or copy and paste this link into your browser:</p><p><a href="{{ resetUrl }}">{{ resetUrl }}</a></p><p><strong>⏱️ Link Expires:</strong> This link will expire in {{ expiresIn }}.</p><p>If you didn't request this, please ignore this email and your password will remain unchanged.</p><p>For security reasons, never share this link with anyone.</p><p>© {{ year }} {{ appName }}. All rights reserved.</p><p>This is an automated message, please do not reply to this email.</p>`,
@@ -13,7 +14,7 @@ const defaultTemplates: Record<string, string> = {
 }
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   const id = getRouterParam(event, 'id')
   if (!id) {
@@ -42,10 +43,22 @@ export default defineEventHandler(async (event) => {
       .where(eq(tables.emailTemplates.templateId, id))
       .run()
 
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.email_template.reset',
+      targetType: 'settings',
+      metadata: {
+        templateId: id,
+      },
+    })
+
     return {
-      id,
-      message: 'Template reset to default successfully',
-      updatedAt: now,
+      data: {
+        id,
+        message: 'Template reset to default successfully',
+        updatedAt: now,
+      },
     }
   }
   catch (err) {

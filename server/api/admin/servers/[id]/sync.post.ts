@@ -53,8 +53,10 @@ export default defineEventHandler(async (event) => {
     })
 
     return {
-      success: true,
-      message: 'Server sync triggered successfully',
+      data: {
+        success: true,
+        message: 'Server sync triggered successfully',
+      },
     }
   } catch (error) {
     console.error('Failed to sync server:', error)

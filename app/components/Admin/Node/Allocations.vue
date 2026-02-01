@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { Allocation } from '#shared/types/server'
 import type { AdminNodeAllocationsResponse } from '#shared/types/admin'
+import { nodeAllocationsCreateSchema } from '#shared/schema/admin/infrastructure'
 
 const props = defineProps<{
   nodeId: string
@@ -67,23 +68,44 @@ const paginatedAllocations = computed(() => {
 
 const _totalPages = computed(() => Math.ceil(filteredAllocations.value.length / pageSize.value))
 
-const createSchema = z.object({
-  ip: z.string().trim().min(1, t('admin.nodes.allocations.ipAddressOrCidrRequired')).refine((val) => {
-    if (!val) return false
-    const parts = val.split('/')
-    if (parts.length === 1) {
-      const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
-      return ipRegex.test(val)
-    }
-    if (parts.length === 2) {
-      const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
-      const prefix = Number.parseInt(parts[1]!, 10)
-      return ipRegex.test(parts[0]!) && Number.isFinite(prefix) && prefix >= 25 && prefix <= 32
-    }
-    return false
-  }, t('admin.nodes.allocations.invalidIpAddressOrCidr')),
+const createSchema = nodeAllocationsCreateSchema.extend({
+  ip: z.string().trim().min(1, t('admin.nodes.allocations.ipAddressOrCidrRequired')),
   ports: z.string().trim().min(1, t('admin.nodes.allocations.provideAtLeastOnePort')),
   ipAlias: z.string().trim().max(255).optional(),
+}).superRefine((data, ctx) => {
+  if (typeof data.ip === 'string') {
+    const value = data.ip.trim()
+    const parts = value.split('/')
+    const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
+
+    if (parts.length === 1) {
+      if (!ipv4Regex.test(value)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ip'],
+          message: t('admin.nodes.allocations.invalidIpAddressOrCidr'),
+        })
+      }
+    }
+    else if (parts.length === 2) {
+      const [base, prefixRaw] = parts
+      const prefix = Number.parseInt(prefixRaw!, 10)
+      if (!ipv4Regex.test(base!) || !Number.isFinite(prefix) || prefix < 25 || prefix > 32) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ip'],
+          message: t('admin.nodes.allocations.invalidIpAddressOrCidr'),
+        })
+      }
+    }
+    else {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['ip'],
+        message: t('admin.nodes.allocations.invalidIpAddressOrCidr'),
+      })
+    }
+  }
 })
 
 type CreateFormSchema = z.infer<typeof createSchema>

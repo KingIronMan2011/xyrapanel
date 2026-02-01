@@ -1,20 +1,14 @@
-import { createError } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const resolvedUser = resolveSessionUser(session)
-
-  if (!resolvedUser?.id) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const accountContext = await requireAccountUser(event)
+  const sessionUser = accountContext.user
 
   const db = useDrizzle()
 
-  const user = db
+  const profile = db
     .select({
       id: tables.users.id,
       username: tables.users.username,
@@ -22,20 +16,21 @@ export default defineEventHandler(async (event) => {
       role: tables.users.role,
     })
     .from(tables.users)
-    .where(eq(tables.users.id, resolvedUser.id))
+    .where(eq(tables.users.id, sessionUser.id))
     .get()
 
-  if (!user) {
+  if (!profile) {
     throw createError({ statusCode: 404, statusMessage: 'User not found' })
   }
 
   await recordAuditEventFromRequest(event, {
-    actor: resolvedUser.id,
+    actor: sessionUser.id,
     actorType: 'user',
     action: 'account.profile.viewed',
     targetType: 'user',
-    targetId: resolvedUser.id,
+    targetId: sessionUser.id,
   })
 
-  return { data: user }
+  return { data: profile }
 })
+

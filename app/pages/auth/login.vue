@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import * as z from 'zod'
-import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
-
+import { ref, computed } from 'vue'
+import type { FormSubmitEvent } from '@nuxt/ui'
+import { accountLoginFormSchema } from '#shared/schema/account'
+import type { AccountLoginFormInput } from '#shared/schema/account'
 import { until } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 
@@ -31,6 +32,17 @@ definePageMeta({
 const requiresToken = ref(false)
 const turnstileToken = ref<string | undefined>(undefined)
 const turnstileRef = ref<{ reset: () => void } | null>(null)
+
+type AuthFormField = {
+  name: string
+  type: string
+  label: string
+  placeholder?: string
+  icon?: string
+  help?: string
+  required?: boolean
+  autocomplete?: string
+}
 
 const baseFields: AuthFormField[] = [
   {
@@ -67,15 +79,9 @@ const fields = computed<AuthFormField[]>(() =>
   requiresToken.value ? [...baseFields, tokenField] : baseFields,
 )
 
-const tokenSchema = z.string().trim().max(64, t('auth.authenticatorCodesShort'))
+const schema = accountLoginFormSchema
 
-const schema = z.object({
-  identity: z.string().trim().min(1, t('auth.enterUsernameOrEmail')),
-  password: z.string().trim().min(1, t('auth.enterPassword')),
-  token: tokenSchema.optional().transform(value => (value && value.length > 0 ? value : undefined)),
-})
-
-type Schema = z.output<typeof schema>
+type Schema = AccountLoginFormInput
 
 const loading = ref(false)
 const submitProps = computed(() => ({
@@ -146,7 +152,7 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
       description: t('auth.signedIn'),
     })
 
-    await until(status).toMatch((v) => v === 'authenticated')
+    await until(status).toMatch((v: string | null | undefined) => v === 'authenticated')
 
     await navigateTo(redirectPath.value)
   }

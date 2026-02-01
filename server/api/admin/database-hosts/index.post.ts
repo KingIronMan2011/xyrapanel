@@ -1,35 +1,31 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { randomUUID } from 'node:crypto'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import type { CreateDatabaseHostPayload } from '#shared/types/admin'
-import { randomUUID } from 'crypto'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { createDatabaseHostSchema } from '#shared/schema/admin/infrastructure'
 
 export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
 
-  const body = await readBody<CreateDatabaseHostPayload>(event)
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.DATABASE_HOSTS, ADMIN_ACL_PERMISSIONS.WRITE)
 
-  if (!body.name || !body.hostname || !body.username || !body.password) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'Name, hostname, username, and password are required',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(event, createDatabaseHostSchema, BODY_SIZE_LIMITS.SMALL)
 
   const db = useDrizzle()
   const now = new Date()
 
   const newHost = {
     id: randomUUID(),
-    name: body.name,
-    hostname: body.hostname,
-    port: body.port || 3306,
-    username: body.username,
+    name: body.name.trim(),
+    hostname: body.hostname.trim(),
+    port: body.port ?? 3306,
+    username: body.username.trim(),
     password: body.password,
-    database: body.database || null,
-    nodeId: body.nodeId || null,
-    maxDatabases: body.maxDatabases || null,
+    database: body.database?.trim() ?? null,
+    nodeId: body.nodeId ?? null,
+    maxDatabases: body.maxDatabases ?? null,
     createdAt: now,
     updatedAt: now,
   }
@@ -55,6 +51,8 @@ export default defineEventHandler(async (event) => {
       name: newHost.name,
       hostname: newHost.hostname,
       port: newHost.port,
+      nodeId: newHost.nodeId,
+      maxDatabases: newHost.maxDatabases,
       createdAt: newHost.createdAt.toISOString(),
       updatedAt: newHost.updatedAt.toISOString(),
     },

@@ -1,8 +1,9 @@
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   const db = useDrizzle()
   const nodes = await db
@@ -13,6 +14,14 @@ export default defineEventHandler(async (event) => {
     .from(tables.wingsNodes)
     .orderBy(tables.wingsNodes.name)
     .all()
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.wings.nodes.listed',
+    targetType: 'node',
+    metadata: { count: nodes.length },
+  })
 
   return { data: nodes }
 })

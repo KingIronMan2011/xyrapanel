@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
@@ -22,11 +21,11 @@ export default defineEventHandler(async (event) => {
   const { ipAlias } = body
 
   const db = useDrizzle()
-  const [allocation] = db.select()
+  const allocation = await db.select()
     .from(tables.serverAllocations)
     .where(eq(tables.serverAllocations.id, allocationId))
     .limit(1)
-    .all()
+    .get()
 
   if (!allocation) {
     throw createError({
@@ -35,9 +34,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  db.update(tables.serverAllocations)
+  await db.update(tables.serverAllocations)
     .set({
-      ipAlias: ipAlias || null,
+      ipAlias: typeof ipAlias === 'string' && ipAlias.trim().length > 0 ? ipAlias.trim() : null,
       updatedAt: new Date(),
     })
     .where(eq(tables.serverAllocations.id, allocationId))
@@ -57,7 +56,13 @@ export default defineEventHandler(async (event) => {
   })
 
   return {
-    success: true,
-    message: 'Allocation updated successfully',
+    data: {
+      success: true,
+      message: 'Allocation updated successfully',
+      allocation: {
+        id: allocationId,
+        ipAlias: typeof ipAlias === 'string' && ipAlias.trim().length > 0 ? ipAlias.trim() : null,
+      },
+    },
   }
 })

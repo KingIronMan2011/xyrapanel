@@ -1,35 +1,25 @@
-import { createError } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
-import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 import { serverCommandSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
-  const identifier = event.context.params?.id
-  if (!identifier || typeof identifier !== 'string') {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const accountContext = await requireAccountUser(event)
+  const { user, session } = accountContext
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const { server } = await getServerWithAccess(identifier, session)
 
-  const server = await findServerByIdentifier(identifier)
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  const isAdmin = user.role === 'admin'
-  const isOwner = server.ownerId === user.id
-
-  if (!isAdmin && !isOwner) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.command'],
+  })
 
   const body = await readValidatedBodyWithLimit(
     event,
@@ -45,9 +35,19 @@ export default defineEventHandler(async (event) => {
     const { client } = await getWingsClientForServer(server.uuid)
     await client.sendCommand(server.uuid, body.command)
 
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.command.sent',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { command: body.command },
+    })
+
     return {
-      success: true,
-      message: 'Command sent successfully',
+      data: {
+        success: true,
+        message: 'Command sent successfully',
+      },
     }
   }
   catch (error) {

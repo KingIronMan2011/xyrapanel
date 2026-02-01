@@ -1,23 +1,31 @@
-import { requirePermission } from '~~/server/utils/permission-middleware'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { recordServerActivity } from '~~/server/utils/server-activity'
 import { requireNodeRow, findWingsNode } from '~~/server/utils/wings/nodesStore'
 import { generateWingsJWT } from '~~/server/utils/wings/jwt'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const serverId = getRouterParam(event, 'server')
+  const accountContext = await requireAccountUser(event)
+  const serverIdentifier = getRouterParam(event, 'server')
 
-  if (!serverId) {
+  if (!serverIdentifier) {
     throw createError({
       statusCode: 400,
       message: 'Server identifier is required',
     })
   }
 
-  const { userId } = await requirePermission(event, 'server.files.upload', serverId)
+  const { server } = await getServerWithAccess(serverIdentifier, accountContext.session)
+
+  const permissionContext = await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.upload'],
+  })
 
   try {
-    const { server } = await getWingsClientForServer(serverId)
+    const { server: wingsServer } = await getWingsClientForServer(server.uuid)
     
     const formData = await readMultipartFormData(event)
     if (!formData || formData.length === 0) {
@@ -31,8 +39,8 @@ export default defineEventHandler(async (event) => {
       throw new Error('No files to upload')
     }
 
-    const nodeRow = requireNodeRow(server.nodeId as string)
-    const node = findWingsNode(server.nodeId as string)
+    const nodeRow = requireNodeRow(wingsServer.nodeId as string)
+    const node = findWingsNode(wingsServer.nodeId as string)
     if (!node) {
       throw new Error('Node not found')
     }
@@ -43,8 +51,8 @@ export default defineEventHandler(async (event) => {
         baseUrl: `http://${nodeRow.fqdn}:${nodeRow.daemonListen}`,
       },
       {
-        user: { id: userId, uuid: userId },
-        server: { uuid: server.uuid as string },
+        user: { id: accountContext.user.id, uuid: accountContext.user.id },
+        server: { uuid: wingsServer.uuid as string },
         expiresIn: 900,
       }
     )
@@ -73,9 +81,9 @@ export default defineEventHandler(async (event) => {
 
     await recordServerActivity({
       event,
-      actorId: userId,
+      actorId: permissionContext.userId,
       action: 'server.file.upload',
-      server: { id: server.id as string, uuid: server.uuid as string },
+      server: { id: wingsServer.id as string, uuid: wingsServer.uuid as string },
       metadata: { directory, fileCount: fileFields.length },
     })
 

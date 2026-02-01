@@ -1,27 +1,16 @@
 import { randomUUID } from 'crypto'
 import { eq } from 'drizzle-orm'
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { invalidateScheduleCaches } from '~~/server/utils/serversStore'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-
-interface CreateSchedulePayload {
-  name: string
-  cron: {
-    minute: string
-    hour: string
-    day_of_month: string
-    month: string
-    day_of_week: string
-  }
-  is_active?: boolean
-}
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { createScheduleSchema } from '#shared/schema/server/operations'
 
 function calculateNextRun(cronExpression: string): Date {
   const now = new Date()
-  const [minute, hour, day, month, weekday] = cronExpression.split(' ')
+  const [minute = '*', hour = '*', day = '*', month = '*', weekday = '*'] = cronExpression.split(' ')
   
   const nextRun = new Date(now)
   nextRun.setSeconds(0)
@@ -79,7 +68,7 @@ function calculateNextRun(cronExpression: string): Date {
 }
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const accountContext = await requireAccountUser(event)
   const serverId = getRouterParam(event, 'server')
 
   if (!serverId) {
@@ -89,14 +78,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const { server } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
     requiredPermissions: ['server.schedule.create'],
   })
 
-  const body = await readBody<CreateSchedulePayload>(event)
+  const body = await readValidatedBodyWithLimit(event, createScheduleSchema, BODY_SIZE_LIMITS.SMALL)
 
   const cronString = `${body.cron.minute} ${body.cron.hour} ${body.cron.day_of_month} ${body.cron.month} ${body.cron.day_of_week}`
 
@@ -130,7 +119,7 @@ export default defineEventHandler(async (event) => {
   await invalidateScheduleCaches({ serverId: server.id, scheduleId })
 
   await recordAuditEventFromRequest(event, {
-    actor: session?.user?.id || 'unknown',
+    actor: accountContext.user.id,
     actorType: 'user',
     action: 'server.schedule.create',
     targetType: 'server',

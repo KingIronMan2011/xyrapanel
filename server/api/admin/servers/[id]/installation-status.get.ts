@@ -3,9 +3,10 @@ import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { checkInstallationStatus } from '~~/server/utils/server-provisioning'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.READ)
 
@@ -45,6 +46,19 @@ export default defineEventHandler(async (event) => {
         .where(eq(tables.servers.id, serverId))
         .run()
     }
+
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.server.installation_status.viewed',
+      targetType: 'server',
+      targetId: serverId,
+      metadata: {
+        serverUuid: server.uuid,
+        status: status.status,
+        installing: status.installing,
+      },
+    })
 
     return {
       data: {

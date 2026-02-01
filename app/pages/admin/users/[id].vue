@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { AdminUserProfilePayload, PaginatedServersResponse, PaginatedApiKeysResponse, PaginatedActivityResponse } from '#shared/types/admin'
+import type { AdminUserProfilePayload } from '#shared/types/admin'
 
 definePageMeta({
   auth: true,
@@ -91,36 +91,13 @@ const { data: generalSettings } = await useFetch<{ paginationLimit: number }>('/
 })
 const itemsPerPage = computed(() => generalSettings.value?.paginationLimit ?? 25)
 
-const { data: serversData } = await useFetch<PaginatedServersResponse>(
-  () => `/api/admin/users/${userId.value}/servers`,
-  {
-    key: `admin-user-servers-${userId.value}`,
-    query: computed(() => ({ page: 1, limit: itemsPerPage.value })),
-    default: () => ({ data: [], pagination: { page: 1, perPage: itemsPerPage.value, total: 0, totalPages: 0 } }),
-  },
-)
-
-const { data: apiKeysData } = await useFetch<PaginatedApiKeysResponse>(
-  () => `/api/admin/users/${userId.value}/api-keys`,
-  {
-    key: `admin-user-api-keys-${userId.value}`,
-    query: computed(() => ({ page: 1, limit: itemsPerPage.value })),
-    default: () => ({ data: [], pagination: { page: 1, perPage: itemsPerPage.value, total: 0, totalPages: 0 } }),
-  },
-)
-
-const { data: activityData } = await useFetch<PaginatedActivityResponse>(
-  () => `/api/admin/users/${userId.value}/activity`,
-  {
-    key: `admin-user-activity-${userId.value}`,
-    query: computed(() => ({ page: 1, limit: itemsPerPage.value })),
-    default: () => ({ data: [], pagination: { page: 1, perPage: itemsPerPage.value, total: 0, totalPages: 0 } }),
-  },
-)
-
-const serversPagination = computed(() => serversData.value?.pagination)
-const apiKeysPagination = computed(() => apiKeysData.value?.pagination)
-const activityPagination = computed(() => activityData.value?.pagination)
+const userStats = computed(() => profile.value?.stats ?? {
+  serverCount: 0,
+  apiKeyCount: 0,
+})
+const serversCount = computed(() => userStats.value.serverCount ?? profile.value?.servers?.length ?? 0)
+const apiKeysCount = computed(() => userStats.value.apiKeyCount ?? profile.value?.apiKeys?.length ?? 0)
+const activityCount = computed(() => profile.value?.activity?.length ?? 0)
 
 const isSuspended = computed(() => Boolean(user.value?.suspended))
 const hasTwoFactor = computed(() => Boolean(user.value?.twoFactorEnabled))
@@ -133,9 +110,9 @@ const controlsOpen = ref(false)
 
 const tabItems = computed(() => [
   { label: t('admin.users.tabs.overview'), value: 'overview', icon: 'i-lucide-layout-dashboard' },
-  { label: `${t('admin.users.tabs.servers')} (${serversPagination.value?.total ?? 0})`, value: 'servers', icon: 'i-lucide-server' },
-  { label: `${t('admin.users.tabs.apiKeys')} (${apiKeysPagination.value?.total ?? 0})`, value: 'api-keys', icon: 'i-lucide-key' },
-  { label: `${t('admin.users.tabs.activity')} (${activityPagination.value?.total ?? 0})`, value: 'activity', icon: 'i-lucide-activity' },
+  { label: `${t('admin.users.tabs.servers')} (${serversCount.value})`, value: 'servers', icon: 'i-lucide-server' },
+  { label: `${t('admin.users.tabs.apiKeys')} (${apiKeysCount.value})`, value: 'api-keys', icon: 'i-lucide-key' },
+  { label: `${t('admin.users.tabs.activity')} (${activityCount.value})`, value: 'activity', icon: 'i-lucide-activity' },
 ])
 
 function formatDate(value: string | null | undefined) {

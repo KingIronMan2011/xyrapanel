@@ -1,9 +1,9 @@
-import { createError } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { disableTwoFactorActionSchema } from '#shared/schema/admin/actions'
 
 export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
@@ -13,6 +13,8 @@ export default defineEventHandler(async (event) => {
   if (!userId) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'User ID is required' })
   }
+
+  const body = await readValidatedBodyWithLimit(event, disableTwoFactorActionSchema, BODY_SIZE_LIMITS.SMALL)
 
   const db = useDrizzle()
 
@@ -52,13 +54,19 @@ export default defineEventHandler(async (event) => {
       action: 'admin.user.disable_2fa',
       targetType: 'user',
       targetId: userId,
+      metadata: body.reason
+        ? {
+            reason: body.reason,
+          }
+        : undefined,
     })
-
     return {
-      success: true,
-      message: existing.twoFactorEnabled
-        ? 'Two-factor authentication has been disabled for the user.'
-        : 'Two-factor authentication was already disabled.',
+      data: {
+        success: true,
+        message: existing.twoFactorEnabled
+          ? 'Two-factor authentication has been disabled for the user.'
+          : 'Two-factor authentication was already disabled.',
+      },
     }
   }
   catch (error) {

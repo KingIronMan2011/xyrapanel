@@ -1,8 +1,9 @@
-import { createError, getQuery, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { getNodeIdFromAuth } from '~~/server/utils/wings/auth'
 import { toWingsHttpError } from '~~/server/utils/wings/http'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { sql } from 'drizzle-orm'
+import { remoteServersPaginationSchema } from '#shared/schema/wings'
 
 function safeJsonParse(value: string | null | undefined, defaultValue: unknown = {}): unknown {
   if (!value || typeof value !== 'string' || value.trim().length === 0) {
@@ -20,18 +21,24 @@ export default defineEventHandler(async (event: H3Event) => {
   try {
     const nodeId = await getNodeIdFromAuth(event)
     const query = getQuery(event)
-    const page = Number(query.page ?? '0')
-    const perPage = Number(query.per_page ?? '50')
+    const parsedQuery = remoteServersPaginationSchema.safeParse({
+      page: query.page,
+      per_page: query.per_page,
+    })
 
-    if (Number.isNaN(page) || Number.isNaN(perPage) || perPage <= 0) {
+    if (!parsedQuery.success) {
+      const errors = parsedQuery.error.issues.map(issue => ({
+        field: issue.path.join('.') || undefined,
+        message: issue.message,
+      }))
       throw createError({
         statusCode: 400,
         statusMessage: 'Invalid pagination parameters',
-        data: {
-          errors: [{ detail: 'Use positive numeric values for page and per_page.' }],
-        },
+        data: { errors },
       })
     }
+
+    const { page, per_page: perPage } = parsedQuery.data
 
     const db = useDrizzle()
     const offset = page * perPage

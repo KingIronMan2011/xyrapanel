@@ -1,12 +1,13 @@
 import { eq } from 'drizzle-orm'
 import type { SettingsData } from '#shared/types/server'
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { requireAccountUser } from '~~/server/utils/security'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const accountContext = await requireAccountUser(event)
   const serverIdentifier = getRouterParam(event, 'server')
 
   if (!serverIdentifier) {
@@ -16,7 +17,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverIdentifier, session)
+  const { server, user } = await getServerWithAccess(serverIdentifier, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
@@ -33,6 +34,9 @@ export default defineEventHandler(async (event) => {
       io: tables.serverLimits.io,
       threads: tables.serverLimits.threads,
       oomDisabled: tables.serverLimits.oomDisabled,
+      databaseLimit: tables.serverLimits.databaseLimit,
+      allocationLimit: tables.serverLimits.allocationLimit,
+      backupLimit: tables.serverLimits.backupLimit,
     })
     .from(tables.serverLimits)
     .where(eq(tables.serverLimits.serverId, server.id))
@@ -57,9 +61,19 @@ export default defineEventHandler(async (event) => {
           io: limitsRow.io,
           threads: limitsRow.threads ?? null,
           oomDisabled: limitsRow.oomDisabled ?? true,
+          databaseLimit: limitsRow.databaseLimit ?? null,
+          allocationLimit: limitsRow.allocationLimit ?? null,
+          backupLimit: limitsRow.backupLimit ?? null,
         }
       : null,
   }
+
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.settings.viewed',
+    server: { id: server.id, uuid: server.uuid },
+  })
 
   return {
     data: response,

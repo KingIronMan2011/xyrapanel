@@ -1,37 +1,28 @@
 import { randomUUID } from 'node:crypto'
-import { createError } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
-import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
 import { createServerDatabaseSchema } from '#shared/schema/server/operations'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { invalidateServerCaches } from '~~/server/utils/serversStore'
 
 export default defineEventHandler(async (event) => {
-  const identifier = event.context.params?.id
-  if (!identifier || typeof identifier !== 'string') {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const server = await findServerByIdentifier(identifier)
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  const isAdmin = user.role === 'admin'
-  const isOwner = server.ownerId === user.id
-
-  if (!isAdmin && !isOwner) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.database.create'],
+    allowOwner: true,
+    allowAdmin: true,
+  })
 
   const body = await readValidatedBodyWithLimit(
     event,
@@ -71,20 +62,6 @@ export default defineEventHandler(async (event) => {
       createdAt: new Date(),
       updatedAt: new Date(),
     })
-
-    return {
-      success: true,
-      data: {
-        id: databaseId,
-        name: dbName,
-        username: dbUsername,
-        password: dbPassword,
-        host: {
-          hostname: host.hostname,
-          port: host.port,
-        },
-      },
-    }
   }
   catch (error) {
     throw createError({
@@ -92,5 +69,32 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Database Error',
       message: error instanceof Error ? error.message : 'Failed to create database',
     })
+  }
+
+  await invalidateServerCaches({ id: server.id })
+
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.database.created',
+    server: { id: server.id, uuid: server.uuid },
+    metadata: {
+      databaseId,
+      databaseName: dbName,
+      hostId: host.id,
+    },
+  })
+
+  return {
+    data: {
+      id: databaseId,
+      name: dbName,
+      username: dbUsername,
+      password: dbPassword,
+      host: {
+        hostname: host.hostname,
+        port: host.port,
+      },
+    },
   }
 })

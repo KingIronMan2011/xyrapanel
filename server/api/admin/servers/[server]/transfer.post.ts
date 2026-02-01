@@ -1,9 +1,9 @@
-import { createError } from 'h3'
 import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAdmin } from '~~/server/utils/security'
 import { initiateServerTransfer } from '~~/server/utils/transfers/initiate'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { serverTransferSchema } from '~~/shared/schema/admin/server'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const serverId = getRouterParam(event, 'server')
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
   
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
@@ -32,9 +32,25 @@ export default defineEventHandler(async (event) => {
       startOnCompletion,
     })
 
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.server.transfer.initiated',
+      targetType: 'server',
+      targetId: serverId,
+      metadata: {
+        transferId: result.transferId,
+        sourceNodeId: result.sourceNodeId,
+        targetNodeId,
+        newAllocationId: result.newAllocationId,
+        additionalAllocationIds,
+        startOnCompletion,
+      },
+    })
+
     return {
-      success: true,
       data: {
+        success: true,
         transferId: result.transferId,
         server: result.server,
         sourceNodeId: result.sourceNodeId,

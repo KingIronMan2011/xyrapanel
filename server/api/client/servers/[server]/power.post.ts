@@ -2,7 +2,9 @@ import { serverManager } from '~~/server/utils/server-manager'
 import { WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { recordServerActivity } from '~~/server/utils/server-activity'
-import { findServerByIdentifier } from '~~/server/utils/serversStore'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { serverPowerActionSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
   const serverIdentifier = getRouterParam(event, 'server')
@@ -11,45 +13,36 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Server identifier required' })
   }
 
-  const { userId } = await requireServerPermission(event, {
-    serverId: serverIdentifier,
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverIdentifier, accountContext.session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
     requiredPermissions: ['server.power'],
+    allowOwner: true,
+    allowAdmin: true,
   })
 
-  const body = await readBody<{ action: 'start' | 'stop' | 'restart' | 'kill' }>(event)
-
-  if (!body.action) {
-    throw createError({ statusCode: 400, statusMessage: 'Action is required' })
-  }
-
-  const validActions = ['start', 'stop', 'restart', 'kill']
-  if (!validActions.includes(body.action)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid action' })
-  }
+  const body = await readValidatedBodyWithLimit(event, serverPowerActionSchema, BODY_SIZE_LIMITS.SMALL)
 
   try {
     await serverManager.powerAction(serverIdentifier, body.action, {
-      userId,
+      userId: user.id,
     })
 
-    const server = await findServerByIdentifier(serverIdentifier)
-
-    if (server) {
-      await recordServerActivity({
-        event,
-        actorId: userId,
-        action: `server.power.${body.action}`,
-        server: { id: server.id as string, uuid: server.uuid as string },
-        metadata: { action: body.action },
-      })
-    }
-    else {
-      console.warn('[Server Activity] Unable to find server for power event logging', { serverIdentifier })
-    }
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: `server.power.${body.action}`,
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { action: body.action },
+    })
 
     return {
-      success: true,
-      message: `Power action ${body.action} sent successfully`,
+      data: {
+        success: true,
+        message: `Power action ${body.action} sent successfully`,
+      },
     }
   } catch (error) {
     console.error('Wings power action failed:', error)

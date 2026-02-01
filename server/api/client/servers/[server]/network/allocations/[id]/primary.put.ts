@@ -1,16 +1,15 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { invalidateServerCaches } from '~~/server/utils/serversStore'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
-import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser } from '~~/server/utils/security'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const serverId = getRouterParam(event, 'server')
+  const serverIdentifier = getRouterParam(event, 'server')
   const allocationId = getRouterParam(event, 'id')
 
-  if (!serverId) {
+  if (!serverIdentifier) {
     throw createError({
       statusCode: 400,
       message: 'Server identifier is required',
@@ -24,11 +23,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverIdentifier, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
     requiredPermissions: ['allocation.update'],
+    allowOwner: true,
+    allowAdmin: true,
   })
 
   const db = useDrizzle()
@@ -87,12 +89,11 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.serverAllocations.id, allocationId))
     .run()
 
-  await recordAuditEventFromRequest(event, {
-    actor: session?.user?.email || session?.user?.id || 'unknown',
-    actorType: 'user',
+  await recordServerActivity({
+    event,
+    actorId: user.id,
     action: 'server.allocation.primary',
-    targetType: 'server',
-    targetId: server.id,
+    server: { id: server.id, uuid: server.uuid },
     metadata: {
       allocationId: allocation.id,
       ip: allocation.ip,
@@ -107,8 +108,8 @@ export default defineEventHandler(async (event) => {
       id: allocation.id,
       ip: allocation.ip,
       port: allocation.port,
-      ip_alias: allocation.ipAlias,
-      is_primary: true,
+      ipAlias: allocation.ipAlias ?? null,
+      isPrimary: true,
       notes: allocation.notes,
     },
   }

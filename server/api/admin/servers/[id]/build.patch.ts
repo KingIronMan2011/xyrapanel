@@ -1,5 +1,4 @@
-import { createError, assertMethod } from 'h3'
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
@@ -22,7 +21,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readValidatedBody(event, payload => serverBuildSchema.parse(payload))
+  const body = await readValidatedBodyWithLimit(event, serverBuildSchema, BODY_SIZE_LIMITS.SMALL)
   const { cpu, memory, swap, disk, io, threads, oomDisabled, databaseLimit, allocationLimit, backupLimit } = body
 
   const db = useDrizzle()
@@ -57,7 +56,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (existingLimits) {
-    db.update(tables.serverLimits)
+    await db.update(tables.serverLimits)
       .set(updateData)
       .where(eq(tables.serverLimits.serverId, serverId))
       .run()
@@ -69,7 +68,7 @@ export default defineEventHandler(async (event) => {
       .all()
   } else {
     const now = new Date()
-    db.insert(tables.serverLimits)
+    await db.insert(tables.serverLimits)
       .values({
         serverId,
         cpu: cpu ?? 100,
@@ -97,7 +96,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (oomDisabled !== undefined) {
-    db.update(tables.servers)
+    await db.update(tables.servers)
       .set({ oomDisabled: Boolean(oomDisabled) })
       .where(eq(tables.servers.id, serverId))
       .run()
@@ -140,7 +139,10 @@ export default defineEventHandler(async (event) => {
   }
 
   return {
-    success: true,
-    message: 'Build configuration updated successfully',
+    data: {
+      success: true,
+      message: 'Build configuration updated successfully',
+      serverId,
+    },
   }
 })

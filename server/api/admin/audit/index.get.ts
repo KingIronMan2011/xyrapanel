@@ -1,17 +1,18 @@
+import { count, desc, eq, like, or, and, inArray } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
-import { count, desc, eq, like, or, and } from 'drizzle-orm'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.AUDIT, ADMIN_ACL_PERMISSIONS.READ)
 
   const query = getQuery(event)
-  const page = Number(query.page) || 1
-  const limit = Number(query.limit) || 50
+  const page = Math.max(1, Number.parseInt((query.page as string) ?? '1', 10))
+  const limit = Math.min(Math.max(1, Number.parseInt((query.limit as string) ?? '50', 10)), 200)
   const search = query.search as string | undefined
   const actor = query.actor as string | undefined
   const action = query.action as string | undefined
@@ -20,7 +21,7 @@ export default defineEventHandler(async (event) => {
 
   const db = useDrizzle()
 
-  const conditions = []
+  const conditions = [] as Array<ReturnType<typeof and> | ReturnType<typeof or> | ReturnType<typeof eq>>
 
   if (search) {
     conditions.push(
@@ -46,7 +47,7 @@ export default defineEventHandler(async (event) => {
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
-  const countResult = db
+  const countResult = await db
     .select({ total: count() })
     .from(tables.auditEvents)
     .where(whereClause)
@@ -54,7 +55,7 @@ export default defineEventHandler(async (event) => {
 
   const total = countResult[0]?.total ?? 0
 
-  const events = db
+  const events = await db
     .select({
       id: tables.auditEvents.id,
       occurredAt: tables.auditEvents.occurredAt,
@@ -109,10 +110,9 @@ export default defineEventHandler(async (event) => {
   const userMap = new Map<string, { id: string; username: string | null; email: string | null }>()
   
   if (actorIds.size > 0) {
-    const { inArray } = await import('drizzle-orm')
     const userIds = Array.from(actorIds)
     if (userIds.length > 0) {
-      const users = db
+      const users = await db
         .select({
           id: tables.users.id,
           username: tables.users.username,
@@ -135,7 +135,7 @@ export default defineEventHandler(async (event) => {
     const emails = Array.from(actorEmails)
     for (const email of emails) {
       if (!userMap.has(email)) {
-        const user = db
+        const user = await db
           .select({
             id: tables.users.id,
             username: tables.users.username,
@@ -153,7 +153,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  return {
+  const response = {
     data: events.map(event => {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       
@@ -189,4 +189,22 @@ export default defineEventHandler(async (event) => {
       hasMore: offset + events.length < total,
     },
   }
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.audit.viewed',
+    targetType: 'settings',
+    metadata: {
+      page,
+      limit,
+      count: response.data.length,
+      search: search ?? null,
+      actor: actor ?? null,
+      action: action ?? null,
+      targetType: targetType ?? null,
+    },
+  })
+
+  return response
 })

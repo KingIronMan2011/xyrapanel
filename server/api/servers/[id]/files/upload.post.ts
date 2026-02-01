@@ -1,10 +1,21 @@
-import { createError, readMultipartFormData, type H3Event } from 'h3'
-import { resolveServerRequest } from '~~/server/utils/http/serverAccess'
 import { remoteUploadFiles } from '~~/server/utils/wings/registry'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
-export default defineEventHandler(async (event: H3Event) => {
-  const context = await resolveServerRequest(event, {
-    requiredPermissions: ['file.upload'],
+export default defineEventHandler(async (event) => {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
+  }
+
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.upload'],
   })
 
   const formData = await readMultipartFormData(event)
@@ -37,19 +48,37 @@ export default defineEventHandler(async (event: H3Event) => {
   }
 
   try {
+    if (!server.nodeId) {
+      throw createError({ statusCode: 500, statusMessage: 'Server has no assigned node' })
+    }
+
     await remoteUploadFiles(
-      context.server.uuid,
+      server.uuid,
       directory,
       files.map(file => ({
         name: file.filename ?? 'upload.bin',
         data: file.data,
         mime: file.type,
       })),
-      context.node?.id,
+      server.nodeId,
     )
 
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.files.upload',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: {
+        directory,
+        fileCount: files.length,
+      },
+    })
+
     return {
-      success: true,
+      data: {
+        success: true,
+        uploaded: files.length,
+      },
     }
   }
   catch (error) {

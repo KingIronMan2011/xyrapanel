@@ -1,13 +1,26 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { adminSettingsPayloadSchema } from '#shared/schema/admin/settings'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
-  const body = await readBody<Record<string, string>>(event)
+  const body = await readValidatedBodyWithLimit(event, adminSettingsPayloadSchema, BODY_SIZE_LIMITS.SMALL)
   const db = useDrizzle()
 
+  const updatedKeys: string[] = []
+  const deletedKeys: string[] = []
+
   for (const [key, value] of Object.entries(body)) {
+    if (value === null) {
+      await db
+        .delete(tables.settings)
+        .where(eq(tables.settings.key, key))
+        .run()
+      deletedKeys.push(key)
+      continue
+    }
 
     const existing = await db
       .select()
@@ -15,24 +28,42 @@ export default defineEventHandler(async (event) => {
       .where(eq(tables.settings.key, key))
       .get()
 
+    const stringValue = String(value)
+
     if (existing) {
 
       await db
         .update(tables.settings)
-        .set({ value })
+        .set({ value: stringValue })
         .where(eq(tables.settings.key, key))
         .run()
     } else {
 
       await db
         .insert(tables.settings)
-        .values({ key, value })
+        .values({ key, value: stringValue })
         .run()
     }
+    updatedKeys.push(key)
   }
 
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.settings.bulk_updated',
+    targetType: 'settings',
+    metadata: {
+      updatedKeys,
+      deletedKeys,
+    },
+  })
+
   return {
-    success: true,
-    message: 'Settings updated successfully',
+    data: {
+      success: true,
+      message: 'Settings updated successfully',
+      updatedKeys,
+      deletedKeys,
+    },
   }
 })

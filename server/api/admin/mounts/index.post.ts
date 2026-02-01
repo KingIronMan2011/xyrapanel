@@ -1,10 +1,10 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { createMountSchema } from '#shared/schema/admin/infrastructure'
+import { randomUUID } from 'node:crypto'
+import { inArray } from 'drizzle-orm'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
-import type { CreateMountPayload } from '#shared/types/admin'
-import { randomUUID } from 'node:crypto'
-import { inArray } from 'drizzle-orm'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
@@ -12,36 +12,28 @@ export default defineEventHandler(async (event) => {
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.MOUNTS, ADMIN_ACL_PERMISSIONS.WRITE)
 
-  const body = await readBody<CreateMountPayload>(event)
-
-  if (!body.name || !body.source || !body.target) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'Name, source, and target are required',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(event, createMountSchema, BODY_SIZE_LIMITS.SMALL)
 
   const db = useDrizzle()
 
-  if (body.nodes && body.nodes.length > 0) {
+  if (body.nodeIds && body.nodeIds.length > 0) {
     const nodes = await db.select({ id: tables.wingsNodes.id })
       .from(tables.wingsNodes)
-      .where(inArray(tables.wingsNodes.id, body.nodes))
+      .where(inArray(tables.wingsNodes.id, body.nodeIds))
       .all()
 
-    if (nodes.length !== body.nodes.length) {
+    if (nodes.length !== body.nodeIds.length) {
       throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'One or more nodes were not found' })
     }
   }
 
-  if (body.eggs && body.eggs.length > 0) {
+  if (body.eggIds && body.eggIds.length > 0) {
     const eggs = await db.select({ id: tables.eggs.id })
       .from(tables.eggs)
-      .where(inArray(tables.eggs.id, body.eggs))
+      .where(inArray(tables.eggs.id, body.eggIds))
       .all()
 
-    if (eggs.length !== body.eggs.length) {
+    if (eggs.length !== body.eggIds.length) {
       throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'One or more eggs were not found' })
     }
   }
@@ -52,10 +44,10 @@ export default defineEventHandler(async (event) => {
   const newMount = {
     id: mountId,
     uuid: randomUUID(),
-    name: body.name,
-    description: body.description ?? null,
-    source: body.source,
-    target: body.target,
+    name: body.name.trim(),
+    description: body.description?.trim() ?? null,
+    source: body.source.trim(),
+    target: body.target.trim(),
     readOnly: body.readOnly ?? false,
     userMountable: body.userMountable ?? false,
     createdAt: now,
@@ -64,18 +56,18 @@ export default defineEventHandler(async (event) => {
 
   await db.insert(tables.mounts).values(newMount)
 
-  if (body.nodes && body.nodes.length > 0) {
+  if (body.nodeIds && body.nodeIds.length > 0) {
     await db.insert(tables.mountNode).values(
-      body.nodes.map((nodeId) => ({
+      body.nodeIds.map((nodeId) => ({
         mountId,
         nodeId,
       })),
     )
   }
 
-  if (body.eggs && body.eggs.length > 0) {
+  if (body.eggIds && body.eggIds.length > 0) {
     await db.insert(tables.mountEgg).values(
-      body.eggs.map((eggId) => ({
+      body.eggIds.map((eggId) => ({
         mountId,
         eggId,
       })),
@@ -92,8 +84,8 @@ export default defineEventHandler(async (event) => {
       mountName: newMount.name,
       source: newMount.source,
       target: newMount.target,
-      nodeCount: body.nodes?.length || 0,
-      eggCount: body.eggs?.length || 0,
+      nodeCount: body.nodeIds?.length || 0,
+      eggCount: body.eggIds?.length || 0,
     },
   })
 
@@ -107,6 +99,8 @@ export default defineEventHandler(async (event) => {
       target: newMount.target,
       readOnly: newMount.readOnly,
       userMountable: newMount.userMountable,
+      eggs: body.eggIds ?? [],
+      nodes: body.nodeIds ?? [],
       createdAt: newMount.createdAt.toISOString(),
       updatedAt: newMount.updatedAt.toISOString(),
     },

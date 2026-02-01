@@ -1,28 +1,24 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-import type { CreateServerPayload } from '#shared/types/admin'
 import { randomUUID } from 'node:crypto'
 import { and, eq, isNull } from 'drizzle-orm'
 import { provisionServerOnWings } from '~~/server/utils/server-provisioning'
 import { sendServerCreatedEmail } from '~~/server/utils/email'
+import { createAdminServerSchema } from '#shared/schema/admin/server'
 
 export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
-  const body = await readBody<CreateServerPayload>(event)
-
-  if (!body.name || !body.ownerId || !body.eggId || !body.nodeId || !body.allocationId) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'Name, owner, egg, node, and allocation are required',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(
+    event,
+    createAdminServerSchema,
+    BODY_SIZE_LIMITS.MEDIUM,
+  )
 
   const db = useDrizzle()
   const now = new Date()
@@ -84,7 +80,7 @@ export default defineEventHandler(async (event) => {
     eggId: body.eggId,
     startup: body.startup || egg.startup || '',
     image: egg.dockerImage || 'ghcr.io/pterodactyl/yolks:latest',
-    dockerImage: body.dockerImage || egg.dockerImage || null, 
+    dockerImage: body.dockerImage || egg.dockerImage || null,
     skipScripts: body.skipScripts ?? false,
     oomDisabled: body.oomDisabled ?? true,
     createdAt: now,

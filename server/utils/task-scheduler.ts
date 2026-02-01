@@ -20,7 +20,7 @@ export class TaskScheduler {
 
   private parseNextRun(cronExpression: string, lastRun?: Date): Date {
     const now = lastRun ? new Date(lastRun.getTime() + 60000) : new Date()
-    const [minute, hour, day, month, weekday] = cronExpression.split(' ')
+    const [minute = '*', hour = '*', day = '*', month = '*', weekday = '*'] = cronExpression.trim().split(/\s+/)
     
     const nextRun = new Date(now)
     nextRun.setSeconds(0)
@@ -78,7 +78,7 @@ export class TaskScheduler {
   }
 
   private isCronDue(cronExpression: string, now: Date): boolean {
-    const [minute, hour, day, month, weekday] = cronExpression.split(' ')
+    const [minute = '*', hour = '*', day = '*', month = '*', weekday = '*'] = cronExpression.trim().split(/\s+/)
     
     const nowMinute = now.getMinutes()
     const nowHour = now.getHours()

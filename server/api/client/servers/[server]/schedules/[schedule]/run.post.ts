@@ -1,11 +1,11 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { TaskScheduler } from '~~/server/utils/task-scheduler'
+import { requireAccountUser } from '~~/server/utils/security'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
   const serverId = getRouterParam(event, 'server')
   const scheduleId = getRouterParam(event, 'schedule')
 
@@ -16,11 +16,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
     requiredPermissions: ['server.schedule.update'],
+    allowOwner: true,
+    allowAdmin: true,
   })
 
   const db = useDrizzle()
@@ -60,6 +63,18 @@ export default defineEventHandler(async (event) => {
     }
 
     const result = await scheduler.executeSchedule(scheduleId, true)
+
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.schedule.executed',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: {
+        scheduleId,
+        success: result.success,
+        taskCount: result.tasks.length,
+      },
+    })
 
     return {
       data: {

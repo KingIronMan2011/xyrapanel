@@ -1,36 +1,17 @@
 <script setup lang="ts">
-import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { SecuritySettings } from '#shared/types/admin'
+import { securitySettingsFormSchema } from '#shared/schema/admin/settings'
+import type { SecuritySettingsFormInput } from '#shared/schema/admin/settings'
 
 const { t } = useI18n()
 const toast = useToast()
 const isSubmitting = ref(false)
 
-const rawSchema = z.object({
-  enforceTwoFactor: z.boolean(),
-  maintenanceMode: z.boolean(),
-  maintenanceMessage: z.string().trim().max(500, t('admin.settings.securitySettings.maintenanceMessageMaxLength')),
-  announcementEnabled: z.boolean(),
-  announcementMessage: z.string().trim().max(500, t('admin.settings.securitySettings.announcementMessageMaxLength')),
-  sessionTimeoutMinutes: z.number()
-    .int(t('admin.settings.securitySettings.sessionTimeoutInt'))
-    .min(5, t('admin.settings.securitySettings.sessionTimeoutMin'))
-    .max(1440, t('admin.settings.securitySettings.sessionTimeoutMax')),
-  queueConcurrency: z.number()
-    .int(t('admin.settings.securitySettings.queueConcurrencyInt'))
-    .min(1, t('admin.settings.securitySettings.queueConcurrencyMin'))
-    .max(32, t('admin.settings.securitySettings.queueConcurrencyMax')),
-  queueRetryLimit: z.number()
-    .int(t('admin.settings.securitySettings.queueRetryLimitInt'))
-    .min(1, t('admin.settings.securitySettings.queueRetryLimitMin'))
-    .max(50, t('admin.settings.securitySettings.queueRetryLimitMax')),
-})
-
-const schema = rawSchema.superRefine((data, ctx) => {
+const schema = securitySettingsFormSchema.superRefine((data, ctx) => {
   if (data.maintenanceMode && data.maintenanceMessage.length === 0) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['maintenanceMessage'],
       message: t('admin.settings.securitySettings.maintenanceMessageRequired'),
     })
@@ -38,14 +19,14 @@ const schema = rawSchema.superRefine((data, ctx) => {
 
   if (data.announcementEnabled && data.announcementMessage.length === 0) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['announcementMessage'],
       message: t('admin.settings.securitySettings.announcementMessageRequired'),
     })
   }
 })
 
-type FormSchema = z.infer<typeof schema>
+type FormSchema = SecuritySettingsFormInput
 
 function createFormState(source?: SecuritySettings | null): FormSchema {
   return {

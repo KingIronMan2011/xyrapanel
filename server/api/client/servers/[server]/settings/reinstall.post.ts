@@ -1,12 +1,13 @@
-import { getServerSession } from '~~/server/utils/session'
+import { requireAccountUser } from '~~/server/utils/security'
 import { getServerWithAccess, getNodeForServer } from '~~/server/utils/server-helpers'
 import { createWingsClient } from '~~/server/utils/wings/client'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const { user, session } = await requireAccountUser(event)
   const serverId = getRouterParam(event, 'server')
 
   if (!serverId) {
@@ -40,16 +41,25 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.servers.id, server.id))
     .run()
 
-  await recordAuditEventFromRequest(event, {
-    actor: session?.user?.email || session?.user?.id || 'unknown',
-    actorType: 'user',
-    action: 'server.reinstalled',
-    targetType: 'server',
-    targetId: server.id,
-    metadata: {
-      serverId: server.id,
-    },
-  })
+  await Promise.all([
+    recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: 'server.reinstalled',
+      targetType: 'server',
+      targetId: server.id,
+      metadata: {
+        serverId: server.id,
+        serverUuid: server.uuid,
+      },
+    }),
+    recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.reinstall.requested',
+      server: { id: server.id, uuid: server.uuid },
+    }),
+  ])
 
   const node = await getNodeForServer(server.nodeId)
 
@@ -74,8 +84,10 @@ export default defineEventHandler(async (event) => {
     }
 
     return {
-      success: true,
-      message: 'Server reinstall initiated',
+      data: {
+        success: true,
+        message: 'Server reinstall initiated',
+      },
     }
   } catch (error) {
     console.error('Failed to trigger reinstall on Wings:', error)

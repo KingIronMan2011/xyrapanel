@@ -1,19 +1,13 @@
-import { createError, assertMethod } from 'h3'
-import { getServerSession, getSessionUser } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
 import { accountProfileUpdateSchema } from '#shared/schema/account'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   assertMethod(event, 'PUT')
 
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
-
-  if (!user?.id) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const accountContext = await requireAccountUser(event)
+  const user = accountContext.user
 
   const body = await readValidatedBodyWithLimit(
     event,

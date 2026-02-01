@@ -1,4 +1,4 @@
-import { createError, sendRedirect, defineEventHandler, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import type { AuthContext, ResolvedSessionUser } from '#shared/types/auth'
 import { getServerSession } from '~~/server/utils/session'
 import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'

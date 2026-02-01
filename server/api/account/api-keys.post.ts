@@ -1,22 +1,13 @@
-import { createError } from 'h3'
 import { randomUUID } from 'node:crypto'
-import { getServerSession } from '~~/server/utils/session'
-import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
 import { createApiKeySchema } from '#shared/schema/account'
 import type { ApiKeyResponse } from '#shared/types/api'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event): Promise<ApiKeyResponse> => {
-  const session = await getServerSession(event)
-
-  if (!session?.user?.id) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Unauthorized',
-      message: 'You must be logged in to create API keys',
-    })
-  }
+  const accountContext = await requireAccountUser(event)
+  const user = accountContext.user
 
   const body = await readValidatedBodyWithLimit(
     event,
@@ -35,7 +26,7 @@ export default defineEventHandler(async (event): Promise<ApiKeyResponse> => {
     await db.insert(tables.apiKeys)
       .values({
         id: apiKeyId,
-        userId: session.user.id,
+        userId: user.id,
         name: body.memo || 'API Key',
         key: rawKey,
         start: rawKey.slice(0, 6),
@@ -72,7 +63,7 @@ export default defineEventHandler(async (event): Promise<ApiKeyResponse> => {
       .run()
 
     await recordAuditEventFromRequest(event, {
-      actor: session.user.id,
+      actor: user.id,
       actorType: 'user',
       action: 'account.api_key.create',
       targetType: 'user',

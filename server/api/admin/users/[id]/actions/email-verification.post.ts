@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
@@ -109,11 +108,17 @@ export default defineEventHandler(async (event) => {
       action: `admin.user.email.${body.action}`,
       targetType: 'user',
       targetId: userId,
+      metadata: {
+        action: body.action,
+        userEmail: user.email ?? undefined,
+      },
     })
 
     return {
-      success: true,
-      action: body.action,
+      data: {
+        success: true,
+        action: body.action,
+      },
     }
   }
   catch (error) {

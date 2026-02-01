@@ -1,21 +1,10 @@
-import { createError, readBody, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { getNodeIdFromAuth } from '~~/server/utils/wings/auth'
 import { invalidateServerBackupsCache } from '~~/server/utils/backups'
-
-interface BackupPart {
-  etag: string
-  part_number: number
-}
-
-interface BackupStatusRequest {
-  checksum: string
-  checksum_type: string
-  size: number
-  successful: boolean
-  parts?: BackupPart[]
-}
+import { remoteBackupStatusSchema } from '#shared/schema/wings'
 
 export default defineEventHandler(async (event: H3Event) => {
   const db = useDrizzle()
@@ -27,8 +16,11 @@ export default defineEventHandler(async (event: H3Event) => {
 
   const nodeId = await getNodeIdFromAuth(event)
 
-  const body = await readBody<BackupStatusRequest>(event)
-  const { checksum, checksum_type, size, successful, parts } = body
+  const { checksum, checksum_type, size, successful, parts } = await readValidatedBodyWithLimit(
+    event,
+    remoteBackupStatusSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const backup = db
     .select()
@@ -80,6 +72,8 @@ export default defineEventHandler(async (event: H3Event) => {
   })
 
   return {
-    success: true,
+    data: {
+      success: true,
+    },
   }
 })

@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
@@ -76,8 +75,10 @@ export default defineEventHandler(async (event) => {
     })
 
     return {
-      success: true,
-      message: 'Server reinstall initiated',
+      data: {
+        success: true,
+        message: 'Server reinstall initiated',
+      },
     }
   }
   catch (error) {

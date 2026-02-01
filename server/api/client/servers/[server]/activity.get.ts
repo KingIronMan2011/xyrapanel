@@ -1,9 +1,9 @@
 import { desc, eq, sql } from 'drizzle-orm'
 import type { PaginatedServerActivityResponse, ServerActivityEvent } from '#shared/types/server'
-import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { requireAccountUser } from '~~/server/utils/security'
 
 function parseMetadata(raw: string | null): Record<string, unknown> | null {
   if (!raw) {
@@ -24,7 +24,7 @@ function parseMetadata(raw: string | null): Record<string, unknown> | null {
 }
 
 export default defineEventHandler(async (event): Promise<PaginatedServerActivityResponse> => {
-  const session = await getServerSession(event)
+  const accountContext = await requireAccountUser(event)
   const serverIdentifier = getRouterParam(event, 'server')
 
   if (!serverIdentifier) {
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event): Promise<PaginatedServerActivity
     })
   }
 
-  const { server } = await getServerWithAccess(serverIdentifier, session)
+  const { server } = await getServerWithAccess(serverIdentifier, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,

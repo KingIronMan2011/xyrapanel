@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
@@ -35,8 +34,10 @@ export default defineEventHandler(async (event) => {
 
   if (!server.suspended) {
     return {
-      success: true,
-      message: 'Server is already unsuspended',
+      data: {
+        success: true,
+        message: 'Server is already unsuspended',
+      },
     }
   }
 
@@ -86,7 +87,9 @@ export default defineEventHandler(async (event) => {
   })
 
   return {
-    success: true,
-    message: 'Server unsuspended successfully',
+    data: {
+      success: true,
+      message: 'Server unsuspended successfully',
+    },
   }
 })

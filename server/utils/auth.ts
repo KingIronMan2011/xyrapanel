@@ -143,6 +143,15 @@ function createAuth() {
       .filter(origin => !trustedOrigins.includes(origin)) 
     trustedOrigins.push(...additionalOrigins)
   }
+
+  if (process.env.NUXT_SECURITY_CORS_ORIGIN) {
+    const corsOrigins = process.env.NUXT_SECURITY_CORS_ORIGIN
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(Boolean)
+      .filter(origin => !trustedOrigins.includes(origin))
+    trustedOrigins.push(...corsOrigins)
+  }
   
   const appUrl = process.env.NUXT_PUBLIC_APP_URL || process.env.APP_URL
   if (appUrl && appUrl !== baseURL && !trustedOrigins.includes(appUrl)) {

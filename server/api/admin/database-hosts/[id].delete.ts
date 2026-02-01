@@ -1,10 +1,14 @@
 import { eq } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
+
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.DATABASE_HOSTS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const hostId = getRouterParam(event, 'id')
   if (!hostId) {
@@ -24,7 +28,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const databasesCount = await db
-    .select()
+    .select({ id: tables.serverDatabases.id })
     .from(tables.serverDatabases)
     .where(eq(tables.serverDatabases.databaseHostId, hostId))
     .all()
@@ -37,7 +41,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await db.delete(tables.databaseHosts).where(eq(tables.databaseHosts.id, hostId))
+  await db.delete(tables.databaseHosts).where(eq(tables.databaseHosts.id, hostId)).run()
 
   await recordAuditEventFromRequest(event, {
     actor: session.user.email || session.user.id,
@@ -51,5 +55,10 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  return { success: true }
+  return {
+    data: {
+      success: true,
+      deletedId: hostId,
+    },
+  }
 })

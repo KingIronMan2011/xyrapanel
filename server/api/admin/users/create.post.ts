@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
@@ -99,13 +98,15 @@ export default defineEventHandler(async (event) => {
     })
 
     return {
-      user: newUser || {
-        id: userId,
-        username,
-        email,
-        role: normalizedRole,
+      data: {
+        user: newUser || {
+          id: userId,
+          username,
+          email,
+          role: normalizedRole,
+        },
+        generatedPassword: password ? undefined : finalPassword,
       },
-      generatedPassword: password ? undefined : finalPassword,
     }
   }
   catch (error) {

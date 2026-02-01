@@ -1,68 +1,58 @@
-import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { invalidateServerCaches } from '~~/server/utils/serversStore'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { serverRenameSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
-
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const serverId = getRouterParam(event, 'id')
-  if (!serverId) {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Server ID required' })
   }
 
-  const body = await readBody<{ name: string }>(event)
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
 
-  if (!body.name || body.name.trim().length === 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Server name is required' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.update'],
+  })
 
-  if (body.name.length > 255) {
-    throw createError({ statusCode: 400, statusMessage: 'Server name must be 255 characters or less' })
-  }
+  const body = await readValidatedBodyWithLimit(event, serverRenameSchema, BODY_SIZE_LIMITS.SMALL)
 
   const db = useDrizzle()
-
-  const server = db
-    .select()
-    .from(tables.servers)
-    .where(eq(tables.servers.uuid, serverId))
-    .get()
-
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  const isAdmin = user.role === 'admin'
-  const isOwner = server.ownerId === user.id
-
-  if (!isAdmin && !isOwner) {
-    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to rename this server' })
-  }
-
-  db.update(tables.servers)
+  await db.update(tables.servers)
     .set({
-      name: body.name.trim(),
+      name: body.name,
+      description: body.description ?? server.description ?? null,
       updatedAt: new Date(),
     })
-    .where(eq(tables.servers.uuid, serverId))
+    .where(eq(tables.servers.id, server.id))
     .run()
 
-  const { invalidateServerCaches } = await import('~~/server/utils/serversStore')
   await invalidateServerCaches({
     id: server.id,
     uuid: server.uuid,
     identifier: server.identifier,
   })
 
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.settings.renamed',
+    server: { id: server.id, uuid: server.uuid },
+    metadata: {
+      previousName: server.name,
+      newName: body.name,
+    },
+  })
+
   return {
-    success: true,
-    message: 'Server renamed successfully',
     data: {
-      name: body.name.trim(),
+      name: body.name,
+      description: body.description ?? server.description ?? null,
     },
   }
 })

@@ -1,21 +1,17 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { randomUUID } from 'node:crypto'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-import type { CreateNestPayload } from '#shared/types/admin'
-import { randomUUID } from 'node:crypto'
+import { createNestSchema } from '#shared/schema/admin/infrastructure'
 
 export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.NESTS, ADMIN_ACL_PERMISSIONS.WRITE)
 
-  const body = await readBody<CreateNestPayload>(event)
-
-  if (!body.name || !body.author) {
-    throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Name and author are required' })
-  }
+  const body = await readValidatedBodyWithLimit(event, createNestSchema, BODY_SIZE_LIMITS.SMALL)
 
   const db = useDrizzle()
   const now = new Date()
@@ -23,9 +19,9 @@ export default defineEventHandler(async (event) => {
   const newNest = {
     id: randomUUID(),
     uuid: randomUUID(),
-    author: body.author,
-    name: body.name,
-    description: body.description || null,
+    author: body.author.trim(),
+    name: body.name.trim(),
+    description: body.description?.trim() || null,
     createdAt: now,
     updatedAt: now,
   }

@@ -1,41 +1,33 @@
-import { createError } from 'h3'
 import { eq, and } from 'drizzle-orm'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { invalidateServerCaches } from '~~/server/utils/serversStore'
 
 export default defineEventHandler(async (event) => {
-  const identifier = event.context.params?.id
-  const databaseId = event.context.params?.databaseId
+  const identifier = getRouterParam(event, 'id')
+  const databaseId = getRouterParam(event, 'databaseId')
 
-  if (!identifier || typeof identifier !== 'string') {
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
-  if (!databaseId || typeof databaseId !== 'string') {
+  if (!databaseId) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing database identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const server = await findServerByIdentifier(identifier)
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  const isAdmin = user.role === 'admin'
-  const isOwner = server.ownerId === user.id
-
-  if (!isAdmin && !isOwner) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.database.delete'],
+    allowOwner: true,
+    allowAdmin: true,
+  })
 
   const db = useDrizzle()
 
@@ -57,9 +49,24 @@ export default defineEventHandler(async (event) => {
       .delete(tables.serverDatabases)
       .where(eq(tables.serverDatabases.id, databaseId))
 
+    await invalidateServerCaches({ id: server.id })
+
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.database.deleted',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: {
+        databaseId,
+        databaseName: database.name,
+      },
+    })
+
     return {
-      success: true,
-      message: 'Database deleted successfully',
+      data: {
+        success: true,
+        message: 'Database deleted successfully',
+      },
     }
   }
   catch (error) {

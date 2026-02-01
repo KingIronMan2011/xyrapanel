@@ -1,28 +1,12 @@
-import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { verifyRecoveryToken } from '~~/server/utils/totp'
-import { log2FA, getRequestMetadata } from '~~/server/utils/activity'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
+import { twoFactorRecoverySchema } from '#shared/schema/account'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
-
-  if (!user) {
-    throw createError({
-      statusCode: 401,
-      message: 'Unauthorized',
-    })
-  }
-
-  const body = await readBody(event)
-  const { token } = body
-
-  if (!token) {
-    throw createError({
-      statusCode: 400,
-      message: 'Recovery token is required',
-    })
-  }
+  const { user } = await requireAccountUser(event)
+  const { token } = await readValidatedBodyWithLimit(event, twoFactorRecoverySchema, BODY_SIZE_LIMITS.SMALL)
 
   const userId = user.id
   const db = useDrizzle()
@@ -66,13 +50,19 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.users.id, userId))
     .run()
 
-  log2FA(userId, 'auth.recovery.used', {
-    ...getRequestMetadata(event),
-    tokenId: matchedTokenId,
+  await recordAuditEventFromRequest(event, {
+    actor: user.email || user.id,
+    actorType: 'user',
+    action: 'auth.2fa.recovery.used',
+    targetType: 'user',
+    targetId: userId,
+    metadata: { tokenId: matchedTokenId },
   })
 
   return {
-    success: true,
-    message: 'Recovery token validated successfully',
+    data: {
+      success: true,
+      message: 'Recovery token validated successfully',
+    },
   }
 })

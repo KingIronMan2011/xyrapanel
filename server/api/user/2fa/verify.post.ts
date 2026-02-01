@@ -1,22 +1,14 @@
-import { createError } from 'h3'
 import { APIError } from 'better-auth/api'
 import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-import { requireAuth } from '~~/server/utils/security'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
+import { twoFactorVerifySchema } from '#shared/schema/account'
 
 export default defineEventHandler(async (event) => {
-  const session = await requireAuth(event)
+  const { user } = await requireAccountUser(event)
   const auth = getAuth()
 
-  const body = await readBody(event)
-  const { code } = body // Better Auth uses code not token
-
-  if (!code) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'TOTP code is required',
-    })
-  }
+  const { code } = await readValidatedBodyWithLimit(event, twoFactorVerifySchema, BODY_SIZE_LIMITS.SMALL)
 
   try {
     const api = auth.api as typeof auth.api & {
@@ -33,16 +25,18 @@ export default defineEventHandler(async (event) => {
     })
 
     await recordAuditEventFromRequest(event, {
-      actor: session.user.email || session.user.id,
+      actor: user.email || user.id,
       actorType: 'user',
       action: 'auth.2fa.enabled',
       targetType: 'user',
-      targetId: session.user.id,
+      targetId: user.id,
     })
 
     return {
-      success: true,
-      message: '2FA enabled successfully',
+      data: {
+        success: true,
+        message: '2FA enabled successfully',
+      },
     }
   }
   catch (error) {

@@ -1,14 +1,17 @@
-import { createError, parseCookies } from 'h3'
 import type { UserSessionSummary, AccountSessionsResponse, AuthContext } from '#shared/types/auth'
-import { requireAuth } from '~~/server/utils/security'
+import { requireAccountUser } from '~~/server/utils/security'
 import { parseUserAgent } from '~~/server/utils/user-agent'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event): Promise<AccountSessionsResponse> => {
   const middlewareAuth = (event.context as { auth?: AuthContext }).auth
-  const session = middlewareAuth ?? (await requireAuth(event))
+  const accountContext = middlewareAuth
+    ? { session: middlewareAuth.session, user: middlewareAuth.user }
+    : await requireAccountUser(event)
 
-  if (!session?.user?.id) {
+  const { user } = accountContext
+
+  if (!user?.id) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }
 
@@ -30,7 +33,7 @@ export default defineEventHandler(async (event): Promise<AccountSessionsResponse
     })
       .from(tables.sessions)
       .leftJoin(tables.sessionMetadata, eq(tables.sessionMetadata.sessionToken, tables.sessions.sessionToken))
-      .where(eq(tables.sessions.userId, session.user.id))
+      .where(eq(tables.sessions.userId, user.id))
       .all()
   }
   catch (error) {
@@ -43,7 +46,7 @@ export default defineEventHandler(async (event): Promise<AccountSessionsResponse
         metadataUserAgent: tables.sessions.userAgent,
       })
         .from(tables.sessions)
-        .where(eq(tables.sessions.userId, session.user.id))
+        .where(eq(tables.sessions.userId, user.id))
         .all()
     }
     else {
@@ -197,11 +200,11 @@ export default defineEventHandler(async (event): Promise<AccountSessionsResponse
   }
 
   await recordAuditEventFromRequest(event, {
-    actor: session.user.id,
+    actor: user.id,
     actorType: 'user',
     action: 'account.sessions.listed',
     targetType: 'user',
-    targetId: session.user.id,
+    targetId: user.id,
     metadata: { count: data.length },
   })
 

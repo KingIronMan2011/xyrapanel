@@ -1,13 +1,14 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { invalidateScheduleCaches } from '~~/server/utils/serversStore'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { clientUpdateScheduleSchema } from '#shared/schema/server/operations'
 
 function calculateNextRun(cronExpression: string): Date {
   const now = new Date()
-  const [minute, hour, day, month, weekday] = cronExpression.split(' ')
+  const [minute = '*', hour = '*', day = '*', month = '*', weekday = '*'] = cronExpression.split(' ')
   
   const nextRun = new Date(now)
   nextRun.setSeconds(0)
@@ -66,20 +67,8 @@ function calculateNextRun(cronExpression: string): Date {
 
 type ServerScheduleUpdate = typeof tables.serverSchedules.$inferInsert
 
-interface UpdateSchedulePayload {
-  name?: string
-  cron?: {
-    minute: string
-    hour: string
-    day_of_month: string
-    month: string
-    day_of_week: string
-  }
-  is_active?: boolean
-}
-
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const accountContext = await requireAccountUser(event)
   const serverId = getRouterParam(event, 'server')
   const scheduleId = getRouterParam(event, 'schedule')
 
@@ -90,14 +79,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const { server } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
     requiredPermissions: ['server.schedule.update'],
   })
 
-  const body = await readBody<UpdateSchedulePayload>(event)
+  const body = await readValidatedBodyWithLimit(event, clientUpdateScheduleSchema, BODY_SIZE_LIMITS.SMALL)
 
   const db = useDrizzle()
   const schedule = db
@@ -150,7 +139,7 @@ export default defineEventHandler(async (event) => {
   await invalidateScheduleCaches({ serverId: server.id, scheduleId })
 
   await recordAuditEventFromRequest(event, {
-    actor: session?.user?.id || 'unknown',
+    actor: accountContext.user.id,
     actorType: 'user',
     action: 'server.schedule.update',
     targetType: 'server',

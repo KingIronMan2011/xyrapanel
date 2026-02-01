@@ -1,36 +1,25 @@
 import { randomUUID } from 'node:crypto'
-import { createError } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const identifier = event.context.params?.id
-  if (!identifier || typeof identifier !== 'string') {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const server = await findServerByIdentifier(identifier)
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  const isAdmin = user.role === 'admin'
-  const isOwner = server.ownerId === user.id
-
-  if (!isAdmin && !isOwner) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.backup.create'],
+  })
 
   if (!server.nodeId) {
     throw createError({ statusCode: 500, statusMessage: 'Server has no assigned node' })
@@ -59,8 +48,16 @@ export default defineEventHandler(async (event) => {
       updatedAt: new Date(),
     })
 
+    await recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: 'server.backup.created',
+      targetType: 'server',
+      targetId: server.id,
+      metadata: { backupId, backupUuid },
+    })
+
     return {
-      success: true,
       data: {
         uuid: backupUuid,
         id: backupId,

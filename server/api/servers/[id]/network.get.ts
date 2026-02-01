@@ -1,32 +1,34 @@
-import { createError, defineEventHandler } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import { listServerAllocations, findServerByIdentifier } from '~~/server/utils/serversStore'
+import { listServerAllocations } from '~~/server/utils/serversStore'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event) => {
-  const id = event.context.params?.id
-  if (!id || typeof id !== 'string') {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Missing server identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const server = await findServerByIdentifier(id)
-
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  if (user.role !== 'admin' && server.ownerId !== user.id) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.read'],
+  })
 
   const allocations = await listServerAllocations(server.id)
+
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.network.viewed',
+    server: { id: server.id, uuid: server.uuid },
+    metadata: {
+      allocationCount: allocations.length,
+    },
+  })
 
   return {
     data: {

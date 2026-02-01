@@ -1,26 +1,17 @@
-import { createError } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import bcrypt from 'bcryptjs'
-import { requireAuth } from '~~/server/utils/security'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
+import { twoFactorDisableSchema } from '#shared/schema/account'
 
 export default defineEventHandler(async (event) => {
-  const session = await requireAuth(event)
-
-  const body = await readBody(event)
-  const { password } = body
-
-  if (!password) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Password is required to disable 2FA',
-    })
-  }
+  const { user: sessionUser } = await requireAccountUser(event)
+  const { password } = await readValidatedBodyWithLimit(event, twoFactorDisableSchema, BODY_SIZE_LIMITS.SMALL)
 
   const db = useDrizzle()
-  const userId = session.user.id
+  const userId = sessionUser.id
 
-  const user = db
+  const dbUser = db
     .select({
       password: tables.users.password,
       useTotp: tables.users.useTotp,
@@ -29,14 +20,14 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.users.id, userId))
     .get()
 
-  if (!user) {
+  if (!dbUser) {
     throw createError({
       statusCode: 404,
       statusMessage: 'User not found',
     })
   }
 
-  const isValidPassword = await bcrypt.compare(password, user.password)
+  const isValidPassword = await bcrypt.compare(password, dbUser.password)
   if (!isValidPassword) {
     throw createError({
       statusCode: 401,
@@ -44,7 +35,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  if (!user.useTotp) {
+  if (!dbUser.useTotp) {
     throw createError({
       statusCode: 400,
       statusMessage: '2FA is not enabled for this account',
@@ -67,7 +58,7 @@ export default defineEventHandler(async (event) => {
       .run()
 
     await recordAuditEventFromRequest(event, {
-      actor: session.user.email || session.user.id,
+      actor: sessionUser.email || sessionUser.id,
       actorType: 'user',
       action: 'auth.2fa.disabled',
       targetType: 'user',
@@ -75,8 +66,10 @@ export default defineEventHandler(async (event) => {
     })
 
     return {
-      success: true,
-      message: '2FA disabled successfully',
+      data: {
+        success: true,
+        message: '2FA disabled successfully',
+      },
     }
   }
   catch (error) {

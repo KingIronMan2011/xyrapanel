@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
@@ -19,11 +18,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = useDrizzle()
-  const [allocation] = db.select()
+  const allocation = await db.select()
     .from(tables.serverAllocations)
     .where(eq(tables.serverAllocations.id, allocationId))
     .limit(1)
-    .all()
+    .get()
 
   if (!allocation) {
     throw createError({
@@ -39,7 +38,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  db.delete(tables.serverAllocations)
+  await db.delete(tables.serverAllocations)
     .where(eq(tables.serverAllocations.id, allocationId))
     .run()
 
@@ -56,7 +55,9 @@ export default defineEventHandler(async (event) => {
   })
 
   return {
-    success: true,
-    message: 'Allocation deleted successfully',
+    data: {
+      success: true,
+      message: 'Allocation deleted successfully',
+    },
   }
 })

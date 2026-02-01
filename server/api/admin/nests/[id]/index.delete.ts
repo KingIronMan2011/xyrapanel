@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const eggsCount = await db
-    .select()
+    .select({ id: tables.eggs.id })
     .from(tables.eggs)
     .where(eq(tables.eggs.nestId, nestId))
     .all()
@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await db.delete(tables.nests).where(eq(tables.nests.id, nestId))
+  await db.delete(tables.nests).where(eq(tables.nests.id, nestId)).run()
 
   await recordAuditEventFromRequest(event, {
     actor: session.user.email || session.user.id,
@@ -55,5 +55,10 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  return { success: true }
+  return {
+    data: {
+      success: true,
+      deletedId: nestId,
+    },
+  }
 })

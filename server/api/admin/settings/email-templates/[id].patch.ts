@@ -1,8 +1,10 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { emailTemplateUpdateSchema } from '#shared/schema/admin/settings'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   const id = getRouterParam(event, 'id')
   if (!id) {
@@ -12,13 +14,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody(event)
-  if (!body.content || typeof body.content !== 'string') {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Template content is required',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(event, emailTemplateUpdateSchema, BODY_SIZE_LIMITS.MEDIUM)
 
   try {
     const db = useDrizzle()
@@ -32,10 +28,22 @@ export default defineEventHandler(async (event) => {
       .where(eq(tables.emailTemplates.templateId, id))
       .run()
 
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.email_template.updated',
+      targetType: 'settings',
+      metadata: {
+        templateId: id,
+      },
+    })
+
     return {
-      id,
-      message: 'Template updated successfully',
-      updatedAt: now,
+      data: {
+        id,
+        message: 'Template updated successfully',
+        updatedAt: now,
+      },
     }
   }
   catch (err) {

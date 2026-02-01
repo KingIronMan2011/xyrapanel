@@ -1,7 +1,8 @@
-import { createError, defineEventHandler, getHeader } from 'h3'
+import { timingSafeEqual } from 'node:crypto'
 import { getWingsNodeConfigurationById } from '~~/server/utils/wings/nodesStore'
 import { parseAuthToken, decryptToken } from '~~/server/utils/wings/encryption'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { useRuntimeConfig, getRequestURL } from '#imports'
 
 export default defineEventHandler(async (event) => {
@@ -50,7 +51,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  if (tokenData.token !== decryptedSecret) {
+  const providedSecret = Buffer.from(tokenData.token, 'utf8')
+  const storedSecret = Buffer.from(decryptedSecret, 'utf8')
+
+  if (providedSecret.byteLength !== storedSecret.byteLength || !timingSafeEqual(providedSecret, storedSecret)) {
     throw createError({ statusCode: 403, statusMessage: 'Invalid token secret' })
   }
 
@@ -62,6 +66,18 @@ export default defineEventHandler(async (event) => {
   
   try {
     const configuration = getWingsNodeConfigurationById(nodeRow.id, panelUrl)
+
+    await recordAuditEventFromRequest(event, {
+      actor: nodeRow.uuid,
+      actorType: 'daemon',
+      action: 'application.node.configuration.requested',
+      targetType: 'node',
+      targetId: nodeRow.id,
+      metadata: {
+        requestOrigin: requestOrigin || null,
+      },
+    })
+
     return configuration
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to build node configuration'

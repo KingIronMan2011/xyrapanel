@@ -1,41 +1,34 @@
-import { createError } from 'h3'
 import { eq, and } from 'drizzle-orm'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { invalidateScheduleCaches } from '~~/server/utils/serversStore'
 
 export default defineEventHandler(async (event) => {
-  const identifier = event.context.params?.id
-  const scheduleId = event.context.params?.scheduleId
+  const identifier = getRouterParam(event, 'id')
+  const scheduleId = getRouterParam(event, 'scheduleId')
 
-  if (!identifier || typeof identifier !== 'string') {
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
-  if (!scheduleId || typeof scheduleId !== 'string') {
+  if (!scheduleId) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing schedule identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const server = await findServerByIdentifier(identifier)
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  const isAdmin = user.role === 'admin'
-  const isOwner = server.ownerId === user.id
-
-  if (!isAdmin && !isOwner) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.schedule.delete'],
+    allowOwner: true,
+    allowAdmin: true,
+  })
 
   const db = useDrizzle()
 
@@ -57,9 +50,31 @@ export default defineEventHandler(async (event) => {
       .delete(tables.serverSchedules)
       .where(eq(tables.serverSchedules.id, scheduleId))
 
+    await invalidateScheduleCaches({ serverId: server.id, scheduleId })
+
+    await Promise.all([
+      recordServerActivity({
+        event,
+        actorId: user.id,
+        action: 'server.schedule.deleted',
+        server: { id: server.id, uuid: server.uuid },
+        metadata: { scheduleId, name: schedule.name },
+      }),
+      recordAuditEventFromRequest(event, {
+        actor: user.id,
+        actorType: 'user',
+        action: 'server.schedule.deleted',
+        targetType: 'server',
+        targetId: server.id,
+        metadata: { scheduleId, name: schedule.name },
+      }),
+    ])
+
     return {
-      success: true,
-      message: 'Schedule deleted successfully',
+      data: {
+        success: true,
+        message: 'Schedule deleted successfully',
+      },
     }
   }
   catch (error) {

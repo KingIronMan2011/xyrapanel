@@ -17,13 +17,15 @@ const expandedActivityEntries = ref<Set<string>>(new Set())
 const {
   data: activityData,
 } = await useAsyncData(
+  `admin-user-activity-${props.userId}`,
   async () => {
-    const url = `/api/admin/users/${props.userId}/activity?page=${activityPage.value}&limit=${props.itemsPerPage}`
+    const url = `/api/admin/users/${props.userId}/activity?page=${activityPage.value}&limit=${props.itemsPerPage}` as string
+    // @ts-expect-error - Nuxt typed routes cause deep type inference here
     return await $fetch(url) as PaginatedActivityResponse
   },
   {
     default: () => ({ data: [], pagination: { page: 1, perPage: props.itemsPerPage, total: 0, totalPages: 0 } }),
-    watch: [activityPage, () => props.itemsPerPage],
+    watch: [activityPage, () => props.itemsPerPage, () => props.userId],
   },
 )
 

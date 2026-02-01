@@ -2,9 +2,10 @@ import { requireAdmin } from '~~/server/utils/security'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import type { AdminScheduleResponse, NitroTasksResponse } from '#shared/types/admin'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SCHEDULES, ADMIN_ACL_PERMISSIONS.READ)
 
@@ -24,7 +25,10 @@ export default defineEventHandler(async (event) => {
     })
     
     if (response.ok) {
-      nitroTasksResponse = await response.json() as NitroTasksResponse
+      const payload = await response.json() as { data?: NitroTasksResponse } | NitroTasksResponse
+      nitroTasksResponse = 'data' in payload && payload.data
+        ? payload.data
+        : (payload as NitroTasksResponse)
     }
   } catch (error) {
     console.error('Failed to fetch Nitro tasks:', error)
@@ -32,7 +36,7 @@ export default defineEventHandler(async (event) => {
 
   const allSchedules: AdminScheduleResponse[] = [...wingsSchedules]
 
-  for (const scheduledTask of nitroTasksResponse.scheduledTasks) {
+  for (const scheduledTask of nitroTasksResponse.scheduledTasks ?? []) {
     for (const taskName of scheduledTask.tasks) {
       const taskInfo = nitroTasksResponse.tasks[taskName]
       
@@ -56,6 +60,18 @@ export default defineEventHandler(async (event) => {
       })
     }
   }
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.schedules.viewed',
+    targetType: 'settings',
+    targetId: null,
+    metadata: {
+      scheduleCount: allSchedules.length,
+      nitroTasks: nitroTasksResponse.scheduledTasks?.length ?? 0,
+    },
+  })
 
   return {
     data: allSchedules,

@@ -54,5 +54,7 @@ export default defineEventHandler(async (event) => {
     },
   ]
 
-  return templates
+  return {
+    data: templates,
+  }
 })

@@ -4,9 +4,10 @@ import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissi
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { getWingsClient, WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
 import type { WingsNode } from '#shared/types/wings-client'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.NODES, ADMIN_ACL_PERMISSIONS.READ)
 
@@ -55,17 +56,44 @@ export default defineEventHandler(async (event) => {
         .where(eq(tables.wingsNodes.id, nodeId))
         .run()
 
+      await recordAuditEventFromRequest(event, {
+        actor: session.user.email || session.user.id,
+        actorType: 'user',
+        action: 'admin.node.connection_test.success',
+        targetType: 'node',
+        targetId: nodeId,
+        metadata: {
+          fqdn: node.fqdn,
+        },
+      })
+
       return {
-        success: true,
-        connected: true,
-        message: 'Successfully connected to Wings daemon',
-        systemInfo,
+        data: {
+          success: true,
+          connected: true,
+          message: 'Successfully connected to Wings daemon',
+          systemInfo,
+        },
       }
     } else {
+      await recordAuditEventFromRequest(event, {
+        actor: session.user.email || session.user.id,
+        actorType: 'user',
+        action: 'admin.node.connection_test.failed',
+        targetType: 'node',
+        targetId: nodeId,
+        metadata: {
+          fqdn: node.fqdn,
+          reason: 'connection_failed',
+        },
+      })
+
       return {
-        success: false,
-        connected: false,
-        message: 'Failed to connect to Wings daemon',
+        data: {
+          success: false,
+          connected: false,
+          message: 'Failed to connect to Wings daemon',
+        },
       }
     }
   } catch (error) {
@@ -84,11 +112,26 @@ export default defineEventHandler(async (event) => {
       errorMessage = error.message
     }
 
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.node.connection_test.failed',
+      targetType: 'node',
+      targetId: nodeId,
+      metadata: {
+        fqdn: node.fqdn,
+        errorType,
+        errorMessage,
+      },
+    })
+
     return {
-      success: false,
-      connected: false,
-      message: errorMessage,
-      errorType,
+      data: {
+        success: false,
+        connected: false,
+        message: errorMessage,
+        errorType,
+      },
     }
   }
 })

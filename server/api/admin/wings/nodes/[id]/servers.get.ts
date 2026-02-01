@@ -1,10 +1,8 @@
-import { createError, defineEventHandler, getQuery } from 'h3'
 import { and, desc, like, or, sql } from 'drizzle-orm'
-
 import type { AdminPaginatedMeta, AdminWingsNodeServerSummary, AdminWingsNodeServersPayload } from '#shared/types/admin'
-
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 function toIsoTimestamp(value: unknown): string {
   if (value instanceof Date) {
@@ -40,7 +38,7 @@ export default defineEventHandler(async (event): Promise<AdminWingsNodeServersPa
     throw createError({ statusCode: 400, statusMessage: 'Missing node id' })
   }
 
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   const query = getQuery(event)
   const pageParam = typeof query.page === 'string' ? Number.parseInt(query.page, 10) : 1
@@ -109,6 +107,21 @@ export default defineEventHandler(async (event): Promise<AdminWingsNodeServersPa
     total,
     hasMore: offset + data.length < total,
   }
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.wings.node.servers.listed',
+    targetType: 'node',
+    targetId: id,
+    metadata: {
+      page,
+      perPage,
+      total,
+      returned: data.length,
+      search: search || undefined,
+    },
+  })
 
   return {
     data,

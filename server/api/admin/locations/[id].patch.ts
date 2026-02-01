@@ -1,10 +1,10 @@
 import { eq } from 'drizzle-orm'
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-import type { UpdateLocationPayload } from '#shared/types/admin'
+import { updateLocationSchema } from '#shared/schema/admin/infrastructure'
 
 export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Location ID is required' })
   }
 
-  const body = await readBody<UpdateLocationPayload>(event)
+  const body = await readValidatedBodyWithLimit(event, updateLocationSchema, BODY_SIZE_LIMITS.SMALL)
   const db = useDrizzle()
 
   const existing = await db
@@ -33,13 +33,14 @@ export default defineEventHandler(async (event) => {
     updatedAt: new Date(),
   }
 
-  if (body.short !== undefined) updates.short = body.short
-  if (body.long !== undefined) updates.long = body.long
+  if (body.short !== undefined) updates.short = body.short.trim()
+  if (body.long !== undefined) updates.long = body.long?.trim() ?? null
 
   await db
     .update(tables.locations)
     .set(updates)
     .where(eq(tables.locations.id, locationId))
+    .run()
 
   const updated = await db
     .select()

@@ -7,12 +7,12 @@ const {
   data,
   pending,
   error,
-} = await useFetch('/api/admin/panel/information', {
+} = await useFetch<{ data: PanelInformation } | null>('/api/admin/panel/information', {
   key: 'admin-panel-information',
   server: false,
 })
 
-const info = computed(() => (data.value as PanelInformation | null) ?? null)
+const info = computed<PanelInformation | null>(() => data.value?.data ?? null)
 
 const releaseNotesOpen = ref(false)
 const releaseNotesLoading = ref(false)

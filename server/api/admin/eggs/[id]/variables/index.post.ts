@@ -1,10 +1,10 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { randomUUID } from 'node:crypto'
+import { eq } from 'drizzle-orm'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
-import type { CreateEggVariablePayload } from '#shared/types/admin'
-import { randomUUID } from 'crypto'
-import { eq } from 'drizzle-orm'
+import { createEggVariableSchema } from '#shared/schema/admin/infrastructure'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
@@ -17,15 +17,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Egg ID is required' })
   }
 
-  const body = await readBody<CreateEggVariablePayload>(event)
-
-  if (!body.name || !body.envVariable) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'Name and environment variable are required',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(event, createEggVariableSchema, BODY_SIZE_LIMITS.SMALL)
 
   const db = useDrizzle()
 
@@ -39,13 +31,13 @@ export default defineEventHandler(async (event) => {
   const newVariable = {
     id: randomUUID(),
     eggId,
-    name: body.name,
-    description: body.description || null,
-    envVariable: body.envVariable,
-    defaultValue: body.defaultValue || null,
+    name: body.name.trim(),
+    description: body.description?.trim() || null,
+    envVariable: body.envVariable.trim(),
+    defaultValue: body.defaultValue?.trim() || null,
     userViewable: body.userViewable ?? true,
     userEditable: body.userEditable ?? true,
-    rules: body.rules || null,
+    rules: body.rules?.trim() || null,
     createdAt: now,
     updatedAt: now,
   }

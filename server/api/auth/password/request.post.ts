@@ -1,24 +1,19 @@
-import { createError, getHeader } from 'h3'
 import { APIError } from 'better-auth/api'
 import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables, eq, or } from '~~/server/utils/drizzle'
 import { resolvePanelBaseUrl } from '~~/server/utils/email'
-
-interface RequestBody {
-  identity?: string
-}
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { passwordRequestSchema } from '#shared/schema/account'
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody<RequestBody>(event)
+  const { identity: rawIdentity } = await readValidatedBodyWithLimit(
+    event,
+    passwordRequestSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
-  const identity = body.identity?.trim().toLowerCase()
-
-  if (!identity) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Username or email required',
-    })
-  }
+  const identity = rawIdentity.toLowerCase()
 
   const db = useDrizzle()
   const user = db
@@ -29,8 +24,10 @@ export default defineEventHandler(async (event) => {
 
   if (!user?.email) {
     return {
-      success: true,
-      message: 'If an account matches, a password reset email has been sent.',
+      data: {
+        success: true,
+        message: 'If an account matches, a password reset email has been sent.',
+      },
     }
   }
 
@@ -51,6 +48,15 @@ export default defineEventHandler(async (event) => {
       },
       headers: authHeaders,
     })
+
+    await recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: 'auth.password.reset.requested',
+      targetType: 'user',
+      targetId: user.id,
+      metadata: { identity },
+    })
   }
   catch (error) {
     if (error instanceof APIError) {
@@ -65,7 +71,9 @@ export default defineEventHandler(async (event) => {
   }
 
   return {
-    success: true,
-    message: 'If an account matches, a password reset email has been sent.',
+    data: {
+      success: true,
+      message: 'If an account matches, a password reset email has been sent.',
+    },
   }
 })

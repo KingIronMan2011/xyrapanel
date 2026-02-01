@@ -26,8 +26,10 @@ export class FileManager {
     const files = await client.listFiles(serverUuid, sanitizedDir)
     
     const sortedFiles = files.sort((a, b) => {
-      if (a.is_file !== b.is_file) {
-        return a.is_file ? 1 : -1
+      const aIsFile = a.file === true
+      const bIsFile = b.file === true
+      if (aIsFile !== bIsFile) {
+        return aIsFile ? 1 : -1
       }
       return a.name.localeCompare(b.name)
     })
@@ -62,7 +64,7 @@ export class FileManager {
       content,
       file: sanitizedPath,
       size: fileInfo?.size || content.length,
-      lastModified: fileInfo?.modified_at,
+      lastModified: fileInfo?.modified,
       isEditable: !this.isBinaryFile(sanitizedPath),
     }
   }

@@ -1,42 +1,31 @@
-import { createError } from 'h3'
 import { eq, and } from 'drizzle-orm'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { useDrizzle } from '~~/server/utils/drizzle'
 import * as tables from '~~/server/database/schema'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const identifier = event.context.params?.id
-  const backupId = event.context.params?.backupId
+  const identifier = getRouterParam(event, 'id')
+  const backupId = getRouterParam(event, 'backupId')
 
-  if (!identifier || typeof identifier !== 'string') {
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
-  if (!backupId || typeof backupId !== 'string') {
+  if (!backupId) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing backup identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const server = await findServerByIdentifier(identifier)
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  const isAdmin = user.role === 'admin'
-  const isOwner = server.ownerId === user.id
-
-  if (!isAdmin && !isOwner) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.backup.delete'],
+  })
 
   const db = useDrizzle()
 
@@ -66,9 +55,20 @@ export default defineEventHandler(async (event) => {
       .delete(tables.serverBackups)
       .where(eq(tables.serverBackups.id, backupId))
 
+    await recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: 'server.backup.deleted',
+      targetType: 'server',
+      targetId: server.id,
+      metadata: { backupId },
+    })
+
     return {
-      success: true,
-      message: 'Backup deleted successfully',
+      data: {
+        success: true,
+        message: 'Backup deleted successfully',
+      },
     }
   }
   catch (error) {

@@ -1,15 +1,14 @@
 import { randomUUID } from 'crypto'
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { createTaskSchema } from '#shared/schema/server/operations'
 import { invalidateScheduleCaches } from '~~/server/utils/serversStore'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
-import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
   const serverId = getRouterParam(event, 'server')
   const scheduleId = getRouterParam(event, 'schedule')
 
@@ -20,11 +19,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
     requiredPermissions: ['server.schedule.update'],
+    allowOwner: true,
+    allowAdmin: true,
   })
 
   const db = useDrizzle()
@@ -88,12 +90,11 @@ export default defineEventHandler(async (event) => {
 
   await invalidateScheduleCaches({ serverId: server.id, scheduleId })
 
-  await recordAuditEventFromRequest(event, {
-    actor: session?.user?.id || 'unknown',
-    actorType: 'user',
-    action: 'server.schedule.task.create',
-    targetType: 'server',
-    targetId: server.id,
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.schedule.task.created',
+    server: { id: server.id, uuid: server.uuid },
     metadata: { scheduleId, taskId, action: body.action },
   })
 

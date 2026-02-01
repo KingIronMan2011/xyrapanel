@@ -1,4 +1,4 @@
-import { createError, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { getNodeIdFromAuth } from '~~/server/utils/wings/auth'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { debugError, debugWarn } from '~~/server/utils/logger'
@@ -132,10 +132,14 @@ export default defineEventHandler(async (event: H3Event) => {
 
   const allocationMappings: Record<string, number[]> = {}
   for (const alloc of allAllocations) {
-    if (!allocationMappings[alloc.ip]) {
-      allocationMappings[alloc.ip] = []
+    const ipKey = alloc.ip?.trim()
+    if (!ipKey) {
+      continue
     }
-    allocationMappings[alloc.ip].push(alloc.port)
+    if (!allocationMappings[ipKey]) {
+      allocationMappings[ipKey] = []
+    }
+    allocationMappings[ipKey].push(alloc.port)
   }
 
   const limitsWithDefaults = limits ? {
@@ -250,25 +254,27 @@ export default defineEventHandler(async (event: H3Event) => {
     const matches = Array.from(value.matchAll(templateRegex))
 
     for (const match of matches) {
-      const key = match[1]
+      const key = match[1] ?? ''
+      if (!key) {
+        continue
+      }
       let replacement: unknown = ''
 
       if (key.startsWith('server.')) {
         const path = key.replace(/^server\./, '').split('.')
-        let current: Record<string, unknown> = structure
+        let current: Record<string, unknown> | null = structure as unknown as Record<string, unknown>
         for (const part of path) {
-          if (current && typeof current === 'object' && part in current) {
-            current = current[part]
-          } else {
+          if (!current || typeof current !== 'object') {
             current = null
             break
           }
+          current = (current[part] as Record<string, unknown> | null) ?? null
         }
         replacement = current ?? ''
       }
       else if (key.startsWith('env.')) {
         const envKey = key.replace(/^env\./, '')
-        replacement = structure.build.env[envKey] ?? ''
+        replacement = structure.build?.env?.[envKey] ?? ''
       }
       else if (key.startsWith('config.')) {
         continue
@@ -293,8 +299,8 @@ export default defineEventHandler(async (event: H3Event) => {
 
     if (findData && typeof findData === 'object') {
       const processed: Record<string, unknown> = {}
-      for (const [key, value] of Object.entries(findData)) {
-        processed[key] = processFindValues(value, structure)
+      for (const [entryKey, entryValue] of Object.entries(findData as Record<string, unknown>)) {
+        processed[entryKey] = processFindValues(entryValue, structure)
       }
       return processed
     }
@@ -394,5 +400,7 @@ export default defineEventHandler(async (event: H3Event) => {
   }
 
 
-  return response
+  return {
+    data: response,
+  }
 })

@@ -1,32 +1,45 @@
-import { createError } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { listServerSchedules } from '~~/server/utils/schedules'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const identifier = event.context.params?.id
-  if (!identifier || typeof identifier !== 'string') {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const server = await findServerByIdentifier(identifier)
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  if (user.role !== 'admin' && server.ownerId !== user.id) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.schedule.read'],
+    allowOwner: true,
+    allowAdmin: true,
+  })
 
   const schedules = await listServerSchedules(server.id)
+
+  await Promise.all([
+    recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.schedule.listed',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { count: schedules.length },
+    }),
+    recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: 'server.schedule.listed',
+      targetType: 'server',
+      targetId: server.id,
+      metadata: { count: schedules.length },
+    }),
+  ])
 
   return {
     data: schedules,

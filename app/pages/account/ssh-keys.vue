@@ -22,25 +22,49 @@ const createForm = reactive({
   publicKey: '',
 })
 
-const { data: generalSettings } = await useFetch<{ paginationLimit: number }>('/api/admin/settings/general', {
-  key: 'admin-settings-general',
-  default: () => ({ paginationLimit: 25 }),
+const { data: generalSettings } = await useFetch('/api/admin/settings/general', {
+  key: 'account-settings-general',
+  default: () => ({
+    data: {
+      paginationLimit: 25,
+    },
+  }),
 })
-const itemsPerPage = computed(() => generalSettings.value?.paginationLimit ?? 25)
+const itemsPerPage = computed(() => ((generalSettings.value as { data: { paginationLimit: number } } | null)?.data.paginationLimit ?? 25))
 
-const { data: keysData, refresh } = await useAsyncData('account-ssh-keys', () => 
-  $fetch('/api/account/ssh-keys', {
+type SshKey = {
+  id: string
+  name: string
+  fingerprint: string
+  public_key: string
+  created_at: string
+}
+
+type SshKeysResponse = {
+  data: SshKey[]
+  pagination?: {
+    page: number
+    perPage: number
+    total: number
+    totalPages: number
+  }
+}
+
+const { data: keysData, refresh } = await useAsyncData('account-ssh-keys', async () => {
+  const response = await $fetch('/api/account/ssh-keys' as string, {
     query: {
       page: currentPage.value,
       limit: itemsPerPage.value,
     },
   })
-, {
+  return response as SshKeysResponse
+}, {
   watch: [currentPage, itemsPerPage],
 })
 
-const sshKeys = computed(() => keysData.value?.data || [])
-const sshKeysPagination = computed(() => (keysData.value as { pagination?: { page: number; perPage: number; total: number; totalPages: number } } | null)?.pagination)
+const sshKeysResponse = computed(() => (keysData.value ?? null) as SshKeysResponse | null)
+const sshKeys = computed(() => sshKeysResponse.value?.data || [])
+const sshKeysPagination = computed(() => sshKeysResponse.value?.pagination)
 const expandedKeys = ref<Set<string>>(new Set())
 const sortOrder = ref<'newest' | 'oldest'>('newest')
 

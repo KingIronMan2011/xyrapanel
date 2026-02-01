@@ -3,6 +3,8 @@ import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { GeneralSettings } from '#shared/types/admin'
 import * as uiLocales from '@nuxt/ui/locale'
+import { generalSettingsFormSchema } from '#shared/schema/admin/settings'
+import type { GeneralSettingsFormInput } from '#shared/schema/admin/settings'
 
 const { t } = useI18n()
 const toast = useToast()
@@ -25,48 +27,24 @@ const timezoneEnumValues = [
   'Europe/London',
   'Europe/Paris',
   'Asia/Tokyo',
-] as const
-type TimezoneValue = (typeof timezoneEnumValues)[number]
-const timezoneOptions = [
-  { label: 'UTC', value: timezoneEnumValues[0] },
-  { label: 'America/New_York', value: timezoneEnumValues[1] },
-  { label: 'America/Los_Angeles', value: timezoneEnumValues[2] },
-  { label: 'Europe/London', value: timezoneEnumValues[3] },
-  { label: 'Europe/Paris', value: timezoneEnumValues[4] },
-  { label: 'Asia/Tokyo', value: timezoneEnumValues[5] },
-] satisfies { label: string; value: TimezoneValue }[]
+]
+type TimezoneValue = string
+const timezoneOptions = timezoneEnumValues.map(value => ({ label: value, value }))
 
-const baseSchema = z.object({
-  locale: z.string(),
-  timezone: z.enum(timezoneEnumValues, { message: t('admin.settings.generalSettings.timezoneInvalid') }),
-  showBrandLogo: z.boolean(),
-  brandLogoUrl: z.preprocess(
-    (value) => {
-      if (value === '' || value === undefined)
-        return null
-      return value
-    },
-    z.string().trim().pipe(z.url(t('validation.invalidUrl'))).nullable(),
-  ),
-  paginationLimit: z.number()
-    .int(t('admin.settings.generalSettings.paginationLimitInt'))
-    .min(10, t('admin.settings.generalSettings.paginationLimitMin'))
-    .max(100, t('admin.settings.generalSettings.paginationLimitMax')),
-  telemetryEnabled: z.boolean(),
-})
-
-const schema = computed(() => {
-  return baseSchema.extend({
+const schema = computed(() =>
+  generalSettingsFormSchema.extend({
     locale: z.string().refine(
-      (val) => availableLocales.value.some(locale => locale.code === val),
-      { message: t('admin.settings.generalSettings.languageInvalid') }
+      val => availableLocales.value.some(locale => locale.code === val),
+      { message: t('admin.settings.generalSettings.languageInvalid') },
     ),
-  })
-})
+    timezone: z.string().refine(
+      val => timezoneEnumValues.includes(val as TimezoneValue),
+      { message: t('admin.settings.generalSettings.timezoneInvalid') },
+    ),
+  }),
+)
 
-type FormSchema = z.infer<typeof baseSchema> & {
-  locale: string
-}
+type FormSchema = GeneralSettingsFormInput
 
 const { data: settings, refresh } = await useAsyncData(
   'admin-settings-general-form',

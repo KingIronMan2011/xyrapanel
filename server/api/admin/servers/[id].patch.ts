@@ -1,5 +1,4 @@
-import { createError, assertMethod } from 'h3'
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
@@ -14,7 +13,11 @@ export default defineEventHandler(async (event) => {
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const serverId = await requireRouteParam(event, 'id', 'Server ID required')
-  const body = await readBody(event)
+  const body = await readValidatedBodyWithLimit(
+    event,
+    serverBuildSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
   const db = useDrizzle()
 
   const { findServerByIdentifier, invalidateServerCaches } = await import('~~/server/utils/serversStore')
@@ -24,8 +27,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Server not found' })
   }
 
-  const validatedBody = serverBuildSchema.parse(body)
-  const { cpu, memory, swap, disk, io, threads, oomDisabled, databaseLimit, allocationLimit, backupLimit } = validatedBody
+  const { cpu, memory, swap, disk, io, threads, oomDisabled, databaseLimit, allocationLimit, backupLimit } = body
 
   const [existingLimits] = db.select()
     .from(tables.serverLimits)
@@ -124,7 +126,9 @@ export default defineEventHandler(async (event) => {
   }
 
   return {
-    success: true,
-    message: 'Build configuration updated successfully',
+    data: {
+      success: true,
+      message: 'Build configuration updated successfully',
+    },
   }
 })

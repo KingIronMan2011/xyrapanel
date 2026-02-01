@@ -1,32 +1,20 @@
-import { getServerSession, getSessionUser  } from '~~/server/utils/session'
+import bcrypt from 'bcryptjs'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-import bcrypt from 'bcryptjs'
-import type { UpdateEmailPayload, UpdateEmailResponse } from '#shared/types/account'
+import type { UpdateEmailResponse } from '#shared/types/account'
+import { updateEmailSchema } from '#shared/schema/account'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event): Promise<UpdateEmailResponse> => {
   assertMethod(event, 'PUT')
 
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
+  const { user } = await requireAccountUser(event)
 
-  if (!user) {
-    throw createError({ statusCode: 401, message: 'Unauthorized' })
-  }
-
-  const body = await readValidatedBody(event, (payload) => {
-    if (!payload || typeof payload !== 'object') {
-      throw createError({ statusCode: 400, message: 'Invalid payload' })
-    }
-
-    const candidate = payload as UpdateEmailPayload
-
-    if (!candidate.email || !candidate.password) {
-      throw createError({ statusCode: 400, message: 'Email and password are required' })
-    }
-
-    return candidate
-  })
+  const body = await readValidatedBodyWithLimit(
+    event,
+    updateEmailSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const db = useDrizzle()
   const userRow = db

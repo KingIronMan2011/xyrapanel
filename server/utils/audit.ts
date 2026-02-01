@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { getHeader, getRequestFingerprint, getRequestHost, getRequestIP, getRequestProtocol, getRequestURL, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import type { LogActivityOptions, ActivityMetadata } from '#shared/types/audit'

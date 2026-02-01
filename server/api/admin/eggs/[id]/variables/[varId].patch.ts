@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm'
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
-import type { UpdateEggVariablePayload } from '#shared/types/admin'
+import { updateEggVariableSchema } from '#shared/schema/admin/infrastructure'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'IDs are required' })
   }
 
-  const body = await readBody<UpdateEggVariablePayload>(event)
+  const body = await readValidatedBodyWithLimit(event, updateEggVariableSchema, BODY_SIZE_LIMITS.SMALL)
   const db = useDrizzle()
 
   const existing = await db
@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
   if (body.userEditable !== undefined) updates.userEditable = body.userEditable
   if (body.rules !== undefined) updates.rules = body.rules
 
-  await db.update(tables.eggVariables).set(updates).where(eq(tables.eggVariables.id, varId))
+  await db.update(tables.eggVariables).set(updates).where(eq(tables.eggVariables.id, varId)).run()
 
   const updated = await db
     .select()

@@ -1,4 +1,4 @@
-import { createError, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { getNodeIdFromAuth } from '~~/server/utils/wings/auth'
 import type { BackupRemoteUploadResponse } from '#shared/types/server'
@@ -29,5 +29,7 @@ export default defineEventHandler(async (event: H3Event) => {
     part_size: 5 * 1024 * 1024 * 1024,
   }
 
-  return response
+  return {
+    data: response,
+  }
 })

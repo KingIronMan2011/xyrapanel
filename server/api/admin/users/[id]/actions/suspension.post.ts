@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
@@ -54,13 +53,18 @@ export default defineEventHandler(async (event) => {
         metadata: {
           reason: reason.length > 0 ? reason : undefined,
           banExpiresIn: body.banExpiresIn || undefined,
+          banExpiresAt: banExpires?.toISOString(),
         },
       })
 
       return {
-        success: true,
-        banned: true,
-        reason: reason.length > 0 ? reason : null,
+        data: {
+          success: true,
+          action: 'ban',
+          banned: true,
+          reason: reason.length > 0 ? reason : null,
+          banExpiresAt: banExpires?.toISOString() ?? null,
+        },
       }
     }
 
@@ -84,8 +88,11 @@ export default defineEventHandler(async (event) => {
       })
 
       return {
-        success: true,
-        banned: false,
+        data: {
+          success: true,
+          action: 'unban',
+          banned: false,
+        },
       }
     }
 
@@ -132,9 +139,12 @@ export default defineEventHandler(async (event) => {
       })
 
       return {
-        success: true,
-        suspended: true,
-        reason: reason.length > 0 ? reason : null,
+        data: {
+          success: true,
+          action: 'suspend',
+          suspended: true,
+          reason: reason.length > 0 ? reason : null,
+        },
       }
     }
 
@@ -157,8 +167,11 @@ export default defineEventHandler(async (event) => {
     })
 
     return {
-      success: true,
-      suspended: false,
+      data: {
+        success: true,
+        action: 'unsuspend',
+        suspended: false,
+      },
     }
   }
   catch (error) {

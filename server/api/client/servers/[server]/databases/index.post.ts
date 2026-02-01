@@ -1,13 +1,13 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { randomBytes } from 'crypto'
 import { invalidateServerCaches } from '~~/server/utils/serversStore'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const accountContext = await requireAccountUser(event)
   const serverId = getRouterParam(event, 'server')
 
   if (!serverId) {
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const { server } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
@@ -83,7 +83,7 @@ export default defineEventHandler(async (event) => {
     await invalidateServerCaches({ id: server.id, uuid: server.uuid, identifier: server.identifier })
 
     await recordAuditEventFromRequest(event, {
-      actor: session?.user?.id || 'unknown',
+      actor: accountContext.user.id,
       actorType: 'user',
       action: 'server.database.create',
       targetType: 'server',

@@ -1,4 +1,3 @@
-import { assertMethod, createError, getValidatedRouterParams } from 'h3'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { requireAdmin } from '~~/server/utils/security'
@@ -10,21 +9,15 @@ export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.USERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
-  const { id: userId } = await getValidatedRouterParams(event, (params) => {
-    const idParam = (params as Record<string, unknown>).id
-    if (typeof idParam !== 'string' || idParam.trim().length === 0) {
-      throw createError({ statusCode: 400, statusMessage: 'Missing user ID' })
-    }
-    return { id: idParam }
-  })
+  const userId = getRouterParam(event, 'id')
+  if (!userId) {
+    throw createError({ statusCode: 400, statusMessage: 'Missing user ID' })
+  }
 
-  const { identifier } = await getValidatedRouterParams(event, (params) => {
-    const identifierParam = (params as Record<string, unknown>).identifier
-    if (typeof identifierParam !== 'string' || identifierParam.trim().length === 0) {
-      throw createError({ statusCode: 400, statusMessage: 'Missing API key identifier' })
-    }
-    return { identifier: identifierParam }
-  })
+  const identifier = getRouterParam(event, 'identifier')
+  if (!identifier) {
+    throw createError({ statusCode: 400, statusMessage: 'Missing API key identifier' })
+  }
 
   const db = useDrizzle()
 
@@ -57,12 +50,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'API key not found' })
   }
 
-  db.delete(tables.apiKeys)
+  await db.delete(tables.apiKeys)
     .where(eq(tables.apiKeys.id, apiKey.id))
     .run()
 
   await recordAuditEventFromRequest(event, {
-    actor: session.user.id,
+    actor: session.user.email || session.user.id,
     actorType: 'user',
     action: 'admin.user.api_key.delete',
     targetType: 'user',
@@ -72,9 +65,16 @@ export default defineEventHandler(async (event) => {
       targetUsername: targetUser.username,
       apiKeyIdentifier: identifier,
       apiKeyMemo: apiKey.memo,
+      apiKeyId: apiKey.id,
     },
   })
 
-  return { success: true }
+  return {
+    data: {
+      success: true,
+      userId,
+      apiKeyIdentifier: identifier,
+    },
+  }
 })
 

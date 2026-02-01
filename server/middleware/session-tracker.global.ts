@@ -1,5 +1,4 @@
 import type { getServerSession } from '~~/server/utils/session'
-import { parseCookies, getRequestIP, getHeader } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import type { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { parseUserAgent } from '~~/server/utils/user-agent'

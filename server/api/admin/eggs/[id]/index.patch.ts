@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Egg ID is required' })
   }
 
-  const body = await readValidatedBody(event, payload => updateEggSchema.parse(payload))
+  const body = await readValidatedBodyWithLimit(event, updateEggSchema, BODY_SIZE_LIMITS.MEDIUM)
 
   if (Object.keys(body).length === 0) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'No fields provided to update' })
@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
   if (body.scriptInstall !== undefined) updates.scriptInstall = body.scriptInstall ?? null
   if (body.copyScriptFrom !== undefined) updates.copyScriptFrom = body.copyScriptFrom ?? null
 
-  db.update(tables.eggs)
+  await db.update(tables.eggs)
     .set(updates)
     .where(eq(tables.eggs.id, eggId))
     .run()
@@ -95,6 +95,9 @@ export default defineEventHandler(async (event) => {
       dockerImage: updatedEgg.dockerImage,
       dockerImages: updatedEgg.dockerImages ? JSON.parse(updatedEgg.dockerImages) : null,
       startup: updatedEgg.startup,
+      configFiles: updatedEgg.configFiles ? JSON.parse(updatedEgg.configFiles) : null,
+      configStartup: updatedEgg.configStartup ? JSON.parse(updatedEgg.configStartup) : null,
+      configLogs: updatedEgg.configLogs ? JSON.parse(updatedEgg.configLogs) : null,
       configStop: updatedEgg.configStop,
       updatedAt: new Date(updatedEgg.updatedAt).toISOString(),
     },

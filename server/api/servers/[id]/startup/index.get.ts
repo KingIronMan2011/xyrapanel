@@ -1,22 +1,11 @@
-import { createError } from 'h3'
-import { resolveServerRequest } from '~~/server/utils/http/serverAccess'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const identifier = event.context.params?.id
-  
-  const contextAuth = (event.context as { auth?: { session?: Awaited<ReturnType<typeof getServerSession>> } }).auth
-  console.log('[Startup GET] Handler started:', {
-    identifier,
-    path: event.path,
-    hasAuth: !!contextAuth,
-    hasSession: !!contextAuth?.session,
-    hasUser: !!contextAuth?.user,
-    timestamp: new Date().toISOString(),
-  })
-  
+  const identifier = getRouterParam(event, 'id')
   if (!identifier) {
     throw createError({
       statusCode: 400,
@@ -24,132 +13,89 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const { user, session } = await requireAccountUser(event)
 
-  console.log('[Startup GET] Session check:', {
-    hasSession: !!session,
-    hasUser: !!user,
-    userId: user?.id,
-    timestamp: new Date().toISOString(),
+  const { server } = await getServerWithAccess(identifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.read'],
   })
 
-  if (!user) {
-    console.error('[Startup GET] No user found - returning 401')
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Unauthorized',
-      message: 'No authenticated user found for startup endpoint',
-    })
+  const db = useDrizzle()
+
+  const egg = server.eggId
+    ? db
+        .select()
+        .from(tables.eggs)
+        .where(eq(tables.eggs.id, server.eggId))
+        .get()
+    : null
+
+  let dockerImages: Record<string, string> = {}
+  if (egg?.dockerImages) {
+    try {
+      dockerImages = typeof egg.dockerImages === 'string'
+        ? JSON.parse(egg.dockerImages)
+        : egg.dockerImages
+    }
+    catch (error) {
+      console.warn('[Startup GET] Failed to parse docker images:', error)
+    }
   }
 
-  console.log('[Startup GET] Request received with valid user:', {
-    identifier,
-    userId: user.id,
-    username: user.username,
-    path: event.path,
-    timestamp: new Date().toISOString(),
-  })
+  if (Object.keys(dockerImages).length === 0 && egg?.dockerImage) {
+    dockerImages = { [egg.name || 'Default']: egg.dockerImage }
+  }
 
-  try {
-    const context = await resolveServerRequest(event, {
-      identifier,
-      requiredPermissions: ['startup.read'],
-      fallbackPermissions: [], 
-    })
+  const envRows = db
+    .select()
+    .from(tables.serverStartupEnv)
+    .where(eq(tables.serverStartupEnv.serverId, server.id))
+    .all()
 
-    console.log('[Startup GET] Server request resolved:', {
-      serverId: context.server.id,
-      serverUuid: context.server.uuid,
-      userId: context.user.id,
-      isOwner: context.isOwner,
-      isAdmin: context.isAdmin,
-      hasStartupRead: context.permissions.includes('startup.read'),
-      timestamp: new Date().toISOString(),
-    })
+  const serverEnvMap = new Map<string, string>()
+  for (const envRow of envRows) {
+    serverEnvMap.set(envRow.key, envRow.value || '')
+  }
 
-    const db = useDrizzle()
-    
-    const egg = context.server.eggId
-      ? db
-          .select()
-          .from(tables.eggs)
-          .where(eq(tables.eggs.id, context.server.eggId))
-          .get()
-      : null
+  const environment: Record<string, string> = {}
 
-    let dockerImages: Record<string, string> = {}
-    if (egg?.dockerImages) {
-      try {
-        dockerImages = typeof egg.dockerImages === 'string' 
-          ? JSON.parse(egg.dockerImages) 
-          : egg.dockerImages
-      } catch (e) {
-        console.warn('[Startup GET] Failed to parse egg dockerImages:', e)
-      }
-    }
-    
-    if (Object.keys(dockerImages).length === 0 && egg?.dockerImage) {
-      dockerImages = { [egg.name || 'Default']: egg.dockerImage }
-    }
-
-    const envVars = db.select()
-      .from(tables.serverStartupEnv)
-      .where(eq(tables.serverStartupEnv.serverId, context.server.id))
+  if (egg?.id) {
+    const eggVariables = db
+      .select()
+      .from(tables.eggVariables)
+      .where(eq(tables.eggVariables.eggId, egg.id))
       .all()
 
-    const serverEnvMap = new Map<string, string>()
-    for (const envVar of envVars) {
-      serverEnvMap.set(envVar.key, envVar.value || '')
+    for (const eggVar of eggVariables) {
+      const value = serverEnvMap.get(eggVar.envVariable) ?? eggVar.defaultValue ?? ''
+      environment[eggVar.envVariable] = value
     }
-
-    const environment: Record<string, string> = {}
-    
-    if (egg?.id) {
-      const eggVariables = db
-        .select()
-        .from(tables.eggVariables)
-        .where(eq(tables.eggVariables.eggId, egg.id))
-        .all()
-
-      for (const eggVar of eggVariables) {
-        const value = serverEnvMap.get(eggVar.envVariable) ?? eggVar.defaultValue ?? ''
-        environment[eggVar.envVariable] = value
-      }
-    }
-
-    for (const [key, value] of serverEnvMap.entries()) {
-      if (!environment[key]) {
-        environment[key] = value
-      }
-    }
-
-    const response = {
-      data: {
-        startup: context.server.startup || egg?.startup || '',
-        dockerImage: context.server.dockerImage || context.server.image || egg?.dockerImage || '',
-        dockerImages,
-        environment,
-      },
-    }
-
-    console.log('[Startup GET] Response prepared:', {
-      serverId: context.server.id,
-      hasStartup: !!response.data.startup,
-      dockerImage: response.data.dockerImage,
-      dockerImagesCount: Object.keys(response.data.dockerImages).length,
-      envVarsCount: Object.keys(response.data.environment).length,
-      timestamp: new Date().toISOString(),
-    })
-
-    return response
-  } catch (error) {
-    console.error('[Startup GET] Error:', {
-      error: error instanceof Error ? error.message : String(error),
-      identifier,
-      path: event.path,
-      timestamp: new Date().toISOString(),
-    })
-    throw error
   }
+
+  for (const [key, value] of serverEnvMap.entries()) {
+    if (!(key in environment)) {
+      environment[key] = value
+    }
+  }
+
+  const response = {
+    data: {
+      startup: server.startup || egg?.startup || '',
+      dockerImage: server.dockerImage || server.image || egg?.dockerImage || '',
+      dockerImages,
+      environment,
+    },
+  }
+
+  await recordAuditEventFromRequest(event, {
+    actor: user.id,
+    actorType: 'user',
+    action: 'server.startup.viewed',
+    targetType: 'server',
+    targetId: server.id,
+  })
+
+  return response
 })

@@ -1,14 +1,15 @@
-import { createError, defineEventHandler, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { requireAdmin } from '~~/server/utils/security'
 import { findWingsNode, ensureNodeHasToken, requireNodeRow } from '~~/server/utils/wings/nodesStore'
 import { decryptToken } from '~~/server/utils/wings/encryption'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 function formatCombinedToken(identifier: string, secret: string): string {
   return `${identifier}.${secret}`
 }
 
 export default defineEventHandler(async (event: H3Event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   const { id } = event.context.params ?? {}
   if (!id || typeof id !== 'string') {
@@ -61,6 +62,17 @@ export default defineEventHandler(async (event: H3Event) => {
     }
 
     const deploymentToken = formatCombinedToken(row.tokenIdentifier, plainSecret)
+
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.node.token.viewed',
+      targetType: 'node',
+      targetId: id,
+      metadata: {
+        nodeName: existing.name,
+      },
+    })
 
     return {
       data: {

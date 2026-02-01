@@ -1,9 +1,10 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { listServerSubusers } from '~~/server/utils/subusers'
+import { requireAccountUser } from '~~/server/utils/security'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
   const serverId = getRouterParam(event, 'server')
 
   if (!serverId) {
@@ -13,9 +14,27 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverId, accountContext.session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.users.read'],
+    allowOwner: true,
+    allowAdmin: true,
+  })
+
+  const subusers = await listServerSubusers(server.id)
+
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.users.listed',
+    server: { id: server.id, uuid: server.uuid },
+    metadata: { count: subusers.length },
+  })
 
   return {
-    data: await listServerSubusers(server.id),
+    data: subusers,
   }
 })

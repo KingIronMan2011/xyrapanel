@@ -1,11 +1,11 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const accountContext = await requireAccountUser(event)
   const serverId = getRouterParam(event, 'server')
 
   if (!serverId) {
@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const { server } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
     await client.renameFile(server.uuid, root || '/', files)
 
     await recordAuditEventFromRequest(event, {
-      actor: session?.user?.id || 'unknown',
+      actor: accountContext.user.id,
       actorType: 'user',
       action: 'server.file.rename',
       targetType: 'server',

@@ -1,10 +1,15 @@
 import { eq, sql } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import type { DatabaseHostWithStats } from '#shared/types/admin'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
+
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.DATABASE_HOSTS, ADMIN_ACL_PERMISSIONS.READ)
 
   const db = useDrizzle()
 
@@ -43,6 +48,16 @@ export default defineEventHandler(async (event) => {
     updatedAt: new Date(host.updatedAt).toISOString(),
     databaseCount: Number(host.databaseCount) || 0,
   }))
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.database_host.listed',
+    targetType: 'settings',
+    metadata: {
+      count: data.length,
+    },
+  })
 
   return { data }
 })

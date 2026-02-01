@@ -1,4 +1,3 @@
-import { defineEventHandler, getQuery } from 'h3'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { count, desc, inArray } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'

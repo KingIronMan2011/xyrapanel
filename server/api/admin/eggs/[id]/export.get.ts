@@ -1,15 +1,15 @@
-import { createError } from 'h3'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.EGGS, ADMIN_ACL_PERMISSIONS.READ)
 
-  const eggId = event.context.params?.id
+  const eggId = getRouterParam(event, 'id')
 
   if (!eggId) {
     throw createError({ statusCode: 400, statusMessage: 'Egg ID is required' })
@@ -80,6 +80,18 @@ export default defineEventHandler(async (event) => {
   setResponseHeaders(event, {
     'Content-Type': 'application/json',
     'Content-Disposition': `attachment; filename="egg-${filename}.json"`,
+  })
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.egg.exported',
+    targetType: 'settings',
+    targetId: eggId,
+    metadata: {
+      eggName: egg.name,
+      variableCount: variables.length,
+    },
   })
 
   return exportData

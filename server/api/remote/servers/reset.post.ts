@@ -1,5 +1,4 @@
 import type { H3Event } from 'h3'
-import { assertMethod } from 'h3'
 import { useDrizzle, tables, eq, and, inArray } from '~~/server/utils/drizzle'
 import { getNodeIdFromAuth } from '~~/server/utils/wings/auth'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
@@ -51,8 +50,10 @@ export default defineEventHandler(async (event: H3Event) => {
   }
 
   return {
-    success: true,
-    reset_count: stuckServers.length,
-    servers: stuckServers.map(s => s.uuid),
+    data: {
+      success: true,
+      reset_count: stuckServers.length,
+      servers: stuckServers.map(s => s.uuid),
+    },
   }
 })

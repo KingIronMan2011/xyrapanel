@@ -1,13 +1,17 @@
-import { createError } from 'h3'
-import { getServerSession, getSessionUser } from '~~/server/utils/session'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
+  const accountContext = await requireAccountUser(event)
+  const user = accountContext.user
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  await recordAuditEventFromRequest(event, {
+    actor: user.id,
+    actorType: 'user',
+    action: 'account.me.viewed',
+    targetType: 'user',
+    targetId: user.id,
+  })
 
   return {
     data: {
@@ -15,6 +19,7 @@ export default defineEventHandler(async (event) => {
       username: user.username,
       email: user.email,
       role: user.role,
+      permissions: user.permissions,
     },
   }
 })

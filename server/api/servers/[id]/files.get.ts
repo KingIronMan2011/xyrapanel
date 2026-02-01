@@ -1,19 +1,43 @@
-import { createError, getQuery, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { remoteListServerDirectory } from '~~/server/utils/wings/registry'
-import { resolveServerRequest } from '~~/server/utils/http/serverAccess'
 import { debugError } from '~~/server/utils/logger'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event: H3Event) => {
-  const context = await resolveServerRequest(event, {
-    requiredPermissions: ['file.read'],
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Missing server identifier',
+    })
+  }
+
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.read'],
   })
 
   const query = getQuery(event)
   const directory = typeof query.directory === 'string' ? query.directory : '/'
 
   try {
-    const nodeId = context.node?.id ? String(context.node.id) : undefined
-    const listing = await remoteListServerDirectory(context.server.uuid, directory, nodeId)
+    const nodeId = server.nodeId ? String(server.nodeId) : undefined
+    const listing = await remoteListServerDirectory(server.uuid, directory, nodeId)
+
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.files.listed',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { directory, nodeId },
+    })
+
     return { data: listing }
   }
   catch (error) {
@@ -33,34 +57,34 @@ export default defineEventHandler(async (event: H3Event) => {
     }
 
     debugError('[Files List] Failed to list directory:', {
-      serverUuid: context.server.uuid,
-      serverStatus: context.server.status,
+      serverUuid: server.uuid,
+      serverStatus: server.status,
       directory,
       error: errorMessage,
       statusCode,
     })
 
-    if (context.server.status === 'installing') {
+    if (server.status === 'installing') {
       throw createError({
         statusCode: 400,
         statusMessage: 'Server not ready',
         message: 'The server is currently installing. Please wait for installation to complete.',
         data: {
-          serverUuid: context.server.uuid,
-          status: context.server.status,
+          serverUuid: server.uuid,
+          status: server.status,
           wingsError: errorMessage,
         },
       })
     }
-    
-    if (context.server.status === 'install_failed' && (errorMessage.includes('directory') || errorMessage.includes('not found') || statusCode === 404)) {
+
+    if (server.status === 'install_failed' && (errorMessage.includes('directory') || errorMessage.includes('not found') || statusCode === 404)) {
       throw createError({
         statusCode: 404,
         statusMessage: 'Server directory not found',
         message: 'The server directory does not exist. This usually happens when installation fails. Please try installing the server again using the "Install on Wings" button.',
         data: {
-          serverUuid: context.server.uuid,
-          status: context.server.status,
+          serverUuid: server.uuid,
+          status: server.status,
           wingsError: errorMessage,
         },
       })
@@ -72,9 +96,9 @@ export default defineEventHandler(async (event: H3Event) => {
         statusMessage: 'Wings Authentication Failed',
         message: 'Unable to authenticate with Wings daemon. The Wings node token may be incorrect. Please update your Wings configuration with the token from Admin → Wings → Nodes → [Your Node] → Configuration.',
         data: {
-          serverUuid: context.server.uuid,
+          serverUuid: server.uuid,
           directory,
-          nodeId: context.node?.id,
+          nodeId: server.nodeId,
           wingsError: errorMessage,
           ...errorData,
         },
@@ -91,7 +115,7 @@ export default defineEventHandler(async (event: H3Event) => {
       statusMessage: 'Wings request failed',
       message: errorMessage,
       data: {
-        serverUuid: context.server.uuid,
+        serverUuid: server.uuid,
         directory,
         ...errorData,
       },

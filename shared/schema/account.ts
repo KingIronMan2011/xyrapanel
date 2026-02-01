@@ -139,6 +139,11 @@ export const createApiKeySchema = z.object({
   expiresAt: z.iso.datetime().nullable().optional(),
 })
 
+export const createApiKeyFormSchema = z.object({
+  memo: z.string().trim().max(255, 'Description too long').optional().default(''),
+  allowedIps: z.string().trim().optional().default(''),
+})
+
 export const updateEmailSchema = z.object({
   email: z.email('Invalid email'),
   password: z.string().min(1, 'Password is required'),
@@ -154,7 +159,11 @@ export type UpdateEmailInput = z.infer<typeof updateEmailSchema>
 export type CreateSshKeyInput = z.infer<typeof createSshKeySchema>
 
 export const passwordRequestSchema = z.object({
-  identity: z.string().trim().min(1, 'Enter your username or email address'),
+  identity: z
+    .string()
+    .trim()
+    .min(1, 'Enter your username or email address')
+    .max(255, 'Identity is too long'),
 })
 
 export type PasswordRequestInput = z.output<typeof passwordRequestSchema>
@@ -185,3 +194,38 @@ export const passwordResetSchema = passwordResetBaseSchema.superRefine(
 )
 
 export type PasswordResetInput = z.output<typeof passwordResetSchema>
+
+export const passwordResetPerformSchema = z.object({
+  token: z.string().trim().min(1, 'Reset token is required'),
+  password: newPasswordSchema,
+})
+
+export const twoFactorVerifySchema = z.object({
+  code: z.string().trim().min(1, 'TOTP code is required'),
+})
+
+export const twoFactorRecoverySchema = z.object({
+  token: z.string().trim().min(1, 'Recovery token is required'),
+})
+
+export const twoFactorEnableSchema = z.object({
+  password: z.string().min(1, 'Password is required to enable 2FA'),
+})
+
+export const twoFactorDisableSchema = z.object({
+  password: z.string().min(1, 'Password is required to disable 2FA'),
+})
+
+export const accountLoginFormSchema = z.object({
+  identity: z.string().trim().min(1, 'Enter your username or email address'),
+  password: z.string().trim().min(1, 'Enter your password'),
+  token: z
+    .string()
+    .trim()
+    .max(64, 'Authenticator code is too long')
+    .optional()
+    .transform(value => (value && value.length > 0 ? value : undefined)),
+})
+
+export type CreateApiKeyFormInput = z.infer<typeof createApiKeyFormSchema>
+export type AccountLoginFormInput = z.infer<typeof accountLoginFormSchema>

@@ -1,10 +1,10 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { requireAccountUser } from '~~/server/utils/security'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
   const serverId = getRouterParam(event, 'server')
   const subuserId = getRouterParam(event, 'user')
 
@@ -15,11 +15,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const accountContext = await requireAccountUser(event)
+  const { server, user: actor } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
     requiredPermissions: ['server.users.read'],
+    allowOwner: true,
+    allowAdmin: true,
   })
 
   const db = useDrizzle()
@@ -45,16 +48,24 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { subuser, user } = result
+  const { subuser, user: targetUser } = result
+
+  await recordServerActivity({
+    event,
+    actorId: actor.id,
+    action: 'server.users.viewed',
+    server: { id: server.id, uuid: server.uuid },
+    metadata: { subuserId },
+  })
 
   return {
     data: {
       id: subuser.id,
       user: {
-        id: user!.id,
-        username: user!.username,
-        email: user!.email,
-        image: user!.image,
+        id: targetUser!.id,
+        username: targetUser!.username,
+        email: targetUser!.email,
+        image: targetUser!.image,
       },
       permissions: JSON.parse(subuser.permissions),
       created_at: subuser.createdAt,

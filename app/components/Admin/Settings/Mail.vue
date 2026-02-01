@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { z } from 'zod'
 import type { FormSubmitEvent, SelectItem } from '@nuxt/ui'
 import type { MailSettings } from '#shared/types/admin'
+import { mailSettingsFormSchema } from '#shared/schema/admin/settings'
+import type { MailSettingsFormInput } from '#shared/schema/admin/settings'
 
 const { t } = useI18n()
 const toast = useToast()
@@ -41,23 +42,13 @@ const serviceEnumValues = [
   'proton',
 ] as const
 
-const schema = z.object({
-  driver: z.enum(driverEnumValues),
-  service: z.enum(serviceEnumValues),
-  host: z.string().trim().max(255),
-  port: z.string().trim().max(5),
-  username: z.string().trim().max(255),
-  password: z.string().max(255),
-  encryption: z.enum(encryptionEnumValues),
-  fromAddress: z.string().trim().email(t('validation.invalidEmail')),
-  fromName: z.string().trim().min(1, t('admin.settings.mailSettings.fromNameRequired')).max(120, t('admin.settings.mailSettings.fromNameMaxLength')),
-}).superRefine((data, ctx) => {
+const schema = mailSettingsFormSchema.superRefine((data, ctx) => {
   const usingService = data.service !== CUSTOM_SERVICE_VALUE
 
   if (data.driver !== 'sendmail' && !usingService) {
     if (data.host.length === 0) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['host'],
         message: t('admin.settings.mailSettings.smtpHostRequired'),
       })
@@ -65,7 +56,7 @@ const schema = z.object({
 
     if (data.port.length === 0) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['port'],
         message: t('admin.settings.mailSettings.smtpPortRequired'),
       })
@@ -75,7 +66,7 @@ const schema = z.object({
   if (data.port.length > 0 && !usingService) {
     if (!/^\d+$/.test(data.port)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['port'],
         message: t('admin.settings.mailSettings.smtpPortNumeric'),
       })
@@ -84,7 +75,7 @@ const schema = z.object({
       const port = Number.parseInt(data.port, 10)
       if (Number.isNaN(port) || port <= 0 || port > 65535) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['port'],
           message: t('admin.settings.mailSettings.smtpPortRange'),
         })
@@ -93,7 +84,7 @@ const schema = z.object({
   }
 })
 
-type FormSchema = z.infer<typeof schema>
+type FormSchema = MailSettingsFormInput
 
 function createFormState(source?: MailSettings | null): FormSchema {
   const normalizedService = source?.service && (serviceEnumValues as readonly string[]).includes(source.service)

@@ -1,4 +1,3 @@
-import { createError, getRequestURL } from 'h3'
 import { randomBytes, createHash, randomUUID } from 'node:crypto'
 import { sql } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'
@@ -60,6 +59,8 @@ export default defineEventHandler(async (event) => {
       targetId: userId,
       metadata: {
         username: user.username,
+        impersonationTokenId: tokenId,
+        expiresAt: expiresAt.toISOString(),
       },
     })
 
@@ -68,9 +69,11 @@ export default defineEventHandler(async (event) => {
     const baseUrl = runtimeConfig.public?.panelBaseUrl || requestUrl.origin
 
     return {
-      success: true,
-      impersonateUrl: `${baseUrl}/auth/impersonate?token=${token}`,
-      expiresAt: expiresAt.toISOString(),
+      data: {
+        success: true,
+        impersonateUrl: `${baseUrl}/auth/impersonate?token=${token}`,
+        expiresAt: expiresAt.toISOString(),
+      },
     }
   }
   catch (error) {

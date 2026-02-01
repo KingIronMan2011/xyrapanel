@@ -1,5 +1,10 @@
 import { z } from 'zod'
 
+export const adminServersPaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(50),
+})
+
 const threadsSchema = z
   .union([
     z.string().trim().min(1).max(191),
@@ -101,6 +106,32 @@ export const createServerSchema = z.object({
   startOnCompletion: z.boolean().default(true),
 })
 
+export const createAdminServerSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().optional(),
+  ownerId: z.string().uuid(),
+  eggId: z.string().uuid(),
+  nestId: z.string().uuid().optional(),
+  nodeId: z.string().uuid(),
+  allocationId: z.string().uuid(),
+  additionalAllocations: z.array(z.string().uuid()).optional(),
+  memory: z.number().int().positive(),
+  swap: z.number().int().min(0).default(0),
+  disk: z.number().int().positive(),
+  io: z.number().int().min(10).max(1000).default(500),
+  cpu: z.number().int().min(0).default(0),
+  threads: z.string().optional(),
+  databases: z.number().int().min(0).optional(),
+  allocations: z.number().int().min(0).optional(),
+  backups: z.number().int().min(0).optional(),
+  startup: z.string().optional(),
+  environment: z.record(z.string(), z.string()).optional(),
+  dockerImage: z.string().optional(),
+  skipScripts: z.boolean().optional(),
+  startOnCompletion: z.boolean().optional(),
+  oomDisabled: z.boolean().optional(),
+})
+
 export const updateServerBuildSchema = z.object({
   memory: z.number().int().positive().optional(),
   swap: z.number().int().min(0).optional(),
@@ -152,7 +183,21 @@ export const serverTransferSchema = z.object({
   startOnCompletion: z.boolean().default(true),
 })
 
+export const serverTransferFormSchema = z.object({
+  nodeId: z.string().trim().uuid('Target node ID must be a valid UUID'),
+  allocationId: z.string().trim().optional().default(''),
+  additionalAllocationIds: z.string().trim().optional().default(''),
+  startOnCompletion: z.boolean().default(true),
+})
+
+export const serverProvisionSchema = z.object({
+  serverId: z.string().uuid('Server ID must be a valid UUID'),
+  startOnCompletion: z.boolean().optional(),
+})
+
 export type ServerTransferInput = z.infer<typeof serverTransferSchema>
+export type ServerTransferFormInput = z.infer<typeof serverTransferFormSchema>
+export type ServerProvisionInput = z.infer<typeof serverProvisionSchema>
 
 export type CreateServerInput = z.infer<typeof createServerSchema>
 export type UpdateServerBuildInput = z.infer<typeof updateServerBuildSchema>

@@ -1,7 +1,8 @@
 import { randomUUID, createHash } from 'node:crypto'
-import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { createSshKeySchema } from '#shared/schema/account'
 
 function parseSSHPublicKey(publicKey: string): { fingerprint: string; valid: boolean } {
   try {
@@ -39,20 +40,16 @@ function parseSSHPublicKey(publicKey: string): { fingerprint: string; valid: boo
 }
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
+  const accountContext = await requireAccountUser(event)
+  const user = accountContext.user
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const body = await readValidatedBodyWithLimit(
+    event,
+    createSshKeySchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
-  const body = await readBody<{ name: string; public_key: string }>(event)
-
-  if (!body.name || !body.public_key) {
-    throw createError({ statusCode: 400, statusMessage: 'Name and public key are required' })
-  }
-
-  const { fingerprint, valid } = parseSSHPublicKey(body.public_key)
+  const { fingerprint, valid } = parseSSHPublicKey(body.publicKey)
 
   if (!valid) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid SSH public key format' })
@@ -89,7 +86,7 @@ export default defineEventHandler(async (event) => {
       userId: user.id,
       name: body.name.trim(),
       fingerprint,
-      publicKey: body.public_key.trim(),
+      publicKey: body.publicKey.trim(),
       createdAt: new Date(now),
       updatedAt: new Date(now),
     })

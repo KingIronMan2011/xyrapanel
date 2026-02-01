@@ -1,12 +1,12 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const accountContext = await requireAccountUser(event)
   const serverId = getRouterParam(event, 'server')
   const backupUuid = getRouterParam(event, 'backup')
 
@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   const body = (await readBody<{ truncate?: boolean }>(event)) ?? {}
   const { truncate = false } = body
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const { server } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const { client } = await getWingsClientForServer(serverId)
+    const { client } = await getWingsClientForServer(server.uuid)
     
     const serverDetails = await client.getServerDetails(server.uuid)
     const wasRunning = serverDetails.state === 'running'
@@ -72,7 +72,7 @@ export default defineEventHandler(async (event) => {
     await client.restoreBackup(server.uuid, backup.uuid, truncate)
 
     await recordAuditEventFromRequest(event, {
-      actor: session?.user?.email || session?.user?.id || 'unknown',
+      actor: accountContext.user.email || accountContext.user.id,
       actorType: 'user',
       action: 'server.backup.restored',
       targetType: 'backup',

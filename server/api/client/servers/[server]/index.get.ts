@@ -1,12 +1,12 @@
 import { eq, sql } from 'drizzle-orm'
 import type { PanelServerDetails, ServerAllocationSummary } from '#shared/types/server'
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { permissionManager } from '~~/server/utils/permission-manager'
 import { getServerLimits, listServerAllocations } from '~~/server/utils/serversStore'
 import { getServerStatus } from '~~/server/utils/server-status'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
   const serverIdentifier = getRouterParam(event, 'server')
@@ -14,8 +14,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Server identifier is required' })
   }
 
-  const session = await getServerSession(event)
-  const { server, user } = await getServerWithAccess(serverIdentifier, session)
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverIdentifier, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,

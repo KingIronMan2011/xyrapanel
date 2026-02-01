@@ -121,6 +121,7 @@ const enableSubmitting = ref(false)
 const totpStateOverride = ref<boolean | null>(null)
 
 const isAuthLoading = computed(() => status.value === 'loading')
+const usernameValue = computed(() => user.value?.email || user.value?.username || '')
 const totpEnabled = computed(() => {
   if (totpStateOverride.value !== null)
     return totpStateOverride.value
@@ -302,6 +303,16 @@ async function disableTotp() {
               :disabled="isSavingPassword"
               @submit="handlePasswordSubmit"
             >
+              <input
+                type="text"
+                name="username"
+                autocomplete="username"
+                :value="usernameValue"
+                tabindex="-1"
+                aria-hidden="true"
+                class="sr-only"
+                readonly
+              >
               <UFormField :label="t('account.security.password.currentPassword')" name="currentPassword" required>
                 <UInput
                   v-model="passwordForm.currentPassword"
@@ -373,10 +384,20 @@ async function disableTotp() {
             </div>
 
             <template v-else>
-              <div v-if="!totpEnabled && !totpSetup" class="space-y-4">
+              <form v-if="!totpEnabled && !totpSetup" class="space-y-4" @submit.prevent="beginTotpSetup">
                 <p class="text-sm text-muted-foreground">
                   {{ t('account.security.twoFactor.enterPasswordToEnable') }}
                 </p>
+                <input
+                  type="text"
+                  name="username"
+                  autocomplete="username"
+                  :value="usernameValue"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  class="sr-only"
+                  readonly
+                >
                 <UFormField :label="t('account.security.twoFactor.passwordConfirmation')" name="enablePassword" required>
                   <UInput
                     v-model="enableForm.password"
@@ -385,23 +406,22 @@ async function disableTotp() {
                     icon="i-lucide-lock"
                     class="w-full"
                     :disabled="enableSubmitting"
-                    @keyup.enter="beginTotpSetup"
                   />
                   <template #help>
                     {{ t('account.security.twoFactor.confirmPasswordToStart') }}
                   </template>
                 </UFormField>
                 <UButton
+                  type="submit"
                   color="primary"
                   variant="subtle"
                   icon="i-lucide-shield"
                   :loading="enableSubmitting"
                   :disabled="!enableForm.password || enableSubmitting"
-                  @click="beginTotpSetup"
                 >
                   {{ t('account.security.twoFactor.startSetup') }}
                 </UButton>
-              </div>
+              </form>
 
               <div v-else-if="totpSetup" class="grid gap-4 md:grid-cols-[160px,1fr]">
                 <div class="flex flex-col items-center gap-3 rounded-md border border-default p-4">
@@ -461,37 +481,44 @@ async function disableTotp() {
                 </div>
               </div>
 
-              <div v-else>
+              <form v-else class="space-y-3" @submit.prevent="disableTotp">
                 <p class="text-sm text-muted-foreground">
                   {{ t('account.security.twoFactor.twoFactorActive') }}
                 </p>
-
-                <div class="space-y-3">
-                  <UFormField :label="t('account.security.twoFactor.passwordConfirmation')" name="disablePassword" required>
-                    <UInput
-                      v-model="disableForm.password"
-                      type="password"
-                      :placeholder="t('account.security.twoFactor.enterPassword')"
-                      icon="i-lucide-lock"
-                      class="w-full"
-                      :disabled="disableSubmitting"
-                    />
-                    <template #help>
-                      {{ t('account.security.twoFactor.confirmPasswordToDisable') }}
-                    </template>
-                  </UFormField>
-                  <UButton
-                    color="error"
-                    variant="subtle"
-                    icon="i-lucide-shield-off"
-                    :loading="disableSubmitting"
-                    :disabled="!disableForm.password"
-                    @click="disableTotp"
-                  >
-                    {{ t('account.security.twoFactor.disableTwoFactor') }}
-                  </UButton>
-                </div>
-              </div>
+                <input
+                  type="text"
+                  name="username"
+                  autocomplete="username"
+                  :value="usernameValue"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  class="sr-only"
+                  readonly
+                >
+                <UFormField :label="t('account.security.twoFactor.passwordConfirmation')" name="disablePassword" required>
+                  <UInput
+                    v-model="disableForm.password"
+                    type="password"
+                    :placeholder="t('account.security.twoFactor.enterPassword')"
+                    icon="i-lucide-lock"
+                    class="w-full"
+                    :disabled="disableSubmitting"
+                  />
+                  <template #help>
+                    {{ t('account.security.twoFactor.confirmPasswordToDisable') }}
+                  </template>
+                </UFormField>
+                <UButton
+                  type="submit"
+                  color="error"
+                  variant="subtle"
+                  icon="i-lucide-shield-off"
+                  :loading="disableSubmitting"
+                  :disabled="!disableForm.password"
+                >
+                  {{ t('account.security.twoFactor.disableTwoFactor') }}
+                </UButton>
+              </form>
             </template>
           </UCard>
         </div>

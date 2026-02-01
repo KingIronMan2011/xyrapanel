@@ -1,40 +1,50 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { listServerAllocations } from '~~/server/utils/serversStore'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { requireAccountUser } from '~~/server/utils/security'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const serverId = getRouterParam(event, 'server')
+  const serverIdentifier = getRouterParam(event, 'server')
 
-  if (!serverId) {
+  if (!serverIdentifier) {
     throw createError({
       statusCode: 400,
       message: 'Server identifier is required',
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverIdentifier, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
     requiredPermissions: ['allocation.read'],
+    allowOwner: true,
+    allowAdmin: true,
   })
 
   const allocations = await listServerAllocations(server.id)
 
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.network.allocations.listed',
+    server: { id: server.id, uuid: server.uuid },
+    metadata: {
+      allocationCount: allocations.length,
+    },
+  })
+
   return {
-    object: 'list',
     data: allocations.map(alloc => ({
-      object: 'allocation',
-      attributes: {
-        id: alloc.id,
-        ip: alloc.ip,
-        ip_alias: alloc.ipAlias,
-        port: alloc.port,
-        notes: alloc.notes,
-        is_default: alloc.id === server.allocationId,
-      },
+      id: alloc.id,
+      ip: alloc.ip,
+      port: alloc.port,
+      ipAlias: alloc.ipAlias ?? null,
+      notes: alloc.notes ?? null,
+      isPrimary: Boolean(alloc.id === server.allocationId),
     })),
   }
 })
+

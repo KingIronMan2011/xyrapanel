@@ -1,12 +1,28 @@
-import { createError, getQuery, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { remoteGetFileContents } from '~~/server/utils/wings/registry'
-import { resolveServerRequest } from '~~/server/utils/http/serverAccess'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event: H3Event) => {
   setHeader(event, 'Content-Type', 'application/json')
 
-  const context = await resolveServerRequest(event, {
-    requiredPermissions: ['file.read'],
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Bad Request',
+      message: 'Missing server identifier',
+    })
+  }
+
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.read'],
   })
 
   // Allow file access regardless of server status (offline, online, etc.)
@@ -25,14 +41,23 @@ export default defineEventHandler(async (event: H3Event) => {
   }
 
   try {
-    const result = await remoteGetFileContents(context.server.uuid, file, context.node?.id ?? undefined)
+    const result = await remoteGetFileContents(server.uuid, file, server.nodeId ?? undefined)
+
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.files.read',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { file },
+    })
+
     return { data: result }
   }
   catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unable to read file contents.'
     
     console.error('[Files Content] Error fetching file:', {
-      serverUuid: context.server.uuid,
+      serverUuid: server.uuid,
       filePath: file,
       error: errorMessage,
       errorType: error instanceof Error ? error.name : typeof error,

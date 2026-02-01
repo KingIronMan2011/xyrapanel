@@ -1,41 +1,24 @@
-import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { recordAuditEvent } from '~~/server/utils/audit'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
-
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const serverId = getRouterParam(event, 'id')
-  if (!serverId) {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Server ID required' })
   }
 
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['settings.reinstall'],
+  })
+
   const db = useDrizzle()
-
-  const server = db
-    .select()
-    .from(tables.servers)
-    .where(eq(tables.servers.uuid, serverId))
-    .get()
-
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  const isAdmin = user.role === 'admin'
-  const isOwner = server.ownerId === user.id
-
-  if (!isAdmin && !isOwner) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'You do not have permission to reinstall this server'
-    })
-  }
 
   if (server.suspended) {
     throw createError({
@@ -57,10 +40,10 @@ export default defineEventHandler(async (event) => {
 
   try {
     const { getWingsClientForServer } = await import('~~/server/utils/wings-client')
-    const { client } = await getWingsClientForServer(serverId)
+    const { client } = await getWingsClientForServer(server.uuid)
     
     console.log('[Reinstall] Calling Wings reinstall endpoint...')
-    await client.reinstallServer(serverId)
+    await client.reinstallServer(server.uuid)
     
     console.log('[Reinstall] Wings accepted reinstall request, updating status to installing')
 
@@ -69,7 +52,7 @@ export default defineEventHandler(async (event) => {
         status: 'installing',
         updatedAt: new Date(),
       })
-      .where(eq(tables.servers.uuid, serverId))
+      .where(eq(tables.servers.id, server.id))
       .run()
     
     console.log('[Reinstall] Server status updated to installing')
@@ -87,20 +70,21 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await recordAuditEvent({
-    actor: user.email || 'unknown',
-    actorType: 'user',
-    action: 'server.reinstall',
-    targetType: 'server',
-    targetId: server.uuid,
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.settings.reinstall_requested',
+    server: { id: server.id, uuid: server.uuid },
     metadata: {
       serverName: server.name,
-      userId: user.id,
+      requestedBy: user.email ?? user.username,
     },
   })
 
   return {
-    success: true,
-    message: 'Server reinstallation has been queued',
+    data: {
+      success: true,
+      message: 'Server reinstallation has been queued',
+    },
   }
 })

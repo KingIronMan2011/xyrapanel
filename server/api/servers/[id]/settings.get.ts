@@ -1,58 +1,94 @@
-import { createError, defineEventHandler } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
 import { eq } from 'drizzle-orm'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import { findServerByIdentifier } from '~~/server/utils/serversStore'
-import { useDrizzle } from '~~/server/utils/drizzle'
-import * as tables from '~~/server/database/schema'
+import type { SettingsData } from '#shared/types/server'
+import { useDrizzle, tables } from '~~/server/utils/drizzle'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event) => {
-  const id = event.context.params?.id
-  if (!id || typeof id !== 'string') {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Missing server identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const { user, session } = await requireAccountUser(event)
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const { server } = await getServerWithAccess(identifier, session)
 
-  const server = await findServerByIdentifier(id)
-
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
-
-  if (user.role !== 'admin' && server.ownerId !== user.id) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.read'],
+  })
 
   const db = useDrizzle()
-  const limits = await db
-    .select()
+  const limitsRow = await db
+    .select({
+      cpu: tables.serverLimits.cpu,
+      memory: tables.serverLimits.memory,
+      disk: tables.serverLimits.disk,
+      swap: tables.serverLimits.swap,
+      io: tables.serverLimits.io,
+      threads: tables.serverLimits.threads,
+      oomDisabled: tables.serverLimits.oomDisabled,
+      databaseLimit: tables.serverLimits.databaseLimit,
+      allocationLimit: tables.serverLimits.allocationLimit,
+      backupLimit: tables.serverLimits.backupLimit,
+    })
     .from(tables.serverLimits)
     .where(eq(tables.serverLimits.serverId, server.id))
+    .limit(1)
     .get()
 
-  return {
-    data: {
-      server: {
-        id: server.id,
-        uuid: server.uuid,
-        identifier: server.identifier,
-        name: server.name,
-        description: server.description,
-        suspended: server.suspended,
-      },
-      limits: limits ? {
-        cpu: limits.cpu,
-        memory: limits.memory,
-        disk: limits.disk,
-        swap: limits.swap,
-        io: limits.io,
-      } : null,
+  const response: SettingsData = {
+    server: {
+      id: server.id,
+      uuid: server.uuid,
+      identifier: server.identifier,
+      name: server.name,
+      description: server.description,
+      suspended: Boolean(server.suspended),
     },
+    limits: limitsRow
+      ? {
+          cpu: limitsRow.cpu,
+          memory: limitsRow.memory,
+          disk: limitsRow.disk,
+          swap: limitsRow.swap,
+          io: limitsRow.io,
+          threads: limitsRow.threads ?? null,
+          oomDisabled: limitsRow.oomDisabled ?? true,
+          databaseLimit: limitsRow.databaseLimit ?? null,
+          allocationLimit: limitsRow.allocationLimit ?? null,
+          backupLimit: limitsRow.backupLimit ?? null,
+        }
+      : null,
+  }
+
+  await Promise.all([
+    recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: 'server.settings.viewed',
+      targetType: 'server',
+      targetId: server.id,
+      metadata: {
+        serverUuid: server.uuid,
+      },
+    }),
+    recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.settings.viewed',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: {
+        context: 'server.settings',
+      },
+    }),
+  ])
+
+  return {
+    data: response,
   }
 })

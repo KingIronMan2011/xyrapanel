@@ -1,13 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { generateIdentifier, generateApiToken, formatApiKey } from '~~/server/utils/apiKeys'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-import type { CreateApiKeyPayload, CreateApiKeyResponse } from '#shared/types/admin'
+import type { CreateApiKeyResponse } from '#shared/types/admin'
+import { createAdminApiKeySchema } from '#shared/schema/admin/api-keys'
+import type { AdminApiKeyPermissionAction } from '#shared/schema/admin/api-keys'
+type PermissionAction = AdminApiKeyPermissionAction
 
-export default defineEventHandler(async (event): Promise<CreateApiKeyResponse> => {
+export default defineEventHandler(async (event): Promise<{ data: CreateApiKeyResponse }> => {
   const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.API_KEYS, ADMIN_ACL_PERMISSIONS.WRITE)
@@ -23,7 +26,7 @@ export default defineEventHandler(async (event): Promise<CreateApiKeyResponse> =
 
   const db = useDrizzle()
 
-  const dbUser = db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()
+  const dbUser = await db.select().from(tables.users).where(eq(tables.users.id, user.id)).get()
   if (!dbUser) {
     throw createError({
       statusCode: 404,
@@ -31,7 +34,9 @@ export default defineEventHandler(async (event): Promise<CreateApiKeyResponse> =
     })
   }
 
-  const body = await readBody<CreateApiKeyPayload>(event)
+  const body = await readValidatedBodyWithLimit(event, createAdminApiKeySchema, BODY_SIZE_LIMITS.SMALL)
+  const trimmedMemo = body.memo?.trim() || null
+  const permissions = body.permissions ?? {}
 
   const identifier = generateIdentifier()
   const token = generateApiToken()
@@ -40,13 +45,15 @@ export default defineEventHandler(async (event): Promise<CreateApiKeyResponse> =
 
   const apiKeyId = randomUUID()
 
-  db.insert(tables.apiKeys).values({
+  const formattedKey = formatApiKey(identifier, token)
+
+  await db.insert(tables.apiKeys).values({
     id: apiKeyId,
     userId: user.id,
-    name: body.memo || 'API Key',
-    start: formatApiKey(identifier, token).slice(0, 6),
+    name: trimmedMemo || 'API Key',
+    start: formattedKey.slice(0, 6),
     prefix: 'sk',
-    key: formatApiKey(identifier, token),
+    key: formattedKey,
     expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
     enabled: true,
     rateLimitEnabled: true,
@@ -55,20 +62,23 @@ export default defineEventHandler(async (event): Promise<CreateApiKeyResponse> =
     updatedAt: now,
   }).run()
 
-  db.insert(tables.apiKeyMetadata).values({
+  await db.insert(tables.apiKeyMetadata).values({
     id: randomUUID(),
     apiKeyId: apiKeyId,
     keyType: 1,
     allowedIps: body.allowedIps ? JSON.stringify(body.allowedIps) : null,
-    memo: body.memo || null,
+    memo: trimmedMemo,
     createdAt: now,
     updatedAt: now,
   }).run()
 
-  if (body.permissions && Object.values(body.permissions).some(actions => actions && actions.length > 0)) {
-    db.update(tables.apiKeys)
+  const permissionValues = Object.values(permissions) as PermissionAction[][]
+  const hasAnyPermissions = permissionValues.some(actions => Array.isArray(actions) && actions.length > 0)
+
+  if (hasAnyPermissions) {
+    await db.update(tables.apiKeys)
       .set({
-        metadata: JSON.stringify(body.permissions),
+        metadata: JSON.stringify(permissions),
       })
       .where(eq(tables.apiKeys.id, apiKeyId))
       .run()
@@ -82,17 +92,19 @@ export default defineEventHandler(async (event): Promise<CreateApiKeyResponse> =
     targetId: apiKeyId,
     metadata: {
       identifier,
-      memo: body.memo || null,
+      memo: trimmedMemo,
       allowedIpsCount: body.allowedIps?.length || 0,
-      permissions: body.permissions,
+      permissions,
     },
   })
 
   return {
-    id: apiKeyId,
-    identifier,
-    apiKey: formatApiKey(identifier, token),
-    memo: body.memo || null,
-    createdAt: now.toISOString(),
+    data: {
+      id: apiKeyId,
+      identifier,
+      apiKey: formattedKey,
+      memo: trimmedMemo,
+      createdAt: now.toISOString(),
+    },
   }
 })

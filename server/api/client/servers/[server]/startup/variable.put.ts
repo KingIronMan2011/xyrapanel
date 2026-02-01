@@ -1,11 +1,11 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
-import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { serverStartupVariableSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
   const serverId = getRouterParam(event, 'server')
 
   if (!serverId) {
@@ -15,22 +15,18 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
     requiredPermissions: ['server.settings.update'],
+    allowOwner: true,
+    allowAdmin: true,
   })
 
-  const body = await readBody(event)
-  const { key, value } = body
-
-  if (!key) {
-    throw createError({
-      statusCode: 400,
-      message: 'Variable key is required',
-    })
-  }
+  const { key, value } = await readValidatedBodyWithLimit(event, serverStartupVariableSchema, BODY_SIZE_LIMITS.SMALL)
+  const normalizedValue = value ?? ''
 
   const db = useDrizzle()
   const [eggVariable] = db.select()
@@ -74,7 +70,7 @@ export default defineEventHandler(async (event) => {
   if (existingVar) {
     db.update(tables.serverEnvironmentVariables)
       .set({
-        value: value || '',
+        value: normalizedValue,
         updatedAt: now,
       })
       .where(eq(tables.serverEnvironmentVariables.id, existingVar.id))
@@ -85,35 +81,35 @@ export default defineEventHandler(async (event) => {
         id: `env_${Date.now()}`,
         serverId: server.id,
         key,
-        value: value || '',
+        value: normalizedValue,
         createdAt: now,
         updatedAt: now,
       })
       .run()
   }
 
-  await recordAuditEventFromRequest(event, {
-    actor: session?.user?.email || session?.user?.id || 'unknown',
-    actorType: 'user',
+  await recordServerActivity({
+    event,
+    actorId: user.id,
     action: 'server.startup_variable.updated',
-    targetType: 'settings',
-    targetId: server.id,
+    server: { id: server.id, uuid: server.uuid },
     metadata: {
       key,
-      value,
     },
   })
 
   return {
-    object: 'egg_variable',
-    attributes: {
-      name: eggVariable.name,
-      description: eggVariable.description,
-      env_variable: eggVariable.envVariable,
-      default_value: eggVariable.defaultValue,
-      server_value: value || '',
-      is_editable: eggVariable.userEditable,
-      rules: eggVariable.rules || '',
+    data: {
+      object: 'egg_variable',
+      attributes: {
+        name: eggVariable.name,
+        description: eggVariable.description,
+        env_variable: eggVariable.envVariable,
+        default_value: eggVariable.defaultValue,
+        server_value: normalizedValue,
+        is_editable: eggVariable.userEditable,
+        rules: eggVariable.rules || '',
+      },
     },
   }
 })

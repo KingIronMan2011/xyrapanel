@@ -1,5 +1,5 @@
-import { createError, getQuery } from 'h3'
-import { requireAuth } from '~~/server/utils/security'
+import { requireAccountUser } from '~~/server/utils/security'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { useDrizzle, tables, eq, isNotNull, and, desc } from '~~/server/utils/drizzle'
 import { getMultipleServerStatuses } from '~~/server/utils/server-status'
 
@@ -7,8 +7,7 @@ import type { ServerListEntry, ServersResponse } from '#shared/types/server'
 
 export default defineEventHandler(async (event): Promise<ServersResponse> => {
   try {
-    const session = await requireAuth(event)
-    const user = session.user
+    const { user } = await requireAccountUser(event)
 
     const query = getQuery(event)
     const scopeParam = typeof query.scope === 'string' ? query.scope : 'own'
@@ -76,6 +75,15 @@ export default defineEventHandler(async (event): Promise<ServersResponse> => {
         isTransferring: false,
         primaryAllocation: primaryAllocation ? `${primaryAllocation.ip}:${primaryAllocation.port}` : null,
       }))
+
+    await recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: includeAll ? 'servers.list.all' : 'servers.list.mine',
+      targetType: 'user',
+      targetId: user.id,
+      metadata: { count: records.length, scope },
+    })
 
     return {
       data: records,

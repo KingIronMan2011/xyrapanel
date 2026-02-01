@@ -32,13 +32,18 @@ onMounted(() => {
 const { user, isAdmin: isAdminRef, status: authStatus } = storeToRefs(authStore)
 const signOutLoading = ref(false)
 
-const { data: securitySettings } = await useFetch('/api/admin/settings/security', {
-  key: 'default-layout-security-settings',
-  default: () => ({
-    maintenanceMode: false,
-    maintenanceMessage: '',
-  } as { maintenanceMode: boolean; maintenanceMessage: string }),
-})
+const { data: securitySettings } = await useFetch<{ data: { maintenanceMode: boolean; maintenanceMessage: string } }>(
+  '/api/admin/settings/security',
+  {
+    key: 'default-layout-security-settings',
+    default: () => ({
+      data: {
+        maintenanceMode: false,
+        maintenanceMessage: '',
+      },
+    }),
+  },
+)
 
 const { data: brandingSettings } = await useFetch('/api/branding', {
   key: 'default-layout-branding-settings',
@@ -52,12 +57,12 @@ const showBrandLogo = computed(() => brandingSettings.value?.showBrandLogo !== f
 const brandLogoUrl = computed(() => brandingSettings.value?.brandLogoUrl || '/logo.png')
 
 const isMaintenanceMode = computed(() => {
-  if (!securitySettings.value?.maintenanceMode) return false
+  if (!securitySettings.value?.data?.maintenanceMode) return false
   if (authStatus.value === 'loading' || authStatus.value === 'unauthenticated') return false
   const isAdmin = isAdminRef.value || user.value?.role === 'admin'
   return !isAdmin
 })
-const maintenanceMessage = computed(() => securitySettings.value?.maintenanceMessage?.trim() || t('layout.defaultMaintenanceMessage'))
+const maintenanceMessage = computed(() => securitySettings.value?.data?.maintenanceMessage?.trim() || t('layout.defaultMaintenanceMessage'))
 
 const fallbackUserLabel = computed(() => t('common.user'))
 const userLabel = computed(() => {

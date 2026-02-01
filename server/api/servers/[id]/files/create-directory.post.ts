@@ -1,38 +1,41 @@
-import { createError, readBody, type H3Event } from 'h3'
-import { resolveServerRequest } from '~~/server/utils/http/serverAccess'
 import { remoteCreateDirectory } from '~~/server/utils/wings/registry'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { createDirectorySchema } from '#shared/schema/server/operations'
 
-interface CreateDirectoryBody {
-  root?: string
-  name?: string
-}
-
-export default defineEventHandler(async (event: H3Event) => {
-  const context = await resolveServerRequest(event, {
-    requiredPermissions: ['file.create'],
-  })
-
-  const body = await readBody<CreateDirectoryBody>(event)
-  const name = body.name?.trim()
-  const root = typeof body.root === 'string' && body.root.length > 0 ? body.root : '/'
-
-  if (!name) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'Unprocessable Entity',
-      message: 'Directory name is required',
-    })
+export default defineEventHandler(async (event) => {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.write'],
+  })
+
+  const body = await readValidatedBodyWithLimit(event, createDirectorySchema, BODY_SIZE_LIMITS.SMALL)
+  const name = body.name
+  const root = body.root && body.root.length > 0 ? body.root : '/'
+
   try {
-    await remoteCreateDirectory(context.server.uuid, root, name, context.node?.id ?? undefined)
+    await remoteCreateDirectory(server.uuid, root, name)
+
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.files.create_directory',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { root, name },
+    })
 
     return {
-      success: true,
-      data: {
-        name,
-        root,
-      },
+      data: { name, root },
     }
   }
   catch (error) {

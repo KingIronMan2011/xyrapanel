@@ -399,8 +399,10 @@ export interface ServerActionPayload {
 }
 
 export interface ServerActionResponse {
-  success: boolean
-  message: string
+  data: {
+    success: boolean
+    message: string
+  }
 }
 
 

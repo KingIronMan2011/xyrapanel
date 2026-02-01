@@ -1,10 +1,12 @@
 import { desc, eq, sql } from 'drizzle-orm'
-import { getQuery } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireAccountUser } from '~~/server/utils/security'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 import type { PaginatedServerActivityResponse, ServerActivityEvent } from '#shared/types/server'
+import type { ActorType, TargetType } from '#shared/types/audit'
 
 function parseMetadata(raw: string | null): Record<string, unknown> | null {
   if (!raw)
@@ -23,7 +25,6 @@ function parseMetadata(raw: string | null): Record<string, unknown> | null {
 }
 
 export default defineEventHandler(async (event): Promise<PaginatedServerActivityResponse> => {
-  const session = await getServerSession(event)
   const serverIdentifier = getRouterParam(event, 'id')
 
   if (!serverIdentifier) {
@@ -33,7 +34,14 @@ export default defineEventHandler(async (event): Promise<PaginatedServerActivity
     })
   }
 
+  const { user, session } = await requireAccountUser(event)
+
   const { server } = await getServerWithAccess(serverIdentifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.read'],
+  })
 
   const query = getQuery(event)
   const page = Math.max(Number.parseInt((query.page as string) ?? '1', 10) || 1, 1)
@@ -41,7 +49,7 @@ export default defineEventHandler(async (event): Promise<PaginatedServerActivity
   const offset = (page - 1) * limit
 
   const db = useDrizzle()
-  const [{ count }] = await db
+  const countResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(tables.auditEvents)
     .where(eq(tables.auditEvents.targetId, server.id))
@@ -69,21 +77,30 @@ export default defineEventHandler(async (event): Promise<PaginatedServerActivity
     id: row.id,
     occurredAt: row.occurredAt instanceof Date ? row.occurredAt.toISOString() : new Date(row.occurredAt).toISOString(),
     actor: row.actor,
-    actorType: row.actorType,
+    actorType: row.actorType as ActorType,
     action: row.action,
-    targetType: row.targetType,
+    targetType: row.targetType as TargetType,
     targetId: row.targetId,
     metadata: parseMetadata(row.metadata),
   }))
 
-  const total = Number(count ?? 0)
+  const total = Number((countResult?.[0]?.count) ?? 0)
   const totalPages = Math.max(Math.ceil(total / limit), 1)
+
+  await recordAuditEventFromRequest(event, {
+    actor: user.id,
+    actorType: 'user',
+    action: 'server.activity.viewed',
+    targetType: 'server',
+    targetId: server.id,
+    metadata: { page, limit },
+  })
 
   return {
     data,
     pagination: {
       page,
-      perPage: limit,
+      limit,
       total,
       totalPages,
     },

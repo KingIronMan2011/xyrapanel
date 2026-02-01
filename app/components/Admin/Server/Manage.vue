@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { Server } from '#shared/types/server'
+import { serverTransferFormSchema } from '#shared/schema/admin/server'
+import type { ServerTransferFormInput } from '#shared/schema/admin/server'
 
 const props = defineProps<{
   server: Server
@@ -132,14 +133,9 @@ async function handleCreateOnWings() {
 
 const showTransferModal = ref(false)
 
-const transferSchema = z.object({
-  nodeId: z.string().trim().min(1, t('admin.servers.manage.targetNodeIdRequired')),
-  allocationId: z.string().trim().optional().or(z.literal('')),
-  additionalAllocationIds: z.string().trim().optional().or(z.literal('')),
-  startOnCompletion: z.boolean().default(true),
-})
+const transferSchema = serverTransferFormSchema
 
-type TransferFormSchema = z.infer<typeof transferSchema>
+type TransferFormSchema = ServerTransferFormInput
 
 const transferForm = reactive<TransferFormSchema>({
   nodeId: '',

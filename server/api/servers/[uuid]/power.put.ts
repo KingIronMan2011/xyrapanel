@@ -1,5 +1,9 @@
-import { createError } from 'h3'
+import { z } from 'zod'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   const uuid = getRouterParam(event, 'uuid')
@@ -10,41 +14,41 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody(event)
-  const { state } = body
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(uuid, session)
 
-  const validStates = ['starting', 'running', 'stopping', 'stopped', 'offline']
-  if (!state || !validStates.includes(state)) {
-    throw createError({
-      statusCode: 400,
-      message: `Invalid state. Must be one of: ${validStates.join(', ')}`,
-    })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.update'],
+  })
+
+  const body = await readValidatedBodyWithLimit(event, z.object({
+    state: z.enum(['starting', 'running', 'stopping', 'stopped', 'offline']).describe('Power state'),
+  }), BODY_SIZE_LIMITS.SMALL)
 
   const db = useDrizzle()
-  const [server] = db.select()
-    .from(tables.servers)
-    .where(eq(tables.servers.uuid, uuid))
-    .limit(1)
-    .all()
-
-  if (!server) {
-    throw createError({
-      statusCode: 404,
-      message: 'Server not found',
-    })
-  }
 
   db.update(tables.servers)
     .set({
-      status: state === 'running' ? null : state,
+      status: body.state === 'running' ? null : body.state,
       updatedAt: new Date(),
     })
     .where(eq(tables.servers.id, server.id))
     .run()
 
+  await recordAuditEventFromRequest(event, {
+    actor: user.id,
+    actorType: 'user',
+    action: 'server.power_state.updated',
+    targetType: 'server',
+    targetId: server.id,
+    metadata: { state: body.state },
+  })
+
   return {
-    success: true,
-    message: `Server power state updated to: ${state}`,
+    data: {
+      success: true,
+      message: `Server power state updated to: ${body.state}`,
+    },
   }
 })

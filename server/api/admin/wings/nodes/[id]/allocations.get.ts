@@ -1,10 +1,10 @@
-import { createError, defineEventHandler, getQuery } from 'h3'
 import { asc, desc, sql } from 'drizzle-orm'
 
 import type { AdminPaginatedMeta, AdminWingsNodeAllocationSummary, AdminWingsNodeAllocationsPayload } from '#shared/types/admin'
 
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event): Promise<AdminWingsNodeAllocationsPayload> => {
   const { id } = event.context.params ?? {}
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event): Promise<AdminWingsNodeAllocatio
     throw createError({ statusCode: 400, statusMessage: 'Missing node id' })
   }
 
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   const query = getQuery(event)
   const pageParam = typeof query.page === 'string' ? Number.parseInt(query.page, 10) : 1
@@ -66,6 +66,20 @@ export default defineEventHandler(async (event): Promise<AdminWingsNodeAllocatio
     total,
     hasMore: offset + data.length < total,
   }
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.wings.node.allocations.listed',
+    targetType: 'node',
+    targetId: id,
+    metadata: {
+      page,
+      perPage,
+      total,
+      returned: data.length,
+    },
+  })
 
   return {
     data,

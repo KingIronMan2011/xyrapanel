@@ -1,10 +1,28 @@
-import { createError, getQuery, type H3Event } from 'h3'
-import { resolveServerRequest } from '~~/server/utils/http/serverAccess'
+import { type H3Event } from 'h3'
 import { remoteGetFileDownloadUrl } from '~~/server/utils/wings/registry'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event: H3Event) => {
-  const context = await resolveServerRequest(event, {
-    requiredPermissions: ['file.download'],
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Bad Request',
+      message: 'Missing server identifier',
+    })
+  }
+
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.download'],
+    allowOwner: true,
+    allowAdmin: true,
   })
 
   const query = getQuery(event)
@@ -19,10 +37,17 @@ export default defineEventHandler(async (event: H3Event) => {
   }
 
   try {
-    const result = await remoteGetFileDownloadUrl(context.server.uuid, file, context.node?.id)
+    const result = await remoteGetFileDownloadUrl(server.uuid, file, server.nodeId ?? undefined)
+
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.files.download_url_requested',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { file },
+    })
 
     return {
-      success: true,
       data: result,
     }
   }

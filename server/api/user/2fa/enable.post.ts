@@ -1,21 +1,14 @@
-import { createError } from 'h3'
 import { APIError } from 'better-auth/api'
 import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
-import { requireAuth } from '~~/server/utils/security'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
+import { twoFactorEnableSchema } from '#shared/schema/account'
 
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  const { user } = await requireAccountUser(event)
   const auth = getAuth()
 
-  const body = await readBody(event)
-  const { password } = body
-
-  if (!password) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Password is required to enable 2FA',
-    })
-  }
+  const { password } = await readValidatedBodyWithLimit(event, twoFactorEnableSchema, BODY_SIZE_LIMITS.SMALL)
 
   try {
     const api = auth.api as typeof auth.api & {
@@ -33,11 +26,21 @@ export default defineEventHandler(async (event) => {
 
     const secretFromUri = result.totpURI ? result.totpURI.split('secret=')[1]?.split('&')[0] : null
     
+    await recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: 'auth.2fa.setup.initiated',
+      targetType: 'user',
+      targetId: user.id,
+    })
+
     return {
-      uri: result.totpURI,
-      secret: secretFromUri || '',
-      recoveryTokens: result.backupCodes || [],
-      backupCodes: result.backupCodes || [],
+      data: {
+        uri: result.totpURI,
+        secret: secretFromUri || '',
+        recoveryTokens: result.backupCodes || [],
+        backupCodes: result.backupCodes || [],
+      },
     }
   }
   catch (error) {

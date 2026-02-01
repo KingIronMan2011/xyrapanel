@@ -1,11 +1,12 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { serverManager } from '~~/server/utils/server-manager'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
-import type { ServerActionPayload, ServerActionResponse } from '#shared/types/admin'
+import type { ServerActionResponse } from '#shared/types/admin'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { serverActionSchema } from '#shared/schema/admin/actions'
 
 export default defineEventHandler(async (event): Promise<ServerActionResponse> => {
   const session = await requireAdmin(event)
@@ -17,11 +18,11 @@ export default defineEventHandler(async (event): Promise<ServerActionResponse> =
     throw createError({ statusCode: 400, statusMessage: 'Server ID is required' })
   }
 
-  const body = await readBody<ServerActionPayload>(event)
-
-  if (!body.action) {
-    throw createError({ statusCode: 400, statusMessage: 'Action is required' })
-  }
+  const body = await readValidatedBodyWithLimit(
+    event,
+    serverActionSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const db = useDrizzle()
   const server = await db
@@ -74,8 +75,10 @@ export default defineEventHandler(async (event): Promise<ServerActionResponse> =
     })
 
     return {
-      success: true,
-      message: `Server ${body.action} action completed successfully`,
+      data: {
+        success: true,
+        message: `Server ${body.action} action completed successfully`,
+      },
     }
   } catch (error) {
     console.error(`Server ${body.action} action failed:`, error)

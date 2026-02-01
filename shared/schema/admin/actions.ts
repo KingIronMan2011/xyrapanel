@@ -31,3 +31,14 @@ export const resetPasswordActionSchema = z.object({
 
 export type ResetPasswordActionInput = z.infer<typeof resetPasswordActionSchema>
 
+export const serverActionSchema = z.object({
+  action: z.enum(['suspend', 'unsuspend', 'reinstall', 'delete', 'start', 'stop', 'restart', 'kill']),
+})
+
+export type ServerActionInput = z.infer<typeof serverActionSchema>
+
+export const disableTwoFactorActionSchema = z.object({
+  reason: z.string().trim().min(1).max(500).optional(),
+}).default({})
+
+export type DisableTwoFactorActionInput = z.infer<typeof disableTwoFactorActionSchema>

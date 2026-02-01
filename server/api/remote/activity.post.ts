@@ -1,21 +1,16 @@
-import { createError, readBody, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { findServerByIdentifier } from '~~/server/utils/serversStore'
-import type { WingsActivityBatchRequest } from '#shared/types/wings'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import type { ActivityAction } from '#shared/types/audit'
+import { remoteActivityBatchSchema } from '#shared/schema/wings'
 
 export default defineEventHandler(async (event: H3Event) => {
-  const body = await readBody<WingsActivityBatchRequest>(event)
-
-  if (!body.data || !Array.isArray(body.data)) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'Invalid activity data format',
-    })
-  }
-
-  const activities = body.data
+  const { data: activities } = await readValidatedBodyWithLimit(
+    event,
+    remoteActivityBatchSchema,
+    BODY_SIZE_LIMITS.MEDIUM,
+  )
 
   const insertedCount = activities.length
   let successCount = 0
@@ -66,9 +61,11 @@ export default defineEventHandler(async (event: H3Event) => {
   }
 
   return {
-    success: true,
-    received: insertedCount,
-    processed: successCount,
-    failed: insertedCount - successCount,
+    data: {
+      success: true,
+      received: insertedCount,
+      processed: successCount,
+      failed: insertedCount - successCount,
+    },
   }
 })

@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { randomBytes } from 'node:crypto'
 import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
@@ -67,13 +66,17 @@ export default defineEventHandler(async (event) => {
         targetType: 'user',
         targetId: userId,
         metadata: {
+          mode,
           notify,
         },
       })
 
       return {
-        success: true,
-        mode,
+        data: {
+          success: true,
+          mode,
+          notify,
+        },
       }
     }
 
@@ -89,14 +92,6 @@ export default defineEventHandler(async (event) => {
       })
       .where(eq(tables.users.id, userId))
       .run()
-    
-    await db.update(tables.users)
-      .set({
-        passwordResetRequired: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(tables.users.id, userId))
-      .run()
 
     await recordAuditEventFromRequest(event, {
       actor: session.user.email || session.user.id,
@@ -105,15 +100,18 @@ export default defineEventHandler(async (event) => {
       targetType: 'user',
       targetId: userId,
       metadata: {
+        mode,
         notify,
       },
     })
 
     return {
-      success: true,
-      mode,
-      temporaryPassword,
-      notify,
+      data: {
+        success: true,
+        mode,
+        temporaryPassword,
+        notify,
+      },
     }
   }
   catch (error) {

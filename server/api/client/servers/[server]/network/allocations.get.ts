@@ -1,49 +1,60 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { listServerAllocations } from '~~/server/utils/serversStore'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { requireAccountUser } from '~~/server/utils/security'
+import { recordServerActivity } from '~~/server/utils/server-activity'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const serverId = getRouterParam(event, 'server')
+  const serverIdentifier = getRouterParam(event, 'server')
 
-  if (!serverId) {
+  if (!serverIdentifier) {
     throw createError({
       statusCode: 400,
       message: 'Server identifier is required',
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverIdentifier, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
     requiredPermissions: ['allocation.read'],
+    allowOwner: true,
+    allowAdmin: true,
   })
 
   const allocations = await listServerAllocations(server.id)
-  const primaryAllocation = allocations.find(a => a.isPrimary)
-  const additionalAllocations = allocations.filter(a => !a.isPrimary)
+  const normalizeAllocation = (allocation: typeof allocations[number]) => ({
+    id: allocation.id,
+    ip: allocation.ip,
+    port: allocation.port,
+    ipAlias: allocation.ipAlias ?? null,
+    isPrimary: Boolean(allocation.isPrimary),
+    notes: allocation.notes ?? null,
+  })
+
+  const mappedAllocations = allocations.map(normalizeAllocation)
+  const primaryAllocation = mappedAllocations.find(a => a.isPrimary) ?? null
+  const additionalAllocations = mappedAllocations.filter(a => !a.isPrimary)
+
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.network.allocations.viewed',
+    server: { id: server.id, uuid: server.uuid },
+    metadata: {
+      allocationCount: mappedAllocations.length,
+      hasPrimary: Boolean(primaryAllocation),
+    },
+  })
 
   return {
     data: {
-      primary: primaryAllocation ? {
-        id: primaryAllocation.id,
-        ip: primaryAllocation.ip,
-        port: primaryAllocation.port,
-        ipAlias: primaryAllocation.ipAlias,
-        isPrimary: primaryAllocation.isPrimary,
-        notes: primaryAllocation.notes,
-      } : null,
-      allocations: additionalAllocations.map(alloc => ({
-        id: alloc.id,
-        ip: alloc.ip,
-        port: alloc.port,
-        ipAlias: alloc.ipAlias,
-        isPrimary: alloc.isPrimary,
-        notes: alloc.notes,
-      })),
-      allocation_limit: server.allocationLimit,
+      primary: primaryAllocation,
+      allocations: additionalAllocations,
+      allocation_limit: server.allocationLimit ?? null,
     },
   }
 })
+

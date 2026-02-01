@@ -1,39 +1,44 @@
-import { createError, readBody, type H3Event } from 'h3'
-import { resolveServerRequest } from '~~/server/utils/http/serverAccess'
 import { remoteChmodFiles } from '~~/server/utils/wings/registry'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { chmodBodySchema } from '#shared/schema/server/operations'
 
-interface ChmodInstruction {
-  file: string
-  mode: string
-}
+export default defineEventHandler(async (event) => {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
+  }
 
-interface ChmodBody {
-  root?: string
-  files?: ChmodInstruction[]
-}
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
 
-export default defineEventHandler(async (event: H3Event) => {
-  const context = await resolveServerRequest(event, {
-    requiredPermissions: ['file.chmod'],
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.write'],
   })
 
-  const body = await readBody<ChmodBody>(event)
-  const root = typeof body.root === 'string' && body.root.length > 0 ? body.root : '/'
-  const files = Array.isArray(body.files) ? body.files.filter(item => item?.file && item?.mode) : []
+  const body = await readValidatedBodyWithLimit(event, chmodBodySchema, BODY_SIZE_LIMITS.SMALL)
+  const root = body.root && body.root.length > 0 ? body.root : '/'
+  const files = body.files
 
-  if (files.length === 0) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'Unprocessable Entity',
-      message: 'File chmod instructions are required',
-    })
+  if (!server.nodeId) {
+    throw createError({ statusCode: 500, statusMessage: 'Server has no assigned node' })
   }
 
   try {
-    await remoteChmodFiles(context.server.uuid, root, files, context.node?.id)
+    await remoteChmodFiles(server.uuid, root, files, server.nodeId)
+
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.files.chmod',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { root, files },
+    })
 
     return {
-      success: true,
       data: {
         root,
         files,

@@ -1,8 +1,8 @@
-import { createError, getQuery } from 'h3'
 import { useDrizzle, tables, eq, or } from '~~/server/utils/drizzle'
 import { desc, count } from 'drizzle-orm'
 import { getNumericSetting, SETTINGS_KEYS } from '~~/server/utils/settings'
 import { requireAdmin } from '~~/server/utils/security'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
@@ -98,6 +98,19 @@ export default defineEventHandler(async (event) => {
   }
 
   const totalPages = Math.ceil(totalCount / limit)
+
+  await recordAuditEventFromRequest(event, {
+    actor: user.id,
+    actorType: 'user',
+    action: 'admin.user.activity.viewed',
+    targetType: 'user',
+    targetId: user.id,
+    metadata: {
+      actorUserId: user.id,
+      page,
+      perPage: limit,
+    },
+  })
 
   return {
     data: activityEvents.map(entry => ({

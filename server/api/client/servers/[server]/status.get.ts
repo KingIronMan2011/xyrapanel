@@ -1,22 +1,17 @@
-import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { getServerStatus } from '~~/server/utils/server-status'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
-
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const accountContext = await requireAccountUser(event)
 
   const serverIdentifier = getRouterParam(event, 'server')
   if (!serverIdentifier) {
     throw createError({ statusCode: 400, statusMessage: 'Server identifier required' })
   }
 
-  const { server } = await getServerWithAccess(serverIdentifier, session)
+  const { server } = await getServerWithAccess(serverIdentifier, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,

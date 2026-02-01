@@ -1,9 +1,13 @@
-import { getServerSession } from '~~/server/utils/session'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { serverClientRenameSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const { user, session } = await requireAccountUser(event)
   const serverId = getRouterParam(event, 'server')
 
   if (!serverId) {
@@ -13,17 +17,18 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody(event)
-  const { name, description } = body
-
-  if (!name) {
-    throw createError({
-      statusCode: 400,
-      message: 'Server name is required',
-    })
-  }
-
   const { server } = await getServerWithAccess(serverId, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.update'],
+  })
+
+  const { name, description } = await readValidatedBodyWithLimit(
+    event,
+    serverClientRenameSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const db = useDrizzle()
   db.update(tables.servers)
@@ -35,11 +40,42 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.servers.id, server.id))
     .run()
 
+  const newDescription = description ?? server.description ?? null
+
+  await Promise.all([
+    recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: 'server.settings.rename',
+      targetType: 'server',
+      targetId: server.id,
+      metadata: {
+        serverUuid: server.uuid,
+        oldName: server.name,
+        newName: name,
+        description: newDescription,
+      },
+    }),
+    recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.settings.rename',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: {
+        oldName: server.name,
+        newName: name,
+        description: newDescription,
+      },
+    }),
+  ])
+
   return {
-    object: 'server',
-    attributes: {
-      name,
-      description: description || server.description,
+    data: {
+      object: 'server',
+      attributes: {
+        name,
+        description: newDescription,
+      },
     },
   }
 })

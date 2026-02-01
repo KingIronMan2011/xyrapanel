@@ -1,12 +1,9 @@
-import { assertMethod, createError, readValidatedBody, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { getNodeIdFromAuth } from '~~/server/utils/wings/auth'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-
-interface InstallStatusRequest {
-  successful: boolean
-  reinstall: boolean
-}
+import { remoteServerInstallStatusSchema } from '#shared/schema/wings'
 
 export default defineEventHandler(async (event: H3Event) => {
   assertMethod(event, 'POST')
@@ -19,19 +16,11 @@ export default defineEventHandler(async (event: H3Event) => {
 
   const nodeId = await getNodeIdFromAuth(event)
 
-  const { successful, reinstall } = await readValidatedBody(event, (payload) => {
-    if (!payload || typeof payload !== 'object') {
-      throw createError({ statusCode: 400, statusMessage: 'Invalid payload' })
-    }
-
-    const candidate = payload as InstallStatusRequest
-
-    if (typeof candidate.successful !== 'boolean' || typeof candidate.reinstall !== 'boolean') {
-      throw createError({ statusCode: 400, statusMessage: 'Missing install status fields' })
-    }
-
-    return candidate
-  })
+  const { successful, reinstall } = await readValidatedBodyWithLimit(
+    event,
+    remoteServerInstallStatusSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const server = db
     .select()
@@ -49,12 +38,19 @@ export default defineEventHandler(async (event: H3Event) => {
   }
 
   const newStatus = successful ? null : 'install_failed'
+  const now = new Date()
+
+  const updatedFields: Partial<typeof tables.servers.$inferInsert> = {
+    status: newStatus,
+    updatedAt: now,
+  }
+
+  if (successful) {
+    updatedFields.installedAt = now
+  }
 
   db.update(tables.servers)
-    .set({
-      status: newStatus,
-      updatedAt: new Date(),
-    })
+    .set(updatedFields)
     .where(eq(tables.servers.id, server.id))
     .run()
 
@@ -72,7 +68,9 @@ export default defineEventHandler(async (event: H3Event) => {
   })
 
   return {
-    success: true,
-    status: newStatus,
+    data: {
+      success: true,
+      status: newStatus,
+    },
   }
 })

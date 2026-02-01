@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'Mount not found' })
   }
 
-  await db.delete(tables.mounts).where(eq(tables.mounts.id, mountId))
+  await db.delete(tables.mounts).where(eq(tables.mounts.id, mountId)).run()
 
   await recordAuditEventFromRequest(event, {
     actor: session.user.email || session.user.id,
@@ -42,5 +42,10 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  return { success: true }
+  return {
+    data: {
+      success: true,
+      deletedId: mountId,
+    },
+  }
 })

@@ -1,10 +1,13 @@
-import { createError, defineEventHandler } from 'h3'
 import { requireAdmin } from '~~/server/utils/security'
 import { getWingsNodeConfigurationById, findWingsNode } from '~~/server/utils/wings/nodesStore'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { useRuntimeConfig, getRequestURL } from '#imports'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.NODES, ADMIN_ACL_PERMISSIONS.READ)
 
   const { id } = event.context.params ?? {}
   if (!id || typeof id !== 'string') {
@@ -30,25 +33,40 @@ export default defineEventHandler(async (event) => {
   try {
     const configuration = getWingsNodeConfigurationById(id, panelUrl)
     
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.node.configuration.tested',
+      targetType: 'node',
+      targetId: id,
+      metadata: {
+        nodeName: node.name,
+      },
+    })
+
     return {
-      success: true,
-      encryptionKeyAvailable,
-      nodeId: id,
-      tokenLength: configuration.token?.length || 0,
-      tokenId: configuration.token_id,
-      uuid: configuration.uuid,
-      tokenPreview: configuration.token ? `${configuration.token.substring(0, 20)}...` : '(empty)',
-      fullConfig: configuration,
+      data: {
+        success: true,
+        encryptionKeyAvailable,
+        nodeId: id,
+        tokenLength: configuration.token?.length || 0,
+        tokenId: configuration.token_id,
+        uuid: configuration.uuid,
+        tokenPreview: configuration.token ? `${configuration.token.substring(0, 20)}...` : '(empty)',
+        fullConfig: configuration,
+      },
     }
   }
   catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return {
-      success: false,
-      encryptionKeyAvailable,
-      nodeId: id,
-      error: message,
-      stack: error instanceof Error ? error.stack : undefined,
+      data: {
+        success: false,
+        encryptionKeyAvailable,
+        nodeId: id,
+        error: message,
+        stack: error instanceof Error ? error.stack : undefined,
+      },
     }
   }
 })

@@ -1,11 +1,11 @@
-import { createError, getQuery } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { desc, count } from 'drizzle-orm'
 import { getNumericSetting, SETTINGS_KEYS } from '~~/server/utils/settings'
 import { requireAdmin } from '~~/server/utils/security'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   const id = getRouterParam(event, 'id')
   if (!id) {
@@ -71,6 +71,19 @@ export default defineEventHandler(async (event) => {
   }
 
   const totalPages = Math.ceil(totalCount / limit)
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.user.servers.listed',
+    targetType: 'user',
+    targetId: user.id,
+    metadata: {
+      userId: user.id,
+      page,
+      perPage: limit,
+    },
+  })
 
   return {
     data: servers.map(server => ({

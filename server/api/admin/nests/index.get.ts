@@ -3,10 +3,11 @@ import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import type { NestWithEggCount } from '#shared/types/admin'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.NESTS, ADMIN_ACL_PERMISSIONS.READ)
 
@@ -39,6 +40,16 @@ export default defineEventHandler(async (event) => {
     updatedAt: new Date(nest.updatedAt).toISOString(),
     eggCount: Number(nest.eggCount) || 0,
   }))
+
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.nest.listed',
+    targetType: 'settings',
+    metadata: {
+      count: data.length,
+    },
+  })
 
   return { data }
 })

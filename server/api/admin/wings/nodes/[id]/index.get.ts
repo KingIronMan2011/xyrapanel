@@ -1,8 +1,5 @@
-import { createError, defineEventHandler } from 'h3'
 import { desc, sql } from 'drizzle-orm'
-
 import type { AdminWingsNodeDetail, AdminWingsNodeAllocationSummary, AdminWingsNodeServerSummary } from '#shared/types/admin'
-
 import { requireAdmin } from '~~/server/utils/security'
 import { getWingsNode } from '~~/server/utils/wings/nodesStore'
 import { remoteGetSystemInformation } from '~~/server/utils/wings/registry'
@@ -91,6 +88,7 @@ export default defineEventHandler(async (event) => {
   const allocationRows = db.select({
     id: tables.serverAllocations.id,
     ip: tables.serverAllocations.ip,
+    ipAlias: tables.serverAllocations.ipAlias,
     port: tables.serverAllocations.port,
     isPrimary: tables.serverAllocations.isPrimary,
     serverId: tables.serverAllocations.serverId,
@@ -119,6 +117,7 @@ export default defineEventHandler(async (event) => {
   const allocations: AdminWingsNodeAllocationSummary[] = allocationRows.map(row => ({
     id: row.id,
     ip: row.ip,
+    ipAlias: row.ipAlias ?? null,
     port: row.port,
     isPrimary: Boolean(row.isPrimary),
     serverId: row.serverId,

@@ -248,6 +248,7 @@ export type Permission =
   | 'schedule.delete'
   | 'settings.rename'
   | 'settings.reinstall'
+  | 'websocket.connect'
   | 'admin.*'
   | 'admin.servers.*'
   | 'admin.users.*'

@@ -1,47 +1,41 @@
-import { resolveServerRequest } from '~~/server/utils/http/serverAccess'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { updateDockerImageSchema } from '~~/shared/schema/server/operations'
+import { updateDockerImageSchema } from '#shared/schema/server/operations'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { invalidateServerCaches } from '~~/server/utils/serversStore'
 
 export default defineEventHandler(async (event) => {
-  console.log('🐳🐳🐳 [Docker Image PUT] CLIENT ENDPOINT HIT!!!', {
-    path: event.path,
-    method: event.method,
-    params: event.context.params,
-    timestamp: new Date().toISOString(),
-  })
-
-  const identifier = event.context.params?.id
+  const identifier = getRouterParam(event, 'id')
   if (!identifier) {
     throw createError({
       statusCode: 400,
-      message: 'Server identifier is required',
+      statusMessage: 'Missing server identifier',
     })
   }
 
-  const context = await resolveServerRequest(event, {
-    identifier,
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
     requiredPermissions: ['startup.update'],
   })
 
-  const body = await readBody(event)
-  const validation = updateDockerImageSchema.safeParse(body)
+  const { dockerImage } = await readValidatedBodyWithLimit(
+    event,
+    updateDockerImageSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
-  if (!validation.success) {
-    throw createError({
-      statusCode: 400,
-      message: 'Invalid request body',
-      data: validation.error.issues,
-    })
-  }
-
-  const { dockerImage } = validation.data
   const db = useDrizzle()
 
-  const egg = context.server.eggId
+  const egg = server.eggId
     ? db
         .select()
         .from(tables.eggs)
-        .where(eq(tables.eggs.id, context.server.eggId))
+        .where(eq(tables.eggs.id, server.eggId))
         .get()
     : null
 
@@ -64,27 +58,40 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  console.log('[Docker Image PUT] Updating Docker image:', {
-    serverId: context.server.id,
-    serverUuid: context.server.uuid,
-    oldDockerImage: context.server.dockerImage,
-    oldImage: context.server.image,
-    newDockerImage: dockerImage,
-  })
+  const previousDockerImage = server.dockerImage
+  const previousImage = server.image
 
-  db.update(tables.servers)
+  await db.update(tables.servers)
     .set({
-      dockerImage: dockerImage,
-      image: dockerImage, 
+      dockerImage,
+      image: dockerImage,
       updatedAt: new Date(),
     })
-    .where(eq(tables.servers.id, context.server.id))
+    .where(eq(tables.servers.id, server.id))
     .run()
 
-  console.log('[Docker Image PUT] Docker image updated successfully')
+  await invalidateServerCaches({
+    id: server.id,
+    uuid: server.uuid,
+    identifier: server.identifier,
+  })
+
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.settings.docker_image_updated',
+    server: { id: server.id, uuid: server.uuid },
+    metadata: {
+      previousDockerImage,
+      previousImage,
+      dockerImage,
+    },
+  })
 
   return {
-    success: true,
-    message: 'Docker image updated successfully. Restart your server for changes to take effect.',
+    data: {
+      success: true,
+      message: 'Docker image updated successfully. Restart your server for changes to take effect.',
+    },
   }
 })

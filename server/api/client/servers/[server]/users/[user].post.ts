@@ -1,16 +1,12 @@
-import { getServerSession } from '~~/server/utils/session'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { invalidateServerSubusersCache } from '~~/server/utils/subusers'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
-import { recordAuditEventFromRequest } from '~~/server/utils/audit'
-
-interface UpdateSubuserPayload {
-  permissions: string[]
-}
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { serverSubuserPermissionsSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
   const serverId = getRouterParam(event, 'server')
   const subuserId = getRouterParam(event, 'user')
 
@@ -21,14 +17,17 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { server } = await getServerWithAccess(serverId, session)
+  const accountContext = await requireAccountUser(event)
+  const { server, user } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
     requiredPermissions: ['server.users.update'],
+    allowOwner: true,
+    allowAdmin: true,
   })
 
-  const body = await readBody<UpdateSubuserPayload>(event)
+  const body = await readValidatedBodyWithLimit(event, serverSubuserPermissionsSchema, BODY_SIZE_LIMITS.SMALL)
 
   const db = useDrizzle()
   const subuser = db
@@ -58,14 +57,12 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.serverSubusers.id, subuserId))
     .run()
 
-  await recordAuditEventFromRequest(event, {
-    actor: session?.user?.email || session?.user?.id || 'unknown',
-    actorType: 'user',
-    action: 'server.user.updated',
-    targetType: 'user',
-    targetId: subuser.userId,
+  await recordServerActivity({
+    event,
+    actorId: user.id,
+    action: 'server.users.updated',
+    server: { id: server.id, uuid: server.uuid },
     metadata: {
-      serverId: server.id,
       subuserId,
       permissions: body.permissions,
     },

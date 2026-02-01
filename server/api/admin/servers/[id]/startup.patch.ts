@@ -1,5 +1,5 @@
-import { createError, assertMethod } from 'h3'
-import { requireAdmin } from '~~/server/utils/security'
+import { randomUUID } from 'node:crypto'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
@@ -21,16 +21,11 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  let body
-  try {
-    body = await readValidatedBody(event, payload => updateServerStartupSchema.parse(payload))
-  } catch (validationError) {
-    throw createError({
-      statusCode: 400,
-      message: 'Invalid request body',
-      data: { error: validationError instanceof Error ? validationError.message : String(validationError) },
-    })
-  }
+  const body = await readValidatedBodyWithLimit(
+    event,
+    updateServerStartupSchema,
+    BODY_SIZE_LIMITS.MEDIUM,
+  )
 
   const { startup, dockerImage, environment } = body
 
@@ -106,9 +101,9 @@ export default defineEventHandler(async (event) => {
       .run()
 
     const envEntries = Object.entries(environment)
-    
+
     for (const [key, value] of envEntries) {
-      const id = `env_${serverId}_${key}_${Date.now()}_${Math.random()}`
+      const id = randomUUID()
       const stringValue = String(value ?? '')
       db.insert(tables.serverStartupEnv)
         .values({
@@ -136,7 +131,9 @@ export default defineEventHandler(async (event) => {
   })
 
   return {
-    success: true,
-    message: 'Startup configuration updated successfully',
+    data: {
+      success: true,
+      message: 'Startup configuration updated successfully',
+    },
   }
 })

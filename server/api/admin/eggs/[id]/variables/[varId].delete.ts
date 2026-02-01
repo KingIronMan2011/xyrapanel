@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'Variable not found' })
   }
 
-  await db.delete(tables.eggVariables).where(eq(tables.eggVariables.id, varId))
+  await db.delete(tables.eggVariables).where(eq(tables.eggVariables.id, varId)).run()
 
   await recordAuditEventFromRequest(event, {
     actor: session.user.email || session.user.id,
@@ -44,5 +44,10 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  return { success: true }
+  return {
+    data: {
+      success: true,
+      deletedId: varId,
+    },
+  }
 })

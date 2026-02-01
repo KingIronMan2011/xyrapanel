@@ -1,11 +1,10 @@
-import { createError, assertMethod } from 'h3'
 import { APIError } from 'better-auth/api'
 import type { AuthContext } from '#shared/types/auth'
 import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { accountPasswordUpdateSchema } from '#shared/schema/account'
-import { requireAuth } from '~~/server/utils/security'
+import { requireAuth, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
   assertMethod(event, 'PUT')
@@ -18,7 +17,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }
 
-  const body = await readValidatedBody(event, payload => accountPasswordUpdateSchema.parse(payload))
+  const body = await readValidatedBodyWithLimit(event, accountPasswordUpdateSchema, BODY_SIZE_LIMITS.SMALL)
 
   try {
     await auth.api.changePassword({
@@ -38,13 +37,15 @@ export default defineEventHandler(async (event) => {
         action: 'account.password.update',
         targetType: 'user',
         targetId: resolvedUser.id,
-      }).catch(err => console.warn('Audit logging failed:', err))
+      })
     }
 
     return {
-      success: true,
-      revokedSessions: 0, 
-      signedOut: false,
+      data: {
+        success: true,
+        revokedSessions: 0,
+        signedOut: false,
+      },
     }
   }
   catch (error) {

@@ -1,6 +1,8 @@
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { requirePermission } from '~~/server/utils/permission-middleware'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { recordServerActivity } from '~~/server/utils/server-activity'
+import { chmodBodySchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
   const serverId = getRouterParam(event, 'server')
@@ -12,33 +14,31 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody(event)
-  const { root, files } = body
-
-  if (!files || !Array.isArray(files) || files.length === 0) {
-    throw createError({
-      statusCode: 400,
-      message: 'Files array with file and mode is required',
-    })
-  }
+  const { root, files } = await readValidatedBodyWithLimit(event, chmodBodySchema, BODY_SIZE_LIMITS.SMALL)
+  const targetRoot = root && root.length > 0 ? root : '/'
 
   const { userId } = await requirePermission(event, 'server.files.write', serverId)
 
   try {
     const { client, server } = await getWingsClientForServer(serverId)
-    await client.chmodFiles(server.uuid as string, root || '/', files)
+    await client.chmodFiles(server.uuid as string, targetRoot, files.map(entry => ({
+      ...entry,
+      mode: typeof entry.mode === 'number' ? String(entry.mode) : entry.mode,
+    })))
 
     await recordServerActivity({
       event,
       actorId: userId,
       action: 'server.file.chmod',
       server: { id: server.id as string, uuid: server.uuid as string },
-      metadata: { root: root || '/', files },
+      metadata: { root: targetRoot, files: files.map(f => ({ file: f.file, mode: f.mode })) },
     })
 
     return {
-      success: true,
-      message: 'Permissions changed successfully',
+      data: {
+        success: true,
+        message: 'Permissions changed successfully',
+      },
     }
   } catch (error) {
     console.error('Failed to change permissions on Wings:', error)

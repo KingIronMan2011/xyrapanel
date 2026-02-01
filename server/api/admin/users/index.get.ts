@@ -1,4 +1,3 @@
-import { createError, getQuery } from 'h3'
 import { or, like, desc } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'

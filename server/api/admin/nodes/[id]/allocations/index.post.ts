@@ -1,13 +1,14 @@
-import { createError } from 'h3'
-import { requireAdmin } from '~~/server/utils/security'
+import { randomUUID } from 'node:crypto'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { parseCidr, parsePorts, CidrOutOfRangeError, InvalidIpAddressError } from '~~/server/utils/ip-utils'
-import { randomUUID } from 'node:crypto'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { createAllocationSchema } from '#shared/schema/admin/infrastructure'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
   
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.ALLOCATIONS, ADMIN_ACL_PERMISSIONS.WRITE)
 
@@ -19,20 +20,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody(event)
-  const { ip, ports, ipAlias } = body
+  const body = await readValidatedBodyWithLimit(event, createAllocationSchema, BODY_SIZE_LIMITS.SMALL)
+  const { ip, ports, alias } = body
+  const ipAlias = alias?.trim() || null
 
   if (!ip || typeof ip !== 'string') {
     throw createError({
       statusCode: 400,
       message: 'IP address or CIDR notation is required',
-    })
-  }
-
-  if (!ports) {
-    throw createError({
-      statusCode: 400,
-      message: 'Ports are required (can be a range like 25565-25600 or comma-separated)',
     })
   }
 
@@ -57,7 +52,11 @@ export default defineEventHandler(async (event) => {
 
   let portNumbers: number[]
   try {
-    portNumbers = parsePorts(ports)
+    portNumbers = Array.isArray(ports)
+      ? ports
+      : typeof ports === 'number'
+        ? [ports]
+        : parsePorts(ports)
   } catch (error) {
     throw createError({
       statusCode: 400,
@@ -72,7 +71,7 @@ export default defineEventHandler(async (event) => {
 
   for (const ipAddr of ipAddresses) {
     for (const port of portNumbers) {
-      const existing = db.select()
+      const existing = await db.select()
         .from(tables.serverAllocations)
         .where(and(
           eq(tables.serverAllocations.nodeId, nodeId),
@@ -88,14 +87,14 @@ export default defineEventHandler(async (event) => {
 
       const id = randomUUID()
       try {
-        db.insert(tables.serverAllocations)
+        await db.insert(tables.serverAllocations)
           .values({
             id,
             nodeId,
             serverId: null,
             ip: ipAddr,
             port,
-            ipAlias: ipAlias || null,
+            ipAlias,
             notes: null,
             createdAt: now,
             updatedAt: now,
@@ -116,10 +115,22 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.node.allocations.created',
+    targetType: 'node',
+    targetId: nodeId,
+    metadata: {
+      createdCount: created.length,
+      skippedCount: skipped.length,
+    },
+  })
+
   return {
-    success: true,
-    message: `Created ${created.length} allocation${created.length === 1 ? '' : 's'}${skipped.length > 0 ? `, skipped ${skipped.length} existing` : ''}`,
     data: {
+      success: true,
+      message: `Created ${created.length} allocation${created.length === 1 ? '' : 's'}${skipped.length > 0 ? `, skipped ${skipped.length} existing` : ''}`,
       created,
       skipped: skipped.length > 0 ? skipped : undefined,
     },

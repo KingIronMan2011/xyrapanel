@@ -1,15 +1,10 @@
-import { createError, getQuery } from 'h3'
 import { desc, eq, or, sql } from 'drizzle-orm'
-import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-
-  if (!session?.user?.id) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const { user } = await requireAccountUser(event)
 
   const query = getQuery(event)
 
@@ -23,8 +18,8 @@ export default defineEventHandler(async (event) => {
 
   const db = useDrizzle()
 
-  const userId = session.user.id
-  const userEmail = session.user.email
+  const userId = user.id
+  const userEmail = user.email
 
   const actorIdentifiers = new Set<string>()
   actorIdentifiers.add(String(userId))
@@ -70,11 +65,11 @@ export default defineEventHandler(async (event) => {
   }))
 
   await recordAuditEventFromRequest(event, {
-    actor: session.user.id,
+    actor: user.id,
     actorType: 'user',
     action: 'account.activity.viewed',
     targetType: 'user',
-    targetId: session.user.id,
+    targetId: user.id,
     metadata: { page, limit, total },
   })
 

@@ -1,9 +1,13 @@
-import { defineEventHandler, readBody, createError } from 'h3'
 import { eq, and } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { randomUUID } from 'node:crypto'
 import { parseCidr, parsePorts, CidrOutOfRangeError, InvalidIpAddressError } from '~~/server/utils/ip-utils'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
+import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
+import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { nodeAllocationsCreateSchema } from '#shared/schema/admin/infrastructure'
 
 export default defineEventHandler(async (event) => {
   const { id: nodeId } = event.context.params ?? {}
@@ -11,7 +15,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Missing node id' })
   }
 
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
+  await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.NODES, ADMIN_ACL_PERMISSIONS.WRITE)
 
   const db = useDrizzle()
 
@@ -24,12 +29,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Node not found' })
   }
 
-  const body = await readBody(event)
+  const body = await readValidatedBodyWithLimit(
+    event,
+    nodeAllocationsCreateSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   let ipAddresses: string[]
   let ports: number[]
 
-  if (body.ip && typeof body.ip === 'string') {
+  if (typeof body.ip === 'string') {
     try {
       ipAddresses = parseCidr(body.ip)
     } catch (error) {
@@ -39,7 +48,7 @@ export default defineEventHandler(async (event) => {
       throw error
     }
   } else if (Array.isArray(body.ip) && body.ip.length > 0) {
-    ipAddresses = body.ip as string[]
+    ipAddresses = body.ip
     for (const ip of ipAddresses) {
       if (typeof ip !== 'string') {
         throw createError({ statusCode: 400, statusMessage: 'IP addresses must be strings' })
@@ -49,17 +58,13 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'IP address or CIDR notation is required' })
   }
 
-  if (body.ports) {
-    try {
-      ports = parsePorts(body.ports)
-    } catch (error) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: error instanceof Error ? error.message : 'Invalid port format',
-      })
-    }
-  } else {
-    throw createError({ statusCode: 400, statusMessage: 'At least one port is required' })
+  try {
+    ports = parsePorts(body.ports)
+  } catch (error) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: error instanceof Error ? error.message : 'Invalid port format',
+    })
   }
 
   const ipAlias = body.ipAlias as string | undefined
@@ -107,14 +112,29 @@ export default defineEventHandler(async (event) => {
 
   db.insert(tables.serverAllocations).values(allocationsToCreate).run()
 
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.node.allocations.created',
+    targetType: 'node',
+    targetId: nodeId,
+    metadata: {
+      created: allocationsToCreate.length,
+      ipCount: ipAddresses.length,
+      portCount: ports.length,
+    },
+  })
+
   return {
-    success: true,
-    created: allocationsToCreate.length,
-    allocations: allocationsToCreate.map(a => ({
-      id: a.id,
-      ip: a.ip,
-      port: a.port,
-      ipAlias: a.ipAlias,
-    })),
+    data: {
+      success: true,
+      created: allocationsToCreate.length,
+      allocations: allocationsToCreate.map(a => ({
+        id: a.id,
+        ip: a.ip,
+        port: a.port,
+        ipAlias: a.ipAlias,
+      })),
+    },
   }
 })

@@ -1,26 +1,32 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
 import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
-import type { AdminCreateUserPayload } from '#shared/types/user'
 import { sendAdminUserCreatedEmail } from '~~/server/utils/email'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { z } from 'zod'
+
+const adminCreateUserSchema = z.object({
+  username: z.string().trim().min(1),
+  email: z.string().trim().email(),
+  password: z.string().min(8),
+  nameFirst: z.string().trim().optional(),
+  nameLast: z.string().trim().optional(),
+  language: z.string().trim().optional(),
+  role: z.enum(['user', 'admin']),
+})
 
 export default defineEventHandler(async (event) => {
   const session = await requireAdmin(event)
   await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.USERS, ADMIN_ACL_PERMISSIONS.WRITE)
 
-  const body = await readBody<AdminCreateUserPayload>(event)
-
-  if (!body.username || !body.email || !body.password) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'Username, email, and password are required',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(
+    event,
+    adminCreateUserSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const db = useDrizzle()
   const now = new Date()

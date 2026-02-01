@@ -3,6 +3,8 @@ import { ref, computed, reactive, watch } from 'vue'
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { ApiKeyResponse } from '#shared/types/api'
+import { createApiKeyFormSchema } from '#shared/schema/account'
+import type { CreateApiKeyFormInput } from '#shared/schema/account'
 
 definePageMeta({
   auth: true,
@@ -23,25 +25,29 @@ const copySuccess = ref(false)
 const createError = ref<string | null>(null)
 const currentPage = ref(1)
 
-const keySchema = z.object({
-  memo: z.string().trim().max(255, t('validation.memoMaxLength')).optional().default(''),
-  allowedIps: z.string().trim().optional().default('')
-    .refine((value) => {
-      if (!value)
-        return true
+const keySchema = createApiKeyFormSchema.superRefine((data, ctx) => {
+  if (!data.allowedIps)
+    return
 
-      return value.split(',').every((ip) => {
-        const trimmed = ip.trim()
-        if (!trimmed)
-          return false
+  const ips = data.allowedIps.split(',')
+  const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/
+  const allValid = ips.every((ip) => {
+    const trimmed = ip.trim()
+    if (!trimmed)
+      return false
+    return ipv4Regex.test(trimmed)
+  })
 
-        const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/
-        return ipv4Regex.test(trimmed)
-      })
-    }, t('validation.invalidIPs')),
+  if (!allValid) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['allowedIps'],
+      message: t('validation.invalidIPs'),
+    })
+  }
 })
 
-type KeyFormSchema = z.infer<typeof keySchema>
+type KeyFormSchema = CreateApiKeyFormInput
 
 const createForm = reactive<KeyFormSchema>(keySchema.parse({}))
 

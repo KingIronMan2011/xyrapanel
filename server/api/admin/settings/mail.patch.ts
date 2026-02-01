@@ -1,12 +1,13 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { SETTINGS_KEYS, setSettings } from '~~/server/utils/settings'
 import { refreshEmailService } from '~~/server/utils/email'
-import type { MailSettings } from '#shared/types/admin'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { mailSettingsSchema } from '#shared/schema/admin/settings'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
-  const body = await readBody<Partial<MailSettings>>(event)
+  const body = await readValidatedBodyWithLimit(event, mailSettingsSchema, BODY_SIZE_LIMITS.SMALL)
   const updates: Record<string, string> = {}
 
   if (body.driver !== undefined) {
@@ -22,7 +23,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (body.port !== undefined) {
-    updates[SETTINGS_KEYS.MAIL_PORT] = body.port
+    updates[SETTINGS_KEYS.MAIL_PORT] = String(body.port)
   }
 
   if (body.username !== undefined) {
@@ -45,7 +46,9 @@ export default defineEventHandler(async (event) => {
     updates[SETTINGS_KEYS.MAIL_FROM_NAME] = body.fromName
   }
 
-  if (Object.keys(updates).length === 0) {
+  const updatedKeys = Object.keys(updates)
+
+  if (updatedKeys.length === 0) {
     throw createError({
       statusCode: 400,
       message: 'No settings to update',
@@ -56,5 +59,18 @@ export default defineEventHandler(async (event) => {
 
   refreshEmailService()
 
-  return { success: true }
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.settings.mail.updated',
+    targetType: 'settings',
+    metadata: { updatedKeys },
+  })
+
+  return {
+    data: {
+      success: true,
+      updatedKeys,
+    },
+  }
 })

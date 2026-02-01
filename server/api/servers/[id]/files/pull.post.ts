@@ -1,36 +1,45 @@
-import { createError, readBody, type H3Event } from 'h3'
-import { resolveServerRequest } from '~~/server/utils/http/serverAccess'
 import { remotePullFile } from '~~/server/utils/wings/registry'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { pullFileSchema } from '#shared/schema/server/operations'
 
-interface PullBody {
-  url?: string
-  directory?: string
-}
-
-export default defineEventHandler(async (event: H3Event) => {
-  const context = await resolveServerRequest(event, {
-    requiredPermissions: ['file.pull'],
-  })
-
-  const body = await readBody<PullBody>(event)
-  const url = body.url?.trim()
-  const directory = typeof body.directory === 'string' && body.directory.length > 0 ? body.directory : '/'
-
-  if (!url) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'Unprocessable Entity',
-      message: 'A source URL is required',
-    })
+export default defineEventHandler(async (event) => {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(identifier, session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.write'],
+  })
+
+  const body = await readValidatedBodyWithLimit(event, pullFileSchema, BODY_SIZE_LIMITS.SMALL)
+  const directory = body.directory && body.directory.length > 0 ? body.directory : '/'
+
   try {
-    await remotePullFile(context.server.uuid, url, directory, context.node?.id)
+    if (!server.nodeId) {
+      throw createError({ statusCode: 500, statusMessage: 'Server has no assigned node' })
+    }
+
+    await remotePullFile(server.uuid, body.url, directory, server.nodeId)
+
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.files.pull',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { url: body.url, directory },
+    })
 
     return {
-      success: true,
       data: {
-        url,
+        url: body.url,
         directory,
       },
     }

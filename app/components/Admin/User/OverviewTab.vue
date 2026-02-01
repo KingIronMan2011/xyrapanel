@@ -9,6 +9,10 @@ interface Props {
 const props = defineProps<Props>()
 
 const user = computed(() => props.profile?.user)
+const stats = computed(() => props.profile?.stats ?? {
+  serverCount: 0,
+  apiKeyCount: 0,
+})
 const security = computed(() => props.profile?.security ?? {
   sessions: [],
   lastLogin: null,
@@ -56,11 +60,11 @@ function maskIp(ip: string) {
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <UCard variant="subtle" :ui="{ body: 'p-3 space-y-1' }">
           <p class="text-xs uppercase tracking-wide text-muted-foreground">Owned servers</p>
-          <p class="text-sm font-semibold">{{ profile?.stats.serverCount ?? 0 }}</p>
+          <p class="text-sm font-semibold">{{ stats.serverCount }}</p>
         </UCard>
         <UCard variant="subtle" :ui="{ body: 'p-3 space-y-1' }">
           <p class="text-xs uppercase tracking-wide text-muted-foreground">API keys</p>
-          <p class="text-sm font-semibold">{{ profile?.stats.apiKeyCount ?? 0 }}</p>
+          <p class="text-sm font-semibold">{{ stats.apiKeyCount }}</p>
         </UCard>
         <UCard variant="subtle" :ui="{ body: 'p-3 space-y-1' }">
           <p class="text-xs uppercase tracking-wide text-muted-foreground">Email verified</p>

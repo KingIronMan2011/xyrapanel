@@ -1,11 +1,12 @@
-import { requireAdmin } from '~~/server/utils/security'
+import { requireAdmin, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { SETTINGS_KEYS, setSettings } from '~~/server/utils/settings'
-import type { SecuritySettings } from '#shared/types/admin'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { securitySettingsSchema } from '#shared/schema/admin/settings'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
-  const body = await readBody<Partial<SecuritySettings>>(event)
+  const body = await readValidatedBodyWithLimit(event, securitySettingsSchema, BODY_SIZE_LIMITS.SMALL)
 
   const updates: Record<string, string> = {}
 
@@ -18,7 +19,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (body.maintenanceMessage !== undefined) {
-    updates[SETTINGS_KEYS.MAINTENANCE_MESSAGE] = body.maintenanceMessage
+    updates[SETTINGS_KEYS.MAINTENANCE_MESSAGE] = body.maintenanceMessage ?? ''
   }
 
   if (body.announcementEnabled !== undefined) {
@@ -26,7 +27,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (body.announcementMessage !== undefined) {
-    updates[SETTINGS_KEYS.ANNOUNCEMENT_MESSAGE] = body.announcementMessage
+    updates[SETTINGS_KEYS.ANNOUNCEMENT_MESSAGE] = body.announcementMessage ?? ''
   }
 
   if (body.sessionTimeoutMinutes !== undefined) {
@@ -50,5 +51,20 @@ export default defineEventHandler(async (event) => {
 
   setSettings(updates as Record<typeof SETTINGS_KEYS[keyof typeof SETTINGS_KEYS], string>)
 
-  return { success: true }
+  await recordAuditEventFromRequest(event, {
+    actor: session.user.email || session.user.id,
+    actorType: 'user',
+    action: 'admin.settings.security.updated',
+    targetType: 'settings',
+    metadata: {
+      updatedKeys: Object.keys(updates),
+    },
+  })
+
+  return {
+    data: {
+      success: true,
+      updatedKeys: Object.keys(updates),
+    },
+  }
 })

@@ -1,8 +1,9 @@
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const session = await requireAdmin(event)
 
   const id = getRouterParam(event, 'id')
   if (!id) {
@@ -27,10 +28,22 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.email_template.viewed',
+      targetType: 'settings',
+      metadata: {
+        templateId: id,
+      },
+    })
+
     return {
-      id,
-      content: template.htmlContent,
-      updatedAt: template.updatedAt,
+      data: {
+        id,
+        content: template.htmlContent,
+        updatedAt: template.updatedAt,
+      },
     }
   }
   catch (err) {

@@ -1,4 +1,3 @@
-import { assertMethod, createError, getValidatedRouterParams, parseCookies } from 'h3'
 import { auth, normalizeHeadersForAuth } from '~~/server/utils/auth'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { requireAuth } from '~~/server/utils/security'
@@ -8,14 +7,10 @@ export default defineEventHandler(async (event) => {
 
   const session = await requireAuth(event)
 
-  const { token: targetToken } = await getValidatedRouterParams(event, (params) => {
-    const tokenParam = (params as Record<string, unknown>).token
-    if (typeof tokenParam !== 'string' || tokenParam.trim().length === 0) {
-      throw createError({ statusCode: 400, statusMessage: 'Missing session token' })
-    }
-
-    return { token: tokenParam }
-  })
+  const targetToken = getRouterParam(event, 'token')
+  if (!targetToken) {
+    throw createError({ statusCode: 400, statusMessage: 'Missing session token' })
+  }
 
   const cookies = parseCookies(event)
   const currentToken = cookies['better-auth.session_token']
@@ -41,7 +36,9 @@ export default defineEventHandler(async (event) => {
   })
 
   return {
-    revoked: true,
-    currentSessionRevoked: currentToken === targetToken,
+    data: {
+      revoked: true,
+      currentSessionRevoked: currentToken === targetToken,
+    },
   }
 })

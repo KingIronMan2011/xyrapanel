@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
 
   const db = useDrizzle()
 
-  const key = db
+  const key = await db
     .select()
     .from(tables.apiKeys)
     .where(eq(tables.apiKeys.id, keyId))
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  db.delete(tables.apiKeys)
+  await db.delete(tables.apiKeys)
     .where(eq(tables.apiKeys.id, keyId))
     .run()
 
@@ -48,5 +48,10 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  return { success: true }
+  return {
+    data: {
+      success: true,
+      deletedId: keyId,
+    },
+  }
 })

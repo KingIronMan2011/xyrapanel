@@ -2,6 +2,7 @@ import { createError, type H3Event, readBody } from 'h3'
 import { getServerSession } from '~~/server/utils/session'
 import { requireAdminPermission } from '~~/server/utils/permission-middleware'
 import { getAuth, normalizeHeadersForAuth } from '~~/server/utils/auth'
+import { requireSessionUser } from '~~/server/utils/auth/sessionUser'
 import type { z } from 'zod'
 
 export const BODY_SIZE_LIMITS = {
@@ -39,6 +40,13 @@ export async function requireAuth(event: H3Event) {
   }
 
   return session
+}
+
+export async function requireAccountUser(event: H3Event) {
+  const session = await requireAuth(event)
+  const user = requireSessionUser(session)
+
+  return { session, user }
 }
 
 export async function requireAdmin(event: H3Event) {

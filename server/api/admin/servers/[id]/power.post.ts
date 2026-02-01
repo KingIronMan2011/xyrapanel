@@ -1,4 +1,3 @@
-import { defineEventHandler, readBody, createError } from 'h3'
 import { eq } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables } from '~~/server/utils/drizzle'
@@ -89,11 +88,13 @@ export default defineEventHandler(async (event) => {
     })
 
     return {
-      success: true,
-      action: 'install_and_start',
-      serverId: server.id,
-      serverUuid: server.uuid,
-      message: `Server installation has been triggered. The server will start automatically after installation completes.`,
+      data: {
+        success: true,
+        action: 'install_and_start',
+        serverId: server.id,
+        serverUuid: server.uuid,
+        message: `Server installation has been triggered. The server will start automatically after installation completes.`,
+      },
     }
   }
 
@@ -126,11 +127,13 @@ export default defineEventHandler(async (event) => {
     })
 
     return {
-      success: true,
-      action,
-      serverId: server.id,
-      serverUuid: server.uuid,
-      message: `Power action '${action}' sent to server ${server.name}`,
+      data: {
+        success: true,
+        action,
+        serverId: server.id,
+        serverUuid: server.uuid,
+        message: `Power action '${action}' sent to server ${server.name}`,
+      },
     }
   }
   catch (error) {

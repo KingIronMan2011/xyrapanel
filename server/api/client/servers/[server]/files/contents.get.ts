@@ -1,7 +1,7 @@
-import { getServerSession, getSessionUser  } from '~~/server/utils/session'
 import { getWingsClientForServer, WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { requireAccountUser } from '~~/server/utils/security'
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024
 const BINARY_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', '.pdf', '.zip', '.tar', '.gz', '.exe', '.bin'])
@@ -16,15 +16,17 @@ function sanitizeFilePath(path: string): string {
 }
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-  const user = getSessionUser(session)
-  
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const accountContext = await requireAccountUser(event)
 
   const serverId = getRouterParam(event, 'server')
-  const { server } = await getServerWithAccess(serverId, session)
+  if (!serverId) {
+    throw createError({
+      statusCode: 400,
+      message: 'Server identifier is required',
+    })
+  }
+
+  const { server } = await getServerWithAccess(serverId, accountContext.session)
 
   await requireServerPermission(event, {
     serverId: server.id,
@@ -32,14 +34,8 @@ export default defineEventHandler(async (event) => {
   })
 
   const query = getQuery(event)
-  const file = sanitizeFilePath(query.file as string)
-
-  if (!serverId) {
-    throw createError({
-      statusCode: 400,
-      message: 'Server identifier is required',
-    })
-  }
+  const fileParam = typeof query.file === 'string' ? query.file : ''
+  const file = sanitizeFilePath(fileParam)
 
   if (!file) {
     throw createError({
@@ -49,7 +45,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const { client, server } = await getWingsClientForServer(serverId)
+    const { client } = await getWingsClientForServer(server.uuid)
     
     if (isBinaryFile(file)) {
       throw createError({
@@ -79,7 +75,7 @@ export default defineEventHandler(async (event) => {
         content,
         file,
         size: fileInfo?.size || content.length,
-        lastModified: fileInfo?.modified_at,
+        lastModified: fileInfo?.modified,
       },
     }
   } catch (error) {

@@ -1,7 +1,9 @@
-import { createError, readBody, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { getNodeIdFromAuth } from '~~/server/utils/wings/auth'
-import type { RestoreStatusRequest } from '#shared/types/server'
+import { BODY_SIZE_LIMITS, readValidatedBodyWithLimit } from '~~/server/utils/security'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { remoteBackupRestoreStatusSchema } from '#shared/schema/wings'
 
 export default defineEventHandler(async (event: H3Event) => {
   const db = useDrizzle()
@@ -13,7 +15,11 @@ export default defineEventHandler(async (event: H3Event) => {
 
   const nodeId = await getNodeIdFromAuth(event)
 
-  const body = await readBody<RestoreStatusRequest>(event)
+  const body = await readValidatedBodyWithLimit(
+    event,
+    remoteBackupRestoreStatusSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
   const { successful } = body
 
   const backup = db
@@ -45,7 +51,7 @@ export default defineEventHandler(async (event: H3Event) => {
       .run()
   }
 
-  await recordAuditEvent({
+  await recordAuditEventFromRequest(event, {
     actor: 'wings',
     actorType: 'system',
     action: successful ? 'server:backup.restore-complete' : 'server:backup.restore-failed',
@@ -59,6 +65,8 @@ export default defineEventHandler(async (event: H3Event) => {
   })
 
   return {
-    success: true,
+    data: {
+      success: true,
+    },
   }
 })

@@ -1,8 +1,11 @@
 import { backupManager } from '~~/server/utils/backup-manager'
 import { WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
-import { requirePermission } from '~~/server/utils/permission-middleware'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
+  const accountContext = await requireAccountUser(event)
   const serverId = getRouterParam(event, 'server')
   if (!serverId) {
     throw createError({
@@ -11,17 +14,29 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { userId } = await requirePermission(event, 'server.backup.create', serverId)
+  const { server } = await getServerWithAccess(serverId, accountContext.session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.backup.create'],
+  })
 
   const body = await readBody<{ name?: string; ignored?: string }>(event)
   const { name, ignored } = body
 
   try {
-    const backup = await backupManager.createBackup(serverId, {
+    const backup = await backupManager.createBackup(server.id, {
       name,
       ignoredFiles: ignored,
-      userId,
+      userId: accountContext.user.id,
     })
+
+    const serializeDate = (value: Date | string | null | undefined) => {
+      if (value instanceof Date) {
+        return value.toISOString()
+      }
+      return value ?? null
+    }
 
     return {
       success: true,
@@ -34,8 +49,8 @@ export default defineEventHandler(async (event) => {
         isLocked: backup.isLocked,
         checksum: backup.checksum,
         ignoredFiles: backup.ignoredFiles,
-        completedAt: backup.completedAt?.toISOString(),
-        createdAt: backup.createdAt.toISOString(),
+        completedAt: serializeDate(backup.completedAt),
+        createdAt: serializeDate(backup.createdAt),
       },
     }
   } catch (error) {

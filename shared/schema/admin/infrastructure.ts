@@ -27,6 +27,41 @@ export const createNodeSchema = z.object({
 
 export const updateNodeSchema = createNodeSchema.partial()
 
+export const nodeSettingsFormSchema = createNodeSchema.pick({
+  name: true,
+  fqdn: true,
+  scheme: true,
+  public: true,
+  maintenanceMode: true,
+  behindProxy: true,
+  memory: true,
+  memoryOverallocate: true,
+  disk: true,
+  diskOverallocate: true,
+  uploadSize: true,
+  daemonListen: true,
+  daemonSftp: true,
+  daemonBase: true,
+}).extend({
+  description: z.string().trim().max(500).optional().or(z.literal('')),
+}).superRefine((data, ctx) => {
+  if (typeof data.daemonBase === 'string' && !data.daemonBase.startsWith('/')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['daemonBase'],
+      message: 'Daemon base directory must be an absolute path',
+    })
+  }
+
+  if (typeof data.uploadSize === 'number' && (data.uploadSize < 1 || data.uploadSize > 1024)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['uploadSize'],
+      message: 'Upload size must be between 1 and 1024 MB',
+    })
+  }
+})
+
 const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$/
 
 const ipValidator = z.string().regex(ipRegex, 'Invalid IP address format')
@@ -37,6 +72,15 @@ export const createAllocationSchema = z.object({
   alias: z.string().max(255).optional(),
 })
 
+export const nodeAllocationsCreateSchema = z.object({
+  ip: z.union([
+    z.string().trim().min(1, 'IP or CIDR is required'),
+    z.array(z.string().trim().min(1, 'IP address is required')).min(1, 'At least one IP address is required'),
+  ]),
+  ports: z.string().trim().min(1, 'Ports are required'),
+  ipAlias: z.string().trim().optional(),
+})
+
 export const updateAllocationSchema = z.object({
   ip: ipValidator.optional(),
   port: z.number().int().min(1).max(65535).optional(),
@@ -45,32 +89,35 @@ export const updateAllocationSchema = z.object({
 })
 
 export const createDatabaseHostSchema = z.object({
-  name: z.string().min(1).max(255),
-  host: z.string().min(1).max(255),
-  port: z.number().int().min(1).max(65535).default(3306),
-  username: z.string().min(1).max(255),
+  name: z.string().trim().min(1).max(255),
+  hostname: z.string().trim().min(1).max(255),
+  port: z.number().int().min(1).max(65535).optional().default(3306),
+  username: z.string().trim().min(1).max(255),
   password: z.string().min(1),
-  maxDatabases: z.number().int().min(0).default(0),
+  database: z.string().trim().min(1).max(255).optional(),
+  nodeId: z.string().trim().uuid().optional(),
+  maxDatabases: z.number().int().min(0).optional(),
 })
 
 export const updateDatabaseHostSchema = createDatabaseHostSchema.partial()
 
 export const createMountSchema = z.object({
-  name: z.string().min(1).max(255),
-  description: z.string().optional(),
-  source: z.string().min(1),
-  target: z.string().min(1),
-  readOnly: z.boolean().default(false),
-  userMountable: z.boolean().default(false),
-  nodeIds: z.array(z.uuid()).optional(),
-  eggIds: z.array(z.uuid()).optional(),
+  name: z.string().trim().min(1).max(255),
+  description: z.string().trim().max(500).optional(),
+  source: z.string().trim().min(1),
+  target: z.string().trim().min(1),
+  readOnly: z.boolean().optional().default(false),
+  userMountable: z.boolean().optional().default(false),
+  nodeIds: z.array(z.string().uuid()).optional(),
+  eggIds: z.array(z.string().uuid()).optional(),
 })
 
 export const updateMountSchema = createMountSchema.partial()
 
 export const createNestSchema = z.object({
-  name: z.string().min(1).max(255),
-  description: z.string().optional(),
+  name: z.string().trim().min(1).max(255),
+  description: z.string().trim().max(500).optional(),
+  author: z.string().trim().min(1),
 })
 
 export const updateNestSchema = createNestSchema.partial()
@@ -113,8 +160,10 @@ export type CreateLocationInput = z.infer<typeof createLocationSchema>
 export type UpdateLocationInput = z.infer<typeof updateLocationSchema>
 export type CreateNodeInput = z.infer<typeof createNodeSchema>
 export type UpdateNodeInput = z.infer<typeof updateNodeSchema>
+export type NodeSettingsFormInput = z.infer<typeof nodeSettingsFormSchema>
 export type CreateAllocationInput = z.infer<typeof createAllocationSchema>
 export type UpdateAllocationInput = z.infer<typeof updateAllocationSchema>
+export type NodeAllocationsCreateInput = z.infer<typeof nodeAllocationsCreateSchema>
 export type CreateDatabaseHostInput = z.infer<typeof createDatabaseHostSchema>
 export type UpdateDatabaseHostInput = z.infer<typeof updateDatabaseHostSchema>
 export type CreateMountInput = z.infer<typeof createMountSchema>

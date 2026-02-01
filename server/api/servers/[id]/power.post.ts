@@ -1,44 +1,27 @@
-import { createError } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
-import { findServerByIdentifier } from '~~/server/utils/serversStore'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
-import type { PowerActionRequest } from '#shared/types/server'
+import { readValidatedBodyWithLimit, BODY_SIZE_LIMITS, requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { serverPowerActionSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
-  const identifier = event.context.params?.id
-  if (!identifier || typeof identifier !== 'string') {
+  const identifier = getRouterParam(event, 'id')
+  if (!identifier) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Missing server identifier' })
   }
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const accountContext = await requireAccountUser(event)
+  const { user, session } = accountContext
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const { server } = await getServerWithAccess(identifier, session)
 
-  const server = await findServerByIdentifier(identifier)
-  if (!server) {
-    throw createError({ statusCode: 404, statusMessage: 'Server not found' })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.power'],
+  })
 
-  const isAdmin = user.role === 'admin'
-  const isOwner = server.ownerId === user.id
-
-  if (!isAdmin && !isOwner) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
-
-  const body = await readBody<PowerActionRequest>(event)
-
-  if (!body.action || !['start', 'stop', 'restart', 'kill'].includes(body.action)) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'Unprocessable Entity',
-      message: 'Invalid power action. Must be one of: start, stop, restart, kill',
-    })
-  }
+  const body = await readValidatedBodyWithLimit(event, serverPowerActionSchema, BODY_SIZE_LIMITS.SMALL)
 
   if (!server.nodeId) {
     throw createError({ statusCode: 500, statusMessage: 'Server has no assigned node' })
@@ -46,11 +29,21 @@ export default defineEventHandler(async (event) => {
 
   try {
     const { client } = await getWingsClientForServer(server.uuid)
-    await client.sendPowerAction(server.uuid, body.action as 'start' | 'stop' | 'restart' | 'kill')
+    await client.sendPowerAction(server.uuid, body.action)
+
+    await recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.power.action',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { action: body.action },
+    })
 
     return {
-      success: true,
-      message: `Power action '${body.action}' sent successfully`,
+      data: {
+        success: true,
+        message: `Power action '${body.action}' sent successfully`,
+      },
     }
   }
   catch (error) {

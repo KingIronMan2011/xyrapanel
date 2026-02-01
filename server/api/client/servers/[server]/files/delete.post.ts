@@ -1,16 +1,21 @@
-import { requirePermission } from '~~/server/utils/permission-middleware'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { getWingsClientForServer } from '~~/server/utils/wings-client'
 import { recordServerActivity } from '~~/server/utils/server-activity'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const serverId = getRouterParam(event, 'server')
+  const accountContext = await requireAccountUser(event)
+  const serverIdentifier = getRouterParam(event, 'server')
 
-  if (!serverId) {
+  if (!serverIdentifier) {
     throw createError({
       statusCode: 400,
       message: 'Server identifier is required',
     })
   }
+
+  const { server } = await getServerWithAccess(serverIdentifier, accountContext.session)
 
   const body = await readBody(event)
   const { root, files } = body
@@ -22,15 +27,18 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { userId } = await requirePermission(event, 'server.files.delete', serverId)
+  const permissionContext = await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.delete'],
+  })
 
   try {
-    const { client, server } = await getWingsClientForServer(serverId)
+    const { client } = await getWingsClientForServer(server.uuid)
     await client.deleteFiles(server.uuid as string, root || '/', files)
 
     await recordServerActivity({
       event,
-      actorId: userId,
+      actorId: permissionContext.userId,
       action: 'server.file.delete',
       server: { id: server.id as string, uuid: server.uuid as string },
       metadata: { root: root || '/', files },

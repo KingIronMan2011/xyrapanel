@@ -1,19 +1,10 @@
-import { createError } from 'h3'
-import { getServerSession, getSessionUser } from '~~/server/utils/session'
-import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { useDrizzle, tables, eq, inArray } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
-
-  if (!session?.user?.id) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const user = getSessionUser(session)
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const accountContext = await requireAccountUser(event)
+  const user = accountContext.user
 
   const db = useDrizzle()
 
@@ -29,6 +20,21 @@ export default defineEventHandler(async (event) => {
     .orderBy(tables.apiKeys.createdAt)
     .all()
 
+  if (!keys.length) {
+    await recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: 'account.api_keys.listed',
+      targetType: 'user',
+      targetId: user.id,
+      metadata: { count: 0 },
+    })
+
+    return { data: [] }
+  }
+
+  const keyIds = keys.map(key => key.id)
+
   const keyPermissions = db
     .select({
       apiKeyId: tables.apiKeyMetadata.apiKeyId,
@@ -37,6 +43,7 @@ export default defineEventHandler(async (event) => {
       lastUsedAt: tables.apiKeyMetadata.lastUsedAt,
     })
     .from(tables.apiKeyMetadata)
+    .where(inArray(tables.apiKeyMetadata.apiKeyId, keyIds))
     .all()
 
   const permsByKeyId = new Map(keyPermissions.map(p => [p.apiKeyId, p]))

@@ -1,16 +1,12 @@
-import { assertMethod, createError, getValidatedRouterParams } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
 import { useDrizzle, tables, eq, and } from '~~/server/utils/drizzle'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { requireAccountUser } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
   assertMethod(event, 'DELETE')
 
-  const session = await getServerSession(event)
-
-  if (!session?.user?.id) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  const accountContext = await requireAccountUser(event)
+  const user = accountContext.user
 
   const { identifier } = await getValidatedRouterParams(event, (params) => {
     const identifierParam = (params as Record<string, unknown>).identifier
@@ -32,7 +28,7 @@ export default defineEventHandler(async (event) => {
     .where(
       and(
         eq(tables.apiKeys.identifier, identifier),
-        eq(tables.apiKeys.userId, session.user.id)
+        eq(tables.apiKeys.userId, user.id)
       )
     )
     .get()
@@ -50,7 +46,7 @@ export default defineEventHandler(async (event) => {
     .run()
 
   await recordAuditEventFromRequest(event, {
-    actor: session.user.id,
+    actor: user.id,
     actorType: 'user',
     action: 'account.api_key.delete',
     targetType: 'user',

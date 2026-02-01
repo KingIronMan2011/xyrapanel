@@ -1,5 +1,8 @@
-import { createError } from 'h3'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+import { requireAccountUser } from '~~/server/utils/security'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import type { WingsServerConfiguration } from '#shared/types/wings-config'
 
 export default defineEventHandler(async (event) => {
@@ -11,19 +14,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const db = useDrizzle()
-  const [server] = db.select()
-    .from(tables.servers)
-    .where(eq(tables.servers.uuid, uuid))
-    .limit(1)
-    .all()
+  const { user, session } = await requireAccountUser(event)
+  const { server } = await getServerWithAccess(uuid, session)
 
-  if (!server) {
-    throw createError({
-      statusCode: 404,
-      message: 'Server not found',
-    })
-  }
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.settings.read'],
+  })
+
+  const db = useDrizzle()
 
   const [limits] = db.select()
     .from(tables.serverLimits)
@@ -118,6 +117,14 @@ export default defineEventHandler(async (event) => {
       image: server.image || egg?.dockerImage || 'ghcr.io/pterodactyl/yolks:java_21',
     },
   }
+
+  await recordAuditEventFromRequest(event, {
+    actor: user.id,
+    actorType: 'user',
+    action: 'server.configuration.requested',
+    targetType: 'server',
+    targetId: server.id,
+  })
 
   return config
 })

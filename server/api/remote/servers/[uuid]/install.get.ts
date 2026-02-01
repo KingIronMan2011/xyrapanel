@@ -1,6 +1,12 @@
-import { createError, type H3Event } from 'h3'
+import { type H3Event } from 'h3'
 import { getNodeIdFromAuth } from '~~/server/utils/wings/auth'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
+
+interface InstallScriptResponse {
+  container_image: string
+  entrypoint: string
+  script: string
+}
 
 export default defineEventHandler(async (event: H3Event) => {
   const { uuid } = event.context.params ?? {}
@@ -52,9 +58,13 @@ export default defineEventHandler(async (event: H3Event) => {
     })
   }
 
-  return {
+  const payload: InstallScriptResponse = {
     container_image: egg.scriptContainer || 'alpine:3.4',
     entrypoint: egg.scriptEntry || 'ash',
     script: egg.scriptInstall || '',
+  }
+
+  return {
+    data: payload,
   }
 })

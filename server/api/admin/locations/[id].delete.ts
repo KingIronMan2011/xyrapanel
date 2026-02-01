@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const nodesCount = await db
-    .select()
+    .select({ id: tables.wingsNodes.id })
     .from(tables.wingsNodes)
     .where(eq(tables.wingsNodes.locationId, locationId))
     .all()
@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await db.delete(tables.locations).where(eq(tables.locations.id, locationId))
+  await db.delete(tables.locations).where(eq(tables.locations.id, locationId)).run()
 
   await recordAuditEventFromRequest(event, {
     actor: session.user.email || session.user.id,
@@ -55,5 +55,10 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  return { success: true }
+  return {
+    data: {
+      success: true,
+      deletedId: locationId,
+    },
+  }
 })

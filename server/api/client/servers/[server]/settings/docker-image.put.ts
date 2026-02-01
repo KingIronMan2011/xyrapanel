@@ -1,11 +1,13 @@
-import { getServerSession } from '~~/server/utils/session'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 import { getServerWithAccess } from '~~/server/utils/server-helpers'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import { requireServerPermission } from '~~/server/utils/permission-middleware'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
+import { recordServerActivity } from '~~/server/utils/server-activity'
+import { serverDockerImageUpdateSchema } from '#shared/schema/server/operations'
 
 export default defineEventHandler(async (event) => {
-  const session = await getServerSession(event)
+  const { user, session } = await requireAccountUser(event)
   const serverId = getRouterParam(event, 'server')
 
   if (!serverId) {
@@ -22,15 +24,11 @@ export default defineEventHandler(async (event) => {
     requiredPermissions: ['server.settings.update'],
   })
 
-  const body = await readBody(event)
-  const { docker_image } = body
-
-  if (!docker_image) {
-    throw createError({
-      statusCode: 400,
-      message: 'Docker image is required',
-    })
-  }
+  const { docker_image } = await readValidatedBodyWithLimit(
+    event,
+    serverDockerImageUpdateSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const db = useDrizzle()
   const [egg] = db.select()
@@ -82,19 +80,30 @@ export default defineEventHandler(async (event) => {
     .where(eq(tables.servers.id, server.id))
     .run()
 
-  await recordAuditEventFromRequest(event, {
-    actor: session?.user?.id || 'unknown',
-    actorType: 'user',
-    action: 'server.settings.docker_image.update',
-    targetType: 'server',
-    targetId: server.id,
-    metadata: { oldImage, newImage: docker_image },
-  })
+  await Promise.all([
+    recordAuditEventFromRequest(event, {
+      actor: user.id,
+      actorType: 'user',
+      action: 'server.settings.docker_image.update',
+      targetType: 'server',
+      targetId: server.id,
+      metadata: { oldImage, newImage: docker_image },
+    }),
+    recordServerActivity({
+      event,
+      actorId: user.id,
+      action: 'server.settings.docker_image.update',
+      server: { id: server.id, uuid: server.uuid },
+      metadata: { oldImage, newImage: docker_image },
+    }),
+  ])
 
   return {
-    object: 'server',
-    attributes: {
-      docker_image,
+    data: {
+      object: 'server',
+      attributes: {
+        docker_image,
+      },
     },
   }
 })

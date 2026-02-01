@@ -1,23 +1,20 @@
-import { assertMethod, createError, readValidatedBody } from 'h3'
-import { getServerSession } from '~~/server/utils/session'
 import bcrypt from 'bcryptjs'
-
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
-import { resolveSessionUser } from '~~/server/utils/auth/sessionUser'
 import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { accountForcedPasswordSchema } from '#shared/schema/account'
+import { requireAccountUser, readValidatedBodyWithLimit, BODY_SIZE_LIMITS } from '~~/server/utils/security'
 
 export default defineEventHandler(async (event) => {
   assertMethod(event, 'PUT')
 
-  const session = await getServerSession(event)
-  const user = resolveSessionUser(session)
+  const accountContext = await requireAccountUser(event)
+  const user = accountContext.user
 
-  if (!user?.id) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  const body = await readValidatedBody(event, payload => accountForcedPasswordSchema.parse(payload))
+  const body = await readValidatedBodyWithLimit(
+    event,
+    accountForcedPasswordSchema,
+    BODY_SIZE_LIMITS.SMALL,
+  )
 
   const db = useDrizzle()
 

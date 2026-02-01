@@ -17,15 +17,30 @@ const operations = ref<DashboardResponse['operations']>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+function getDefaultDashboard(): DashboardResponse {
+  return {
+    metrics: [],
+    nodes: [],
+    incidents: [],
+    operations: [],
+    generatedAt: new Date().toISOString(),
+  }
+}
+
 async function fetchDashboard() {
   loading.value = true
   error.value = null
   try {
-    const response = await requestFetch<DashboardResponse>('/api/admin/dashboard')
-    metrics.value = response.metrics
-    nodes.value = response.nodes
-    incidents.value = response.incidents
-    operations.value = response.operations
+    const response = await requestFetch<{ data: DashboardResponse } | DashboardResponse>('/api/admin/dashboard')
+    const payload = 'data' in response ? response.data : response
+    const safePayload = {
+      ...getDefaultDashboard(),
+      ...payload,
+    }
+    metrics.value = safePayload.metrics ?? []
+    nodes.value = safePayload.nodes ?? []
+    incidents.value = safePayload.incidents ?? []
+    operations.value = safePayload.operations ?? []
   } catch (err) {
     error.value = err instanceof Error ? err.message : t('admin.dashboard.failedToLoadDashboard')
   } finally {

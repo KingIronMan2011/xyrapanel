@@ -2,17 +2,31 @@ import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq, isNotNull, desc } from '~~/server/utils/drizzle'
 import { requireAdminApiKeyPermission } from '~~/server/utils/admin-api-permissions'
 import { ADMIN_ACL_RESOURCES, ADMIN_ACL_PERMISSIONS } from '~~/server/utils/admin-acl'
+import { recordAuditEventFromRequest } from '~~/server/utils/audit'
 import { sql } from 'drizzle-orm'
+import { adminServersPaginationSchema } from '#shared/schema/admin/server'
 
 export default defineEventHandler(async (event) => {
   try {
-    await requireAdmin(event)
+    const session = await requireAdmin(event)
 
     await requireAdminApiKeyPermission(event, ADMIN_ACL_RESOURCES.SERVERS, ADMIN_ACL_PERMISSIONS.READ)
 
     const query = getQuery(event)
-    const page = Number(query.page) || 1
-    const perPage = Math.min(Number(query.per_page) || 50, 100)
+    const parsed = adminServersPaginationSchema.safeParse({
+      page: query.page,
+      perPage: query.per_page ?? query.perPage,
+    })
+
+    if (!parsed.success) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Invalid pagination parameters',
+        data: parsed.error.format(),
+      })
+    }
+
+    const { page, perPage } = parsed.data
     const offset = (page - 1) * perPage
 
     const db = useDrizzle()
@@ -39,47 +53,69 @@ export default defineEventHandler(async (event) => {
     const total = db.select({ count: sql`count(*)` }).from(tables.servers).where(isNotNull(tables.servers.nodeId)).get()
     const totalCount = Number(total?.count ?? 0)
 
-  return {
-    data: servers.map(({ server, owner, node, egg, nest }) => ({
-      id: server.id,
-      uuid: server.uuid,
-      identifier: server.identifier,
-      external_id: server.externalId,
-      name: server.name,
-      description: server.description,
-      status: server.status,
-      suspended: server.suspended,
-      owner: owner ? {
-        id: owner.id,
-        username: owner.username,
-        email: owner.email,
-      } : null,
-      node: node ? {
-        id: node.id,
-        name: node.name,
-      } : null,
-      egg: egg ? {
-        id: egg.id,
-        name: egg.name,
-      } : null,
-      nest: nest ? {
-        id: nest.id,
-        name: nest.name,
-      } : null,
-      created_at: server.createdAt,
-      updated_at: server.updatedAt,
-    })),
-    meta: {
-      pagination: {
-        total: totalCount,
+    await recordAuditEventFromRequest(event, {
+      actor: session.user.email || session.user.id,
+      actorType: 'user',
+      action: 'admin.servers.listed',
+      targetType: 'server',
+      targetId: null,
+      metadata: {
+        page,
+        perPage,
         count: servers.length,
-        per_page: perPage,
-        current_page: page,
-        total_pages: Math.ceil(totalCount / perPage),
       },
-    },
+    })
+
+    return {
+      data: servers.map(({ server, owner, node, egg, nest }) => ({
+        id: server.id,
+        uuid: server.uuid,
+        identifier: server.identifier,
+        externalId: server.externalId,
+        name: server.name,
+        description: server.description,
+        status: server.status,
+        suspended: server.suspended,
+        owner: owner
+          ? {
+              id: owner.id,
+              username: owner.username,
+              email: owner.email,
+            }
+          : null,
+        node: node
+          ? {
+              id: node.id,
+              name: node.name,
+            }
+          : null,
+        egg: egg
+          ? {
+              id: egg.id,
+              name: egg.name,
+            }
+          : null,
+        nest: nest
+          ? {
+              id: nest.id,
+              name: nest.name,
+            }
+          : null,
+        createdAt: server.createdAt instanceof Date ? server.createdAt.toISOString() : new Date(server.createdAt).toISOString(),
+        updatedAt: server.updatedAt instanceof Date ? server.updatedAt.toISOString() : new Date(server.updatedAt).toISOString(),
+      })),
+      meta: {
+        pagination: {
+          total: totalCount,
+          count: servers.length,
+          perPage,
+          currentPage: page,
+          totalPages: Math.ceil(totalCount / perPage),
+        },
+      },
+    }
   }
-  } catch (error) {
+ catch (error) {
     console.error('[GET] /api/admin/servers: Error:', error)
     if (error && typeof error === 'object' && 'statusCode' in error) {
       throw error

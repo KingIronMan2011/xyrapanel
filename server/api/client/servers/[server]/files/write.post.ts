@@ -1,6 +1,8 @@
 import { getWingsClientForServer, WingsConnectionError, WingsAuthError } from '~~/server/utils/wings-client'
 import { recordAuditEvent } from '~~/server/utils/audit'
-import { requirePermission } from '~~/server/utils/permission-middleware'
+import { requireServerPermission } from '~~/server/utils/permission-middleware'
+import { getServerWithAccess } from '~~/server/utils/server-helpers'
+import { requireAccountUser } from '~~/server/utils/security'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -9,16 +11,22 @@ function sanitizeFilePath(path: string): string {
 }
 
 export default defineEventHandler(async (event) => {
-  const serverId = getRouterParam(event, 'server')
+  const accountContext = await requireAccountUser(event)
+  const serverIdentifier = getRouterParam(event, 'server')
 
-  if (!serverId) {
+  if (!serverIdentifier) {
     throw createError({
       statusCode: 400,
       message: 'Server identifier is required',
     })
   }
 
-  const { userId } = await requirePermission(event, 'server.files.write', serverId)
+  const { server } = await getServerWithAccess(serverIdentifier, accountContext.session)
+
+  await requireServerPermission(event, {
+    serverId: server.id,
+    requiredPermissions: ['server.files.write'],
+  })
 
   const body = await readBody<{ file: string; content: string }>(event)
   const { file: rawFile, content } = body
@@ -48,7 +56,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const { client, server } = await getWingsClientForServer(serverId)
+    const { client } = await getWingsClientForServer(server.uuid)
     
     let hadExistingFile = false
     try {
@@ -61,7 +69,7 @@ export default defineEventHandler(async (event) => {
     await client.writeFileContents(server.uuid as string, file, content)
 
     await recordAuditEvent({
-      actor: userId,
+      actor: accountContext.user.id,
       actorType: 'user',
       action: hadExistingFile ? 'server.file.edit' : 'server.file.create',
       targetType: 'server',

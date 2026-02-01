@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { count } from 'drizzle-orm'
 import { requireAdmin } from '~~/server/utils/security'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
@@ -68,7 +67,10 @@ export default defineEventHandler(async (event) => {
   })
 
   return {
-    success: true,
-    message: 'User deleted successfully',
+    data: {
+      success: true,
+      message: 'User deleted successfully',
+      userId,
+    },
   }
 })

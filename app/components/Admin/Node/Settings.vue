@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { StoredWingsNode } from '#shared/types/wings'
+import { nodeSettingsFormSchema } from '#shared/schema/admin/infrastructure'
+import type { NodeSettingsFormInput } from '#shared/schema/admin/infrastructure'
 
 const props = defineProps<{
   node: StoredWingsNode
@@ -17,33 +18,9 @@ const schemeOptions: { label: string; value: SchemeOption }[] = [
   { label: 'HTTPS', value: 'https' },
 ]
 
-const schema = z.object({
-  name: z.string().trim().min(1, 'Node name is required').max(100, 'Node name must be 100 characters or less'),
-  description: z.string().trim().max(500).optional().or(z.literal('')),
-  fqdn: z.string().trim().min(1, 'FQDN is required'),
-  scheme: z.enum(['http', 'https']),
-  public: z.boolean(),
-  maintenanceMode: z.boolean(),
-  behindProxy: z.boolean(),
-  memory: z.number().int('Memory must be a whole number').positive('Memory must be greater than 0'),
-  memoryOverallocate: z.number().int('Memory overallocate must be a whole number').min(-1, 'Value must be -1 or greater'),
-  disk: z.number().int('Disk must be a whole number').positive('Disk must be greater than 0'),
-  diskOverallocate: z.number().int('Disk overallocate must be a whole number').min(-1, 'Value must be -1 or greater'),
-  uploadSize: z.number().int('Upload size must be a whole number').min(1, 'Upload size must be at least 1 MB').max(1024, 'Upload size cannot exceed 1024 MB'),
-  daemonListen: z.number().int('Daemon port must be a whole number').min(1, 'Daemon port must be between 1 and 65535').max(65535, 'Daemon port must be between 1 and 65535'),
-  daemonSftp: z.number().int('SFTP port must be a whole number').min(1, 'SFTP port must be between 1 and 65535').max(65535, 'SFTP port must be between 1 and 65535'),
-  daemonBase: z.string().trim().min(1, 'Daemon base directory is required'),
-}).superRefine((data, ctx) => {
-  if (!data.daemonBase.startsWith('/')) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['daemonBase'],
-      message: 'Daemon base directory must be an absolute path',
-    })
-  }
-})
+const schema = nodeSettingsFormSchema
 
-type FormSchema = z.infer<typeof schema>
+type FormSchema = NodeSettingsFormInput
 
 function createFormState(node: StoredWingsNode): FormSchema {
   return {

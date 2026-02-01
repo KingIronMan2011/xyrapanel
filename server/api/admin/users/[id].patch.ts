@@ -1,4 +1,3 @@
-import { createError } from 'h3'
 import { APIError } from 'better-auth/api'
 import { useDrizzle, tables, eq } from '~~/server/utils/drizzle'
 import type { UpdateUserRequest } from '#shared/types/user'
